@@ -6,7 +6,7 @@ module Entry
   , dateModified
   , Entry (..), EntryConvertible (..), emptyEntry
   , path, masterField, fields
-  , Field (..), emptyField, getFieldKey
+  , Field (..), FieldKey (..), emptyField, getFieldKey
   , value
   )
 where
