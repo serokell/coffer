@@ -1,3 +1,4 @@
 /dist-newstyle
 /.ghc.environment.*
 /.direnv
+.stack-work

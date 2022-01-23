@@ -1,0 +1,108 @@
+name:                coffer
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/serokell/coffer/
+license:             BSD3
+author:              Serokell
+maintainer:          Serokell <hi@serokell.io>
+copyright:           2022 Serokell
+category:            Command Line Tools
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.14.3.0 && < 5
+  - lens
+  - generic-lens
+  - text
+  - bytestring
+  - unordered-containers
+  - aeson
+  - mtl
+  - hashable
+  - polysemy
+  - scientific
+  - tomland
+  - validation-selective
+  - time
+
+default-extensions:
+  - AllowAmbiguousTypes
+  - ApplicativeDo
+  - BangPatterns
+  - BlockArguments
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveAnyClass
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveTraversable
+  - DerivingStrategies
+  - DerivingVia
+  - EmptyCase
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - LambdaCase
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
+  - NegativeLiterals
+  - NumDecimals
+  - NumericUnderscores
+  - OverloadedLabels
+  - OverloadedStrings
+  - PatternSynonyms
+  - PolyKinds
+  - QuantifiedConstraints
+  - QuasiQuotes
+  - RankNTypes
+  - RecordWildCards
+  - RecursiveDo
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - StrictData
+  - TemplateHaskell
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeOperators
+  - UndecidableInstances
+  - UndecidableSuperClasses
+  - ViewPatterns
+
+library:
+  source-dirs:      lib
+  dependencies:
+    - servant
+    - servant-client
+    - servant-client-core
+    - http-client
+    - http-client-tls
+    - http-types
+    - vector
+    - containers
+    - lens-aeson
+
+executables:
+  coffer:
+    source-dirs:      app
+    main:             Main.hs
+    dependencies:
+      - coffer
+
+tests:
+  doctests:
+    source-dirs:      test
+    main:             Doctests.hs
+    ghc-options:
+      - -threaded
+    dependencies:
+      - coffer
+      - doctest-parallel
