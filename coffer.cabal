@@ -19,11 +19,14 @@ extra-source-files:
 library
   exposed-modules:
       Backend
+      Backend.Commands
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       Backends
       CLI.Parser
+      CLI.PrettyPrint
       CLI.Types
+      Coffer.Directory
       Coffer.Path
       Config
       Entry
@@ -64,6 +67,7 @@ library
     , base >=4.14.3.0 && <5
     , bytestring
     , containers
+    , extra
     , fmt
     , generic-lens
     , hashable

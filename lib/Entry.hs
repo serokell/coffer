@@ -13,10 +13,9 @@ module Entry
   )
 where
 
-
+import Fmt (Buildable, build)
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
-
 import Control.Lens
 import qualified Data.Aeson as A
 import Data.Hashable (Hashable)
@@ -30,6 +29,7 @@ type DateTime = UTCTime
 
 newtype FieldKey = FieldKey T.Text
   deriving (Generic, Show, Eq)
+  deriving newtype Buildable
 
 instance Hashable FieldKey
 
@@ -54,6 +54,7 @@ getFieldKey (FieldKey t) = t
 
 newtype EntryTag = EntryTag T.Text
   deriving (Generic, Show, Eq)
+  deriving newtype (Buildable, Ord)
 
 instance A.ToJSON EntryTag where
 instance A.FromJSON EntryTag where
@@ -72,6 +73,11 @@ getEntryTag (EntryTag t) = t
 
 data FieldVisibility = Public | Private
   deriving stock (Show, Eq)
+
+instance Buildable FieldVisibility where
+  build = \case
+    Public -> "public"
+    Private -> "private"
 
 instance A.ToJSON FieldVisibility where
   toJSON = \case

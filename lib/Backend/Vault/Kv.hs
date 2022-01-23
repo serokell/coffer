@@ -2,6 +2,7 @@
 
 module Backend.Vault.Kv
   ( VaultKvBackend
+  , I.VaultToken(..)
   , runVaultIO
   ) where
 

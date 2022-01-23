@@ -82,6 +82,7 @@ library:
     - time
     - time-compat
     - vector
+    - extra
 
 executables:
   coffer:

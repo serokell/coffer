@@ -3,24 +3,71 @@ module CLI.Types where
 import Data.Text (Text)
 import Data.Time.Compat (Day, UTCTime , Year)
 import Data.Time.Calendar.Month.Compat (Month)
-import Entry (FieldKey, FieldVisibility, EntryTag)
+import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag)
+import Coffer.Directory (Directory)
 import Coffer.Path (Path, EntryPath)
 
 data Command res where
-  CmdView :: ViewOptions -> Command ()
-  CmdCreate :: CreateOptions -> Command ()
-  CmdSetField :: SetFieldOptions -> Command ()
-  CmdDeleteField :: DeleteFieldOptions -> Command ()
-  CmdFind :: FindOptions -> Command ()
-  CmdRename :: RenameOptions -> Command ()
-  CmdCopy :: CopyOptions -> Command ()
-  CmdDelete :: DeleteOptions -> Command ()
-  CmdTag :: TagOptions -> Command ()
+  CmdView :: ViewOptions -> Command ViewResult
+  CmdCreate :: CreateOptions -> Command CreateResult
+  CmdSetField :: SetFieldOptions -> Command SetFieldResult
+  CmdDeleteField :: DeleteFieldOptions -> Command DeleteFieldResult
+  CmdFind :: FindOptions -> Command (Maybe Directory)
+  CmdRename :: RenameOptions -> Command RenameResult
+  CmdCopy :: CopyOptions -> Command CopyResult
+  CmdDelete :: DeleteOptions -> Command DeleteResult
+  CmdTag :: TagOptions -> Command TagResult
 
 deriving stock instance Show (Command res)
 
 data SomeCommand where
   SomeCommand :: Command res -> SomeCommand
+
+----------------------------------------------------------------------------
+-- Command results
+----------------------------------------------------------------------------
+
+data ViewResult
+  = VRDirectory Directory
+  | VREntry Entry
+  | VRField FieldKey Field
+  | VRPathNotFound Path
+  | VRDirectoryNoFieldMatch Path FieldKey
+  | VREntryNoFieldMatch EntryPath FieldKey
+
+data CreateResult
+  = CRSuccess Entry
+  | CREntryAlreadyExists EntryPath
+
+data SetFieldResult
+  = SFRSuccess Entry
+  | SFREntryNotFound EntryPath
+  | SFRMissingFieldContents EntryPath
+
+data DeleteFieldResult
+  = DFRSuccess Entry
+  | DFREntryNotFound EntryPath
+  | DFRFieldNotFound FieldKey
+
+type RenameResult = CopyResult
+
+data CopyResult
+  = CPRSuccess [(EntryPath, EntryPath)]
+  | CPRPathNotFound Path
+  | CPRMissingEntryName
+  | CPRDestinationIsDirectory [(EntryPath, EntryPath)]
+  | CPREntryAlreadyExists [(EntryPath, EntryPath)]
+
+data DeleteResult
+  = DRSuccess [EntryPath]
+  | DRPathNotFound Path
+  | DRDirectoryFound Path
+
+data TagResult
+  = TRSuccess Entry
+  | TREntryNotFound EntryPath
+  | TRTagNotFound EntryTag
+  | TRDuplicateTag EntryTag
 
 ----------------------------------------------------------------------------
 -- Options
