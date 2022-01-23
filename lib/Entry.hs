@@ -47,7 +47,7 @@ newFieldKey t
   | otherwise = Right $ FieldKey t
 
 fieldKeyAllowedChars :: [Char]
-fieldKeyAllowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;:"
+fieldKeyAllowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (FieldKey t) = t
