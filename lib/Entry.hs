@@ -14,11 +14,11 @@ module Entry
   )
 where
 
+import Fmt (Buildable, build)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
 import qualified Data.Set as S
-
 import Control.Lens
 import qualified Data.Aeson as A
 import Data.Hashable (Hashable)
@@ -27,7 +27,7 @@ import Coffer.Path (EntryPath)
 
 newtype FieldKey = UnsafeFieldKey T.Text
   deriving stock (Show, Eq)
-  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable)
+  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable)
 
 keyCharSet :: [Char]
 keyCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
@@ -45,7 +45,7 @@ getFieldKey (UnsafeFieldKey t) = t
 
 newtype EntryTag = UnsafeEntryTag T.Text
   deriving stock (Show, Eq, Ord)
-  deriving newtype (A.ToJSON, A.FromJSON)
+  deriving newtype (A.ToJSON, A.FromJSON, Buildable)
 
 newEntryTag :: Text -> Either Text EntryTag
 newEntryTag tag
@@ -60,6 +60,11 @@ getEntryTag (UnsafeEntryTag t) = t
 
 data FieldVisibility = Public | Private
   deriving stock (Show, Eq)
+
+instance Buildable FieldVisibility where
+  build = \case
+    Public -> "public"
+    Private -> "private"
 
 instance A.ToJSON FieldVisibility where
   toJSON = \case
