@@ -137,6 +137,7 @@ tests:
       - -threaded
     dependencies:
       - tasty
+
   doctests:
     source-dirs:      tests/doctests
     main:             Doctests.hs

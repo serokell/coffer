@@ -7,3 +7,4 @@
 /.direnv
 .stack-work
 hie.yaml
+.vscode/

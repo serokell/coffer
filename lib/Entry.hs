@@ -42,12 +42,14 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time (UTCTime)
 import Fmt (Buildable, build)
+import GHC.Generics (Generic)
+import Servant (FromHttpApiData, ToHttpApiData)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
 newtype FieldName = UnsafeFieldName Text
   deriving stock (Show, Eq)
-  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable)
+  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable, ToHttpApiData, FromHttpApiData)
 
 allowedCharSet :: [Char]
 allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
@@ -68,7 +70,7 @@ getFieldName (UnsafeFieldName t) = t
 
 newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
-  deriving newtype (A.ToJSON, A.FromJSON, Buildable)
+  deriving newtype (A.ToJSON, A.FromJSON, Buildable, Hashable, ToHttpApiData, FromHttpApiData)
 
 newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
   deriving newtype Buildable
@@ -85,7 +87,8 @@ getEntryTag :: EntryTag -> Text
 getEntryTag (UnsafeEntryTag t) = t
 
 data FieldVisibility = Public | Private
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 instance Buildable FieldVisibility where
   build = \case
@@ -96,6 +99,7 @@ instance A.ToJSON FieldVisibility where
   toJSON = \case
     Public -> A.toJSON @Text "public"
     Private -> A.toJSON @Text "private"
+
 instance A.FromJSON FieldVisibility where
   parseJSON = A.withText "visibility" \case
     "public" -> pure Public
@@ -104,6 +108,7 @@ instance A.FromJSON FieldVisibility where
 
 newtype FieldContents = FieldContents { unFieldContents :: Text }
   deriving stock (Show, Eq, Ord)
+  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
 makeLensesFor [("unFieldContents", "fieldContents")] ''FieldContents
 
 -- | User can use ANSI control sequences in field contents.
@@ -123,7 +128,8 @@ data Field =
   , fVisibility :: FieldVisibility
   , fContents :: FieldContents
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
 makeLensesWith abbreviatedFields ''Field
 
 newField :: UTCTime -> FieldContents -> Field
@@ -142,7 +148,8 @@ data Entry =
   , eFields :: HashMap FieldName Field
   , eTags :: Set EntryTag
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
 makeLensesWith abbreviatedFields ''Entry
 
 newEntry :: EntryPath -> UTCTime -> Entry

@@ -5,11 +5,14 @@
 module Coffer.Util
   ( catchAndReturn
   , didimatch
+  , MParser
   ) where
 
 import Data.Text (Text)
+import Data.Void (Void)
 import Polysemy (Sem)
 import Polysemy.Error (Error, runError)
+import Text.Megaparsec (Parsec)
 import Toml (TomlCodec)
 import Toml qualified
 import Validation (Validation(Failure, Success))
@@ -46,3 +49,9 @@ didimatch matchB matchA codec = Toml.Codec
       a' <- Toml.codecWrite codec a
       Toml.eitherToTomlState $ matchA a'
   }
+
+----------------------------------------------------------------------------
+-- Megaparsec helpers
+----------------------------------------------------------------------------
+
+type MParser = Parsec Void Text
