@@ -11,17 +11,21 @@ import Entry (FieldKey, FieldVisibility, EntryTag)
 import Coffer.Path (Path, EntryPath)
 import Data.Set (Set)
 
-data Command
-  = CmdView ViewOptions
-  | CmdCreate CreateOptions
-  | CmdSetField SetFieldOptions
-  | CmdDeleteField DeleteFieldOptions
-  | CmdFind FindOptions
-  | CmdRename RenameOptions
-  | CmdCopy CopyOptions
-  | CmdDelete DeleteOptions
-  | CmdTag TagOptions
-  deriving stock Show
+data Command res where
+  CmdView :: ViewOptions -> Command ()
+  CmdCreate :: CreateOptions -> Command ()
+  CmdSetField :: SetFieldOptions -> Command ()
+  CmdDeleteField :: DeleteFieldOptions -> Command ()
+  CmdFind :: FindOptions -> Command ()
+  CmdRename :: RenameOptions -> Command ()
+  CmdCopy :: CopyOptions -> Command ()
+  CmdDelete :: DeleteOptions -> Command ()
+  CmdTag :: TagOptions -> Command ()
+
+deriving stock instance Show (Command res)
+
+data SomeCommand where
+  SomeCommand :: Command res -> SomeCommand
 
 ----------------------------------------------------------------------------
 -- Options
