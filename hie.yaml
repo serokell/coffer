@@ -8,3 +8,6 @@ cradle:
 
     - path: "app/Main.hs"
       component: "coffer:exe:coffer"
+
+    - path: "tests/test"
+      component: "coffer:test:test"
