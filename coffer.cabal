@@ -184,7 +184,7 @@ test-suite doctests
   other-modules:
       Paths_coffer
   hs-source-dirs:
-      test
+      tests/doctests
   default-extensions:
       AllowAmbiguousTypes
       ApplicativeDo

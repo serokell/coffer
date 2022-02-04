@@ -99,7 +99,7 @@ executables:
 
 tests:
   doctests:
-    source-dirs:      test
+    source-dirs:      tests/doctests
     main:             Doctests.hs
     ghc-options:
       - -threaded

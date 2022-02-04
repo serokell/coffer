@@ -3,7 +3,7 @@ cradle:
     - path: "lib"
       component: "lib:coffer"
 
-    - path: "test"
+    - path: "tests/doctests"
       component: "coffer:test:doctests"
 
     - path: "app/Main.hs"
