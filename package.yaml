@@ -91,6 +91,17 @@ executables:
       - coffer
 
 tests:
+  test:
+    source-dirs:      test
+    main:             Main.hs
+    build-tools:      tasty-discover:tasty-discover
+    ghc-options:
+      - -threaded
+    dependencies:
+      - coffer
+      - megaparsec
+      - tasty
+      - tasty-hunit
   doctests:
     source-dirs:      doctests
     main:             Doctests.hs

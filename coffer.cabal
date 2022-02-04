@@ -192,3 +192,63 @@ test-suite doctests
     , unordered-containers
     , validation-selective
   default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Tree
+      Paths_coffer
+  hs-source-dirs:
+      test
+  default-extensions:
+      BlockArguments
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveAnyClass
+      DerivingVia
+      OverloadedStrings
+      DerivingStrategies
+      DataKinds
+      FlexibleContexts
+      GADTs
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiWayIf
+      PatternSynonyms
+      PolyKinds
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TemplateHaskell
+      TypeApplications
+      TypeOperators
+      TypeFamilies
+      ViewPatterns
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded
+  build-tool-depends:
+      tasty-discover:tasty-discover
+  build-depends:
+      aeson
+    , base >=4.14.3.0 && <5
+    , bytestring
+    , coffer
+    , fmt
+    , generic-lens
+    , hashable
+    , lens
+    , megaparsec
+    , mtl
+    , optparse-applicative
+    , polysemy
+    , scientific
+    , servant-client
+    , servant-client-core
+    , tasty
+    , tasty-hunit
+    , text
+    , tomland
+    , unordered-containers
+    , validation-selective
+  default-language: Haskell2010
