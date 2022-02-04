@@ -144,7 +144,7 @@ test-suite doctests
   other-modules:
       Paths_coffer
   hs-source-dirs:
-      test
+      doctests
   default-extensions:
       BlockArguments
       DeriveFoldable
