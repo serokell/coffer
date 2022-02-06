@@ -18,9 +18,10 @@ import Control.Lens
 import qualified Data.Aeson.Types as A
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
+import Data.Time (UTCTime)
 
 -- TODO - proper date time lib
-type DateTime = T.Text
+type DateTime = UTCTime
 
 newtype FieldKey = FieldKey T.Text
   deriving (Generic, Show, Eq)
@@ -54,7 +55,7 @@ data Field =
 emptyField :: Field
 emptyField =
   Field
-  { _fDateModified = ""
+  { _fDateModified = undefined
   , _value = ""
   }
 
@@ -74,7 +75,7 @@ emptyEntry :: Entry
 emptyEntry =
   Entry
   { _path = []
-  , _eDateModified = ""
+  , _eDateModified = undefined
   , _masterField = undefined
   , _fields = HS.empty
   }

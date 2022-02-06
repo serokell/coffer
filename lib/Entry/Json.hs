@@ -13,6 +13,9 @@ import qualified Data.Text as T
 import Control.Applicative (liftA2)
 import qualified Control.Monad.Writer.Strict as T
 import GHC.Generics (Generic)
+import Data.Time (UTCTime(..))
+import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Data.Time.Calendar.OrdinalDate (fromMondayStartWeek)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving (Show, Generic)
@@ -32,6 +35,7 @@ fieldConverter = prism' to from
             do
               _dateModified <- lift $ HS.lookup "date_modified" o
                 >>= \case A.String t -> Just t ; _ -> Nothing
+                >>= iso8601ParseM . T.unpack
               _value <- lift $ HS.lookup "value" o
                 >>= \case A.String t -> Just t ; _ -> Nothing
 
@@ -56,6 +60,7 @@ instance EntryConvertible JsonEntry where
                   <&> T.split (== '/')
                 _dateModified <- lift $ HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
+                  >>= iso8601ParseM . T.unpack
                 _masterField <- lift $ HS.lookup "master_field" o
                   >>= \case A.Array t -> Just t ; _ -> Nothing
                   >>= uncurry (liftA2 (,)) .
@@ -83,10 +88,11 @@ instance EntryConvertible JsonEntry where
 testEntry = do
   k1 <- newFieldKey "haei"
   k2 <- newFieldKey "asdf"
+  let time = UTCTime { utctDay = fromMondayStartWeek 69 69 69, utctDayTime = 42 }
 
   pure Entry
     { _path = ["haei", "aa"]
-    , _eDateModified = "very late"
-    , _masterField = (k1, Field { _fDateModified = "", _value = "" })
-    , _fields = HS.fromList [ (k2, Field { _fDateModified  = "", _value = "" })]
+    , _eDateModified = time
+    , _masterField = (k1, Field { _fDateModified = time, _value = "" })
+    , _fields = HS.fromList [ (k2, Field { _fDateModified  = time, _value = "" })]
     }
