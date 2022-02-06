@@ -28,6 +28,7 @@ fieldConverter = prism' to from
   where to field =
           A.object
           [ "date_modified" A..= (field ^. dateModified)
+          , "private" A..= (field ^. private)
           , "value" A..= (field ^. value)
           ]
         from (A.Object o) =
@@ -36,10 +37,13 @@ fieldConverter = prism' to from
               _dateModified <- lift $ HS.lookup "date_modified" o
                 >>= \case A.String t -> Just t ; _ -> Nothing
                 >>= iso8601ParseM . T.unpack
+              _private <- lift $ HS.lookup "private" o
+                >>= \case A.Bool b -> Just b ; _ -> Nothing
               _value <- lift $ HS.lookup "value" o
                 >>= \case A.String t -> Just t ; _ -> Nothing
 
               dateModified .= _dateModified
+              private .= _private
               value .= _value) emptyField
         from _ = Nothing
 

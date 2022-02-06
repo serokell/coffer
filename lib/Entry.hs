@@ -7,7 +7,7 @@ module Entry
   , Entry (..), EntryConvertible (..), emptyEntry
   , path, masterField, fields
   , Field (..), FieldKey (..), emptyField, getFieldKey
-  , value
+  , private, value
   )
 where
 
@@ -47,6 +47,7 @@ getFieldKey (FieldKey t) = t
 data Field =
   Field
   { _fDateModified :: DateTime
+  , _private :: Bool
   , _value :: T.Text
   }
   deriving (Show, Eq)
@@ -56,10 +57,11 @@ emptyField :: Field
 emptyField =
   Field
   { _fDateModified = undefined
+  , _private = False
   , _value = ""
   }
 
-makeLensesFor [("_value", "value")] ''Field
+makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
 
 data Entry =
   Entry

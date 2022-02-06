@@ -82,6 +82,7 @@ data CofferSpecials =
   CofferSpecials
   { _masterKey :: T.Text
   , _datesModified :: HS.HashMap T.Text UTCTime
+  , _privates :: HS.HashMap T.Text Bool
   , _globalDateModified :: UTCTime
   }
   deriving (Show, Generic)
@@ -110,16 +111,21 @@ runVaultIO url token mount = interpret $
 
     case x of
       WriteSecret entry -> do
+        let fields = entry ^. E.fields
+        let masterField = entry ^. E.masterField
         let datesModified =
               HS.mapKeys E.getFieldKey $
               HS.insert (masterField ^. _1) (masterField ^. _2) fields
               & traverse %~ (^. E.dateModified)
-              where fields = entry ^. E.fields
-                    masterField = entry ^. E.masterField
+        let privates =
+              HS.mapKeys E.getFieldKey $
+              HS.insert (masterField ^. _1) (masterField ^. _2) (entry ^. E.fields)
+              & traverse %~ (^. E.private)
         let cofferSpecials = CofferSpecials
                              { _masterKey = entry ^. E.masterField . _1 & E.getFieldKey
                              , _datesModified = datesModified
                              , _globalDateModified = entry ^. E.dateModified
+                             , _privates = privates
                              }
         let secret = I.PostSecret
               { I._cas = Nothing
@@ -146,10 +152,11 @@ runVaultIO url token mount = interpret $
           let secrets = HS.toList $ foldr HS.delete _data ["#$coffer", cofferSpecials ^. masterKey]
           let keyToField key = do
                modTime <- cofferSpecials ^. datesModified.at key
+               private <- cofferSpecials ^. privates.at key
                value <- _data ^.at key
                key <- E.newFieldKey key
 
-               Just (key, E.Field { E._fDateModified = modTime, E._value = value })
+               Just (key, E.Field { E._fDateModified = modTime, E._value = value, E._private = private })
 
           fields <- maybe (throw MarshallingFailed) pure $
             over traversed (keyToField . fst) secrets & sequence <&> HS.fromList
