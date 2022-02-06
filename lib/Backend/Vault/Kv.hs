@@ -8,7 +8,8 @@ module Backend.Vault.Kv
 import qualified Entry                        as E
 import qualified Backend.Vault.Kv.Internal    as I
 
-import           Error                        (CofferError (MarshallingFailed), VaultError (ConnectionFailed))
+import           Error                        (CofferError (MarshallingFailed, EntryNotFound, OtherError, ConnectError))
+import           Backend                      (Backend (..), BackendEffect (..))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
@@ -29,12 +30,17 @@ import           Control.Exception.Lens       (exception)
 import           Control.Monad.State          (evalState)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
-import           Backend                      (Backend (..), BackendEffect (..))
+import           Control.Applicative          (Alternative(empty))
+import           Validation                   (Validation(Success, Failure))
+import           Data.Time.Format.ISO8601     (iso8601ParseM, iso8601Show)
+import           Data.Time                    (UTCTime)
+import           Control.Exception            (catch)
 
 import           Polysemy
 import           Control.Lens
-import Control.Applicative (Alternative(empty))
-import Validation (Validation(Success, Failure))
+import Servant.Client.Core.Response (responseStatusCode)
+import Servant.Client.Core.Request (RequestF (Request))
+import Network.HTTP.Types (statusCode)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -53,7 +59,7 @@ didimatch
 didimatch matchB matchA codec = Toml.Codec
     { Toml.codecRead = \t -> case Toml.codecRead codec t of
         Success a -> maybe empty Success (matchA a)
-        Failure b -> Failure b 
+        Failure b -> Failure b
     , Toml.codecWrite = \c -> case matchB c of
         Nothing -> empty
         Just d  -> Toml.codecWrite codec d >>= maybe empty pure . matchA
@@ -70,13 +76,13 @@ vaultKvCodec = VaultKvBackend
   where tokenToText (I.VaultToken t) = Just t
         textToToken t = Just $ I.VaultToken t
         baseUrlToText = Just . T.pack . showBaseUrl
-        textToBaseUrl = parseBaseUrl . T.unpack 
+        textToBaseUrl = parseBaseUrl . T.unpack
 
 data CofferSpecials =
   CofferSpecials
   { _masterKey :: T.Text
-  , _datesModified :: HS.HashMap T.Text T.Text
-  , _globalDateModified :: T.Text
+  , _datesModified :: HS.HashMap T.Text UTCTime
+  , _globalDateModified :: UTCTime
   }
   deriving (Show, Generic)
 makeLenses ''CofferSpecials
@@ -126,21 +132,20 @@ runVaultIO url token mount = interpret $
               where fields = entry ^. E.fields
                     masterField = entry ^. E.masterField
 
-        response <- embed (postSecret env (entry ^. E.path) secret)
-        embed $ print cofferSpecials
+        response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
 
         case response ^. I.ddata . at ("version" :: T.Text) of
           Just (A.Number i) -> maybe (throw MarshallingFailed) pure (S.toBoundedInteger i)
           _ -> throw MarshallingFailed
       ReadSecret path version ->
-        embed (readSecret env path version)
+        embedCatch path (readSecret env path version)
         >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
           cofferSpecials :: CofferSpecials <-
             maybe (throw MarshallingFailed) pure
             (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
           let secrets = HS.toList $ foldr HS.delete _data ["#$coffer", cofferSpecials ^. masterKey]
           let keyToField key = do
-               modTime <- cofferSpecials ^.datesModified.at key
+               modTime <- cofferSpecials ^. datesModified.at key
                value <- _data ^.at key
                key <- E.newFieldKey key
 
@@ -159,12 +164,31 @@ runVaultIO url token mount = interpret $
               , E._fields = fields
               }
       ListSecrets path ->
-        embed (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
-
+        embedCatch path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
+      DeleteSecret path ->
+        embedCatch path (deleteSecret env path)
   where postSecret env = (I.routes env ^. I.postSecret) mount token
         readSecret env = (I.routes env ^. I.readSecret) mount token
         listSecrets env = (I.routes env ^. I.listSecrets) mount token
         updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
+        deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
+
+        exceptionHandler :: [T.Text] -> ClientError -> CofferError
+        exceptionHandler path =
+          \case FailureResponse _request response ->
+                    case statusCode $ responseStatusCode response of
+                      404 -> EntryNotFound path
+                      _ -> OtherError
+                DecodeFailure text response -> MarshallingFailed
+                UnsupportedContentType mediaType response -> MarshallingFailed
+                InvalidContentTypeHeader response -> MarshallingFailed
+                ConnectionError excepton -> ConnectError
+        embedCatch :: Member (Embed IO) r
+                       => Member (Error CofferError) r
+                       => [T.Text]
+                       -> IO a
+                       -> Sem r a
+        embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>= \case Left l -> pure l ; Right r -> throw r
 
 instance Backend VaultKvBackend where
   _name s = _vbName s
