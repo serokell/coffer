@@ -3,6 +3,8 @@
 
 module Entry
   ( dateModified
+  , fieldKeyAllowedChars
+  , EntryTag
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
   , Field, FieldKey (..), newField, newFieldKey, getFieldKey, newEntryTag, getEntryTag
@@ -40,10 +42,12 @@ newFieldKey :: Text -> Either Text FieldKey
 newFieldKey t
   | T.null t =
       Left "Tags must contain at least 1 character"
-  | T.any (`notElem` allowedChars) t =
-      Left $ "Tags can only contain the following characters: '" <> T.pack allowedChars <> "'"
+  | T.any (`notElem` fieldKeyAllowedChars) t =
+      Left $ "Tags can only contain the following characters: '" <> T.pack fieldKeyAllowedChars <> "'"
   | otherwise = Right $ FieldKey t
-  where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;:"
+
+fieldKeyAllowedChars :: [Char]
+fieldKeyAllowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;:"
 
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (FieldKey t) = t

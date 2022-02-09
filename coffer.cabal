@@ -22,6 +22,8 @@ library
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       Backends
+      CLI.Parser
+      CLI.Types
       Coffer.Path
       Config
       Entry

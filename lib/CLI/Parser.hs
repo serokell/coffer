@@ -1,0 +1,550 @@
+{-# LANGUAGE OverloadedLists #-}
+
+module CLI.Parser
+  ( parserInfo
+  ) where
+
+import Options.Applicative
+import qualified Options.Applicative.Help.Pretty as Pretty
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Functor ((<&>), ($>))
+import qualified Data.List as List
+import Data.Function ((&))
+import Control.Arrow ((>>>))
+import qualified Text.Megaparsec as P
+import qualified Text.Megaparsec.Char as P
+import qualified Text.Megaparsec.Char.Lexer as P
+import Data.Void ( Void )
+import Data.Foldable (asum)
+import Data.Time.Compat (LocalTime (..), makeTimeOfDayValid, localTimeToUTC, utc)
+import Data.Time.Calendar.Compat ( fromGregorianValid )
+import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
+import Control.Monad (guard, void)
+import qualified Data.Char as Char
+import Data.Fixed (Pico)
+
+import CLI.Types
+import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private))
+import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath)
+
+{-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
+
+parserInfo :: ParserInfo Command
+parserInfo =
+  info (parser <**> helper) $
+    fullDesc
+    <> progDesc "TODO: coffer description goes here"
+    <> header "TODO: coffer description goes here"
+
+parser :: Parser Command
+parser =
+  subparser $ mconcat
+    [ mkCommand "view" CmdView viewOptions
+        "View entries under the specified path, optionally returning only the specified field for each entry"
+    , mkCommand "create" CmdCreate createOptions
+        "Create a new entry at the specified path"
+    , mkCommand "set-field" CmdSetField setFieldOptions
+        "Set a field on the entry at the specified path"
+    , mkCommand "delete-field" CmdDeleteField deleteFieldOptions
+        "Delete a field from the entry at the specified path"
+    , mkCommand "find" CmdFind findOptions
+        "Find and list entries, optionally filtering"
+    , mkCommand "rename" CmdRename renameOptions
+        "Rename an entry or directory"
+    , mkCommand "copy" CmdCopy copyOptions
+        "Copy an entry or directory"
+    , mkCommand "delete" CmdDelete deleteOptions
+        "Delete an entry or directory"
+    , mkCommand "tag" CmdTag tagOptions
+        "Add or remove tags from an entry"
+    ]
+  where
+    mkCommand :: String -> (opts -> a) -> Parser opts -> String -> Mod CommandFields a
+    mkCommand cmdName constructor optsParser cmdHelp =
+      command cmdName $
+        info (helper <*> (constructor <$> optsParser)) $
+        progDesc cmdHelp
+
+----------------------------------------------------------------------------
+-- Options
+----------------------------------------------------------------------------
+
+viewOptions :: Parser ViewOptions
+viewOptions = do
+  ViewOptions
+    <$> argument readPath ( mconcat
+          [ metavar "PATH"
+          , help "The path to either a directory of entries, or a single entry"
+          ])
+    <*> optional
+          ( argument readFieldKey $ mconcat
+              [ metavar "FIELDNAME"
+              , help "The optional field name to fetch the contents of"
+              ]
+          )
+
+createOptions :: Parser CreateOptions
+createOptions =
+  CreateOptions
+    <$> argument readEntryPath ( mconcat
+          [ metavar "ENTRYPATH"
+          , help "The path to insert the new entry into, this must not already be a directory or an entry unless `-f` is specified"
+          ])
+    <*> switch ( mconcat
+          [ long "edit"
+          , short 'e'
+          , help $ unlines
+              [ "Open an editor to configure the fields and tags for this entry."
+              , "By default, `vi` will be used."
+              , "This can be set using the `$EDITOR` environment variable."
+              ]
+          ])
+    <*> switch ( mconcat
+          [ long "force"
+          , short 'f'
+          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          ])
+    <*> many ( option readEntryTag $ mconcat
+          [ long "tag"
+          , metavar "TAG"
+          , help "Tag to add to this new entry, this may be specified multiple times"
+          ])
+    <*> many ( option readFieldInfo $ mconcat
+          [ long "field"
+          , metavar "NAME=CONTENT"
+          , help "A field to insert into the new entry, with the format 'fieldname=fieldcontents', this may be specified multiple times"
+          ])
+    <*> many ( option readFieldInfo $ mconcat
+          [ long "privatefield"
+          , metavar "NAME=CONTENT"
+          , help $ unlines
+              [ "Same as `--field`, but the field will be marked as private."
+              , "Private fields can only be viewed with 'coffer view',"
+              , "and will be hidden when using other commands."
+              ]
+          ])
+
+setFieldOptions :: Parser SetFieldOptions
+setFieldOptions =
+  SetFieldOptions
+    <$> argument readEntryPath ( mconcat
+          [ metavar "ENTRYPATH"
+          , help "The path to set the field value on, this must already exist as an entry"
+          ])
+    <*> argument readFieldKey ( mconcat
+          [ metavar "FIELDNAME"
+          , help "The name of the field to set"
+          ])
+    <*> optional (argument str $ mconcat
+          [ metavar "FIELDCONTENTS"
+          , help "The contents to insert into the field. Required when creating a new field, optional otherwise"
+          ])
+    <*> optional (option readFieldVisibility $ mconcat
+          [ long "visibility"
+          , short 'V'
+          , metavar "VISIBILITY"
+          , help "Whether to mark this field as 'public' or 'private'"
+          ])
+
+deleteFieldOptions :: Parser DeleteFieldOptions
+deleteFieldOptions =
+  DeleteFieldOptions
+    <$> argument readEntryPath ( mconcat
+          [ metavar "ENTRYPATH"
+          , help "The path to the entry with the field to delete"
+          ])
+    <*> argument readFieldKey ( mconcat
+          [ metavar "FIELDNAME"
+          , help "The name of the field to delete"
+          ])
+
+findOptions :: Parser FindOptions
+findOptions =
+  FindOptions
+    <$> optional (argument readPath $ mconcat
+          [ metavar "PATH"
+          , help "If specified, only show entries within this path (use `/` to find everything)"
+          ])
+    <*> optional (argument str $ mconcat
+          [ metavar "TEXT"
+          , help "The text to search for in the paths and tags of entries"
+          ])
+    <*> optional (option readSort $ mconcat
+          [ metavar "SORT"
+          , long "sort"
+          , helpDoc $ Just $ Pretty.vsep
+            [ "Sort the entries inside each directory."
+            , expectedSortFormat
+            ]
+          ])
+    <*> many (option readFilter $ mconcat
+          [ metavar "FILTER"
+          , long "filter"
+          , helpDoc $ Just $ Pretty.vsep
+            [ "Filter entries."
+            , expectedFilterFormat
+            ]
+          ])
+    <*> many (option readFilterField $ mconcat
+          [ metavar "FILTERFIELD"
+          , long "filter-field"
+          , helpDoc $ Just $ Pretty.vsep
+            [ "Filter entries based on a field."
+            , expectedFilterFieldFormat
+            ]
+          ])
+
+renameOptions :: Parser RenameOptions
+renameOptions =
+  RenameOptions
+    <$> argument readPath ( mconcat
+          [ metavar "OLDPATH"
+          , help "The path to move the old directory or entry from"
+          ])
+    <*> argument readPath ( mconcat
+          [ metavar "NEWPATH"
+          , help "The path to move the directory or entry to"
+          ])
+    <*> switch ( mconcat
+          [ long "force"
+          , short 'f'
+          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          ])
+
+copyOptions :: Parser CopyOptions
+copyOptions =
+  CopyOptions
+    <$> argument readPath ( mconcat
+          [ metavar "OLDPATH"
+          , help "The path to copy the old directory or entry from"
+          ])
+    <*> argument readPath ( mconcat
+          [ metavar "NEWPATH"
+          , help "The path to copy the directory or entry to"
+          ])
+    <*> switch ( mconcat
+          [ long "force"
+          , short 'f'
+          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          ])
+
+deleteOptions :: Parser DeleteOptions
+deleteOptions =
+  DeleteOptions
+    <$> argument readPath ( mconcat
+          [ metavar "PATH"
+          , help "The path to the entry or directory to delete"
+          ])
+    <*> switch ( mconcat
+          [ long "recursive"
+          , short 'r'
+          , help "If the specified path is a directory, remove it and its contents"
+          ])
+
+tagOptions :: Parser TagOptions
+tagOptions =
+  TagOptions
+    <$> argument readEntryPath ( mconcat
+          [ metavar "ENTRYPATH"
+          , help "The path to the entry to add or delete a tag from"
+          ])
+    <*> argument readEntryTag ( mconcat
+          [ metavar "TAGNAME"
+          , help "The name of the tag to add or delete"
+          ])
+    <*> switch ( mconcat
+          [ long "delete"
+          , short 'd'
+          , help "Remove this tag instead of setting it"
+          ])
+
+----------------------------------------------------------------------------
+-- Common
+----------------------------------------------------------------------------
+
+readPath :: ReadM Path
+readPath = do
+  input <- str
+  case mkPath input of
+    Right path -> pure path
+    Left err -> readerError $ unlines
+      [ "Invalid path: '" <> T.unpack input <> "'."
+      , T.unpack err
+      ]
+
+readEntryPath :: ReadM EntryPath
+readEntryPath = do
+  input <- str
+  case mkEntryPath input of
+    Right path -> pure path
+    Left err -> readerError $ unlines
+      [ "Invalid entry path: '" <> T.unpack input <> "'."
+      , T.unpack err
+      ]
+
+readEntryTag :: ReadM EntryTag
+readEntryTag = do
+  input <- str
+  case newEntryTag input of
+    Right tag -> pure tag
+    Left err -> readerError $ unlines
+      [ "Invalid tag: '" <> T.unpack input <> "'."
+      , T.unpack err
+      ]
+
+readFieldVisibility :: ReadM FieldVisibility
+readFieldVisibility =
+  eitherReader $ readSum "visibility"
+    [ ("public", Public)
+    , ("private", Private)
+    ]
+
+readFieldKey :: ReadM FieldKey
+readFieldKey = str >>= toReader . readFieldKey'
+
+readFieldKey' :: Text -> Either String FieldKey
+readFieldKey' input = do
+  case newFieldKey input of
+    Right tag -> pure tag
+    Left err -> Left $ unlines
+      [ "Invalid field name: '" <> T.unpack input <> "'."
+      , T.unpack err
+      ]
+
+readFieldInfo :: ReadM FieldInfo
+readFieldInfo = do
+  input <- str
+  case P.parse (parseFieldInfo <* P.eof) "" input of
+    Right fieldInfo -> pure fieldInfo
+    Left err -> readerError $ unlines
+      [ "Invalid field format: '" <> T.unpack input <> "'."
+      , "Expected format: 'fieldname=fieldcontents'."
+      , ""
+      , "Parser error:"
+      , P.errorBundlePretty err
+      ]
+
+readSort :: ReadM (Sort, Direction)
+readSort = do
+  input <- str
+  case T.splitOn ":" input of
+    [means, direction] -> do
+      direction' <- toReader (readDirection direction)
+      case means of
+        "name" -> pure (SortByEntryName, direction')
+        "date" -> pure (SortByEntryDate, direction')
+        _ -> readerError $ unlines
+          [ "Invalid sort: '" <> T.unpack means <> "'."
+          , "Choose one of: 'name', 'date'."
+          , ""
+          , show expectedSortFormat
+          ]
+    [fieldName, means, direction] -> do
+      fieldName' <- toReader (readFieldKey' fieldName)
+      direction' <- toReader (readDirection direction)
+      case means of
+        "value" -> pure (SortByFieldValue fieldName', direction')
+        "date" -> pure (SortByFieldDate fieldName', direction')
+        _ -> readerError $ unlines
+          [ "Invalid sort: '" <> T.unpack means <> "'."
+          , "Choose one of: 'value', 'date'."
+          , ""
+          , show expectedSortFormat
+          ]
+    _ -> readerError $ unlines
+      [ "Invalid sort format: '" <> T.unpack input <> "'."
+      , show expectedSortFormat
+      ]
+
+expectedSortFormat :: Pretty.Doc
+expectedSortFormat = Pretty.vsep
+  [ "Expected format is:"
+  , " * to sort by entry name: 'name:<direction>',"
+  , " * to sort by the entry's last modified date: 'date:<direction>',"
+  , " * to sort by a field's value: '<fieldname>:value:<direction>',"
+  , " * to sort by a field's last modified date: '<fieldname>:date:<direction>'."
+  , "Direction can be 'asc' or 'desc'."
+  , "Examples: 'name:desc', 'password:date:asc'."
+  ]
+
+readDirection :: Text -> Either String Direction
+readDirection =
+  T.unpack >>> readSum "direction"
+    [ ("asc", Asc)
+    , ("desc", Desc)
+    ]
+
+readFilter :: ReadM Filter
+readFilter = do
+  input <- str
+  case P.parse (parseFilter <* P.eof) "" input of
+    Right filter -> pure filter
+    Left err -> readerError $ unlines
+      [ "Invalid filter format: '" <> T.unpack input <> "'."
+      , show expectedFilterFormat
+      , ""
+      , "Parser error:"
+      , P.errorBundlePretty err
+      ]
+
+expectedFilterFormat :: Pretty.Doc
+expectedFilterFormat = Pretty.vsep
+  [ "Expected format is: 'name~<substring>' or `date<op><date>`."
+  , "<op> can be '<=', '>=', '<', '>', or '='."
+  , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
+  , "Examples: 'name~vault', 'date<2020-02'."
+  ]
+
+readFilterField :: ReadM (FieldKey, FilterField)
+readFilterField = do
+  input <- str
+  case P.parse (parseFilterField <* P.eof) "" input of
+    Right filterField -> pure filterField
+    Left err -> readerError $ unlines
+      [ "Invalid filter-field format: '" <> T.unpack input <> "'."
+      , show expectedFilterFieldFormat
+      , ""
+      , "Parser error:"
+      , P.errorBundlePretty err
+      ]
+
+expectedFilterFieldFormat :: Pretty.Doc
+expectedFilterFieldFormat = Pretty.vsep
+  [ "Expected format is: '<fieldname>:value~<substring>' or `<fieldname>:date<op><date>`."
+  , "<op> can be '<=', '>=', '<', '>', or '='."
+  , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
+  , "Examples: 'url:value~google.com', 'pw:date<2020-02'."
+  ]
+
+----------------------------------------------------------------------------
+-- Megaparsec
+----------------------------------------------------------------------------
+
+type MParser = P.Parsec Void Text
+
+-- | Parses any of these formats:
+--
+-- * @YYYY@
+-- * @YYYY-MM@
+-- * @YYYY-MM-DD@
+-- * @YYYY-MM-DD HH:MM:SS@
+parseFilterDate :: MParser FilterDate
+parseFilterDate = do
+  y <- P.decimal
+  optional (P.char '-') >>= \case
+    Nothing -> pure $ FDYear y
+    Just _ -> do
+      m <- twoDigits
+      optional (P.char '-') >>= \case
+        Nothing ->
+          case fromYearMonthValid y m of
+            Nothing -> fail "invalid year/month"
+            Just month -> pure $ FDMonth month
+        Just _ -> do
+          d <- twoDigits
+          case fromGregorianValid y m d of
+            Nothing -> fail "invalid year/month/day"
+            Just day ->
+              optional (P.char ' ') >>= \case
+                Nothing -> pure $ FDDay day
+                Just _ -> do
+                  hh <- twoDigits <* P.char ':'
+                  mm <- twoDigits <* P.char ':'
+                  ss <- twoDigits
+                  case makeTimeOfDayValid hh mm (fromIntegral @Int @Pico ss) of
+                    Nothing -> fail "invalid hour/minute/seconds"
+                    Just timeOfDay -> pure $ FDTime (localTimeToUTC utc $ LocalTime day timeOfDay)
+  where
+    -- | Parse a two-digit integer (e.g. day of month, hour).
+    twoDigits :: MParser Int
+    twoDigits = do
+      a <- P.digitChar
+      b <- P.digitChar
+      pure $ Char.digitToInt a * 10 + Char.digitToInt b
+
+parseFilterOp :: MParser FilterOp
+parseFilterOp =
+  asum @[]
+    [ P.string ">=" $> OpGTE
+    , P.string "<=" $> OpLTE
+    , P.char '>' $> OpGT
+    , P.char '<' $> OpLT
+    , P.char '=' $> OpEQ
+    ]
+
+parseFilter :: MParser Filter
+parseFilter =
+  parseFilterByName <|> parseFilterByDate
+  where
+    parseFilterByName = do
+      void $ P.string "name" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterByName rest
+    parseFilterByDate = do
+      void $ P.string "date"
+      op <- parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterByDate op localTime
+
+parseFilterField :: MParser (FieldKey, FilterField)
+parseFilterField = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  filterField <- parseFilterFieldByValue <|> parseFilterFieldByDate
+
+  pure (fieldName, filterField)
+  where
+    parseFilterFieldByValue = do
+      void $ P.string "value" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterFieldByValue rest
+    parseFilterFieldByDate = do
+      op <- P.string "date" >> parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterFieldByDate op localTime
+
+parseFieldInfo :: MParser FieldInfo
+parseFieldInfo = do
+  fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
+  P.hspace >> P.char '=' >> P.hspace
+  fieldContents <- parseFieldContentsEof
+  pure $ FieldInfo fieldName fieldContents
+
+parseFieldNameWhile :: (Char -> Bool) -> MParser FieldKey
+parseFieldNameWhile whileCond = do
+  fieldName <- P.takeWhile1P (Just "fieldname") whileCond
+  either fail pure $ readFieldKey' fieldName
+
+-- | Parse the rest of the input as a field content.
+parseFieldContentsEof :: MParser Text
+parseFieldContentsEof = T.pack <$> P.manyTill P.anySingle P.eof
+
+----------------------------------------------------------------------------
+-- Utils
+----------------------------------------------------------------------------
+
+toReader :: Either String a -> ReadM a
+toReader = either readerError pure
+
+readSum ::  String -> Map String a -> String -> Either String a
+readSum sumDescription constructors input =
+  case M.lookup input constructors of
+    Just cons -> Right cons
+    Nothing ->
+      Left $ unlines
+        [ "Invalid " <> sumDescription <> ": '" <> input <> "'."
+        , "Choose one of: " <> constructorNames <> "."
+        ]
+  where
+    constructorNames :: String
+    constructorNames =
+      constructors
+        & M.keys
+        <&> (\name -> "'" <> name <> "'")
+        & List.intersperse ", "
+        & mconcat
