@@ -31,20 +31,18 @@ fieldConverter = prism' to from
           , "private" A..= (field ^. private)
           , "value" A..= (field ^. value)
           ]
-        from (A.Object o) =
-          (execStateT $
-            do
-              _dateModified <- lift $ HS.lookup "date_modified" o
-                >>= \case A.String t -> Just t ; _ -> Nothing
-                >>= iso8601ParseM . T.unpack
-              _private <- lift $ HS.lookup "private" o
-                >>= \case A.Bool b -> Just b ; _ -> Nothing
-              _value <- lift $ HS.lookup "value" o
-                >>= \case A.String t -> Just t ; _ -> Nothing
+        from (A.Object o) = do
+          dateModified <- HS.lookup "date_modified" o
+                               >>= \case A.String t -> Just t ; _ -> Nothing
+                               >>= iso8601ParseM . T.unpack
+          value <- HS.lookup "value" o
+                     >>= \case A.String t -> Just t ; _ -> Nothing
+          _private <- HS.lookup "private" o
+                       >>= \case A.Bool b -> Just b ; _ -> Nothing
 
-              dateModified .= _dateModified
-              private .= _private
-              value .= _value) emptyField
+          pure $
+              newField dateModified value
+            & private .~ _private
         from _ = Nothing
 
 instance EntryConvertible JsonEntry where
@@ -53,32 +51,29 @@ instance EntryConvertible JsonEntry where
             JsonEntry $ A.object
             [ "path" A..= T.intercalate "/" (entry ^. path)
             , "date_modified" A..= (entry ^. dateModified)
-            , "master_field" A..= over _2 (^. re fieldConverter) (entry ^. masterField)
+            , "master_field" A..= (entry ^. masterField)
             , "fields" A..= (HS.fromList . over (traverse . _1) getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. fields))
             ]
           from (JsonEntry (A.Object o)) =
-            (execStateT $
               do
-                _path <- lift $ HS.lookup "path" o
+                path <- HS.lookup "path" o
                   >>= (\case A.String t -> Just t ; _ -> Nothing)
                   <&> T.split (== '/')
-                _dateModified <- lift $ HS.lookup "date_modified" o
+                dateModified <- HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
                   >>= iso8601ParseM . T.unpack
-                _masterField <- lift $ HS.lookup "master_field" o
-                  >>= \case A.Array t -> Just t ; _ -> Nothing
-                  >>= uncurry (liftA2 (,)) .
-                      \t -> (t ^? traversed.index 0 >>= \case A.String t -> newFieldKey t ; _ -> Nothing, t ^? traversed.index 1 >>= (^? fieldConverter))
-                _fields <- lift $ HS.lookup "fields" o
+                let _masterField = HS.lookup "master_field" o
+                                     >>= \case A.String t -> newFieldKey t ; _ -> Nothing
+                _fields <- HS.lookup "fields" o
                   >>= (\case A.Object t -> Just t ; _ -> Nothing)
                   <&> HS.map (^? fieldConverter)
                   >>= (mapM (uncurry (liftA2 (,)) . over _1 newFieldKey) . HS.toList)
                   <&> HS.fromList
 
-                path .= _path
-                dateModified .= _dateModified
-                masterField .= _masterField
-                fields .= _fields) emptyEntry
+                pure $
+                    newEntry path dateModified
+                  & masterField .~ _masterField
+                  & fields .~ _fields
           from _ = Nothing
 
 -- |
@@ -94,9 +89,8 @@ testEntry = do
   k2 <- newFieldKey "asdf"
   let time = UTCTime { utctDay = fromMondayStartWeek 69 69 69, utctDayTime = 42 }
 
-  pure Entry
-    { _path = ["haei", "aa"]
-    , _eDateModified = time
-    , _masterField = (k1, Field { _fDateModified = time, _value = "" })
-    , _fields = HS.fromList [ (k2, Field { _fDateModified  = time, _value = "" })]
-    }
+  execStateT
+    (do
+      masterField .= Just k1
+      fields .= HS.fromList [ (k2, newField time "") ]
+    ) (newEntry ["haei", "aa"] time)

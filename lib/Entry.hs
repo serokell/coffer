@@ -4,9 +4,9 @@
 module Entry
   ( newFieldKey
   , dateModified
-  , Entry (..), EntryConvertible (..), emptyEntry
+  , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
-  , Field (..), FieldKey (..), emptyField, getFieldKey
+  , Field, FieldKey (..), newField, getFieldKey
   , private, value
   )
 where
@@ -20,7 +20,6 @@ import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
 
--- TODO - proper date time lib
 type DateTime = UTCTime
 
 newtype FieldKey = FieldKey T.Text
@@ -52,13 +51,12 @@ data Field =
   }
   deriving (Show, Eq)
 
--- TODO me no likey, better way? https://github.com/ekmett/lens/issues/286
-emptyField :: Field
-emptyField =
+newField :: UTCTime -> T.Text -> Field
+newField time value =
   Field
-  { _fDateModified = undefined
+  { _fDateModified = time
   , _private = False
-  , _value = ""
+  , _value = value
   }
 
 makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
@@ -67,18 +65,17 @@ data Entry =
   Entry
   { _path :: [T.Text]
   , _eDateModified :: DateTime
-  , _masterField :: (FieldKey, Field)
+  , _masterField :: Maybe FieldKey
   , _fields :: HS.HashMap FieldKey Field
   }
   deriving (Show, Eq)
 
--- TODO me no likey, better way? https://github.com/ekmett/lens/issues/286
-emptyEntry :: Entry
-emptyEntry =
+newEntry :: [T.Text] -> UTCTime -> Entry
+newEntry path time =
   Entry
-  { _path = []
-  , _eDateModified = undefined
-  , _masterField = undefined
+  { _path = path
+  , _eDateModified = time
+  , _masterField = Nothing
   , _fields = HS.empty
   }
 
