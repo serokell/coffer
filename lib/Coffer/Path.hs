@@ -7,16 +7,13 @@ module Coffer.Path
   , unPathSegment
   , mkPathSegment
   , pathSegmentAllowedCharacters
+  , HasPathSegments(..)
   , Path(..)
-  , isoPath
-  , pathSegments
   , mkPath
   , EntryPath(..)
-  , isoEntryPath
   , mkEntryPath
   , entryPathName
   , entryPathParentDir
-  , entryPathSegments
   , appendEntryName
   , pathAsEntryPath
   , entryPathAsPath
@@ -62,20 +59,11 @@ newtype Path = Path { unPath :: [PathSegment] }
   deriving stock (Show, Eq)
   deriving newtype (Semigroup, Monoid)
 
-makeLensesFor [("unPath", "isoPath")] ''Path
-
 -- |
 -- >>> pretty @Path @String <$> mkPath "a/b/c"
 -- Right "/a/b/c"
 instance Buildable Path where
   build (Path segments) = "/" <> build (T.intercalate "/" $ pretty <$> segments)
-
--- | Retrieve a list of a path's segments.
---
--- >>> pathSegments $ unsafeMkPath "/a/b/c"
--- ["a","b","c"]
-pathSegments :: Path -> [Text]
-pathSegments p = p ^.. isoPath . each . to unPathSegment
 
 -- | Parses a path to a directory or entry.
 --
@@ -110,8 +98,6 @@ mkPath path = do
 newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
   deriving stock (Show, Eq)
 
-makeLensesFor [("unEntryPath", "isoEntryPath")] ''EntryPath
-
 -- |
 -- >>> pretty @EntryPath @String <$> mkEntryPath "a/b/c"
 -- Right "/a/b/c"
@@ -127,7 +113,7 @@ mkEntryPath = mkPath >=> pathAsEntryPath
 -- >>> unsafeMkEntryPath "/a/b/c" & entryPathName
 -- "c"
 entryPathName :: EntryPath -> Text
-entryPathName = view $ isoEntryPath . last1 . to unPathSegment
+entryPathName = view $ pathSegments . last1 . to unPathSegment
 
 -- | Focus the path to the directory this entry is in.
 --
@@ -137,14 +123,8 @@ entryPathName = view $ isoEntryPath . last1 . to unPathSegment
 -- >>> build $ unsafeMkEntryPath "/old/parent1/c" & entryPathParentDir .~ unsafeMkPath "/new/parent2"
 -- "/new/parent2/c"
 entryPathParentDir :: Lens' EntryPath Path
-entryPathParentDir = isoEntryPath . initNE . from isoPath
+entryPathParentDir = pathSegments . initNE . from pathSegments
 
--- | Retrieve a list of a path's segments.
---
--- >>> entryPathSegments $ unsafeMkEntryPath "/a/b/c"
--- ["a","b","c"]
-entryPathSegments :: EntryPath -> [Text]
-entryPathSegments p = p ^.. isoEntryPath . each . to unPathSegment
 
 -- | Build an `EntryPath` by append the entry's name to its location path.
 --
@@ -178,6 +158,17 @@ replacePathPrefix (Path oldPrefix) (Path newPrefix) (Path fullpath) =
     & List.stripPrefix oldPrefix
     <&> mappend newPrefix
     <&> Path
+
+----------------------------------------------------------------------------
+-- Optics
+----------------------------------------------------------------------------
+
+class HasPathSegments s pathSegments | s -> pathSegments where
+  pathSegments :: Iso' s pathSegments
+instance HasPathSegments Path [PathSegment] where
+  pathSegments = iso unPath Path
+instance HasPathSegments EntryPath (NonEmpty PathSegment) where
+  pathSegments = iso unEntryPath EntryPath
 
 ----------------------------------------------------------------------------
 -- Helpers

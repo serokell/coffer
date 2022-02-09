@@ -95,12 +95,15 @@ library:
     - http-types
     - lens
     - lens-aeson
+    - megaparsec
+    - optparse-applicative
     - polysemy
     - servant
     - servant-client
     - servant-client-core
     - text
     - time
+    - time-compat
     - tomland
     - unordered-containers
     - validation-selective

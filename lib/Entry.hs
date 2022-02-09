@@ -4,6 +4,7 @@
 
 module Entry
   ( dateModified
+  , keyCharSet
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
   , Field (..), FieldKey,  newField, getFieldKey
@@ -12,7 +13,6 @@ module Entry
   , FieldVisibility(..)
   )
 where
-
 
 import Data.Text (Text)
 import qualified Data.Text as T

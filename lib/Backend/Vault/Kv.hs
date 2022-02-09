@@ -37,10 +37,11 @@ import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
-import Coffer.Path (entryPathSegments, pathSegments)
+import Coffer.Path (pathSegments, unPathSegment, HasPathSegments, PathSegment)
 import qualified Data.Aeson.Text as A
 import Entry (FieldVisibility)
 import Data.Either.Extra (eitherToMaybe)
+import Data.Text (Text)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -144,9 +145,9 @@ runVaultIO url token mount = interpret $
               }
 
         void $ embedCatchClientError do
-          postSecret env (entry ^. E.path . to entryPathSegments) secret
+          postSecret env (entry ^. E.path . to getPathSegments) secret
       ReadSecret path ->
-        embedCatchClientErrorMaybe (readSecret env (entryPathSegments path) Nothing) >>= \case
+        embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -186,10 +187,10 @@ runVaultIO url token mount = interpret $
               & E.tags .~ _tags
       ListSecrets path ->
         embedCatchClientErrorMaybe $ do
-          response <- listSecrets env (pathSegments path)
+          response <- listSecrets env (getPathSegments path)
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatchClientError (void $ deleteSecret env (entryPathSegments path))
+        embedCatchClientError (void $ deleteSecret env (getPathSegments path))
 
   where
     postSecret env = (I.routes env ^. I.postSecret) mount token
@@ -241,6 +242,11 @@ runVaultIO url token mount = interpret $
       -> e
       -> Sem r a
     orThrow m e = maybe (throw e) pure m
+
+    getPathSegments
+      :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+      => s -> [Text]
+    getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
 instance Backend VaultKvBackend where
   _name kvBackend = vbName kvBackend
