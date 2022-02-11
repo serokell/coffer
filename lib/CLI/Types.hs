@@ -167,7 +167,7 @@ data FieldInfo = FieldInfo
   { fiName :: FieldKey
   , fiContents :: FieldValue
   }
-  deriving stock Show
+  deriving stock (Show, Eq)
 
 data Direction = Asc | Desc
   deriving stock Show

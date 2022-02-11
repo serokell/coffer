@@ -7,6 +7,7 @@ module Main where
 import Backend
 import Backend.Commands as Commands
 import Backend.Interpreter
+import CLI.EditorMode
 import CLI.Parser
 import CLI.PrettyPrint
 import CLI.Types
@@ -79,7 +80,11 @@ main = do
           VREntryNoFieldMatch path fieldName -> printError $
             "The entry at '" +| path |+ "' does not have a field '" +| fieldName |+ "'."
 
-      SomeCommand cmd@(CmdCreate opts) -> do
+      SomeCommand (CmdCreate opts) -> do
+        cmd <- CmdCreate <$>
+          if coEdit opts
+            then embed (editorMode opts)
+            else pure opts
         runCommand config cmd >>= \case
           CRSuccess _ -> printSuccess $ "Entry created at '"  +| coQPath opts |+ "'."
           CRCreateError error -> do
