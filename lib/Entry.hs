@@ -8,17 +8,19 @@ module Entry
   , path, masterField, fields
   , Field (..), FieldKey,  newField, getFieldKey
   , newFieldKey, newEntryTag, getEntryTag
-  , private, value, tags, EntryTag
+  , visibility, value, tags, EntryTag
+  , FieldVisibility(..)
   )
 where
 
 
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
 import qualified Data.Set as S
 
 import Control.Lens
-import qualified Data.Aeson.Types as A
+import qualified Data.Aeson as A
 import Data.Hashable (Hashable)
 import Data.Time (UTCTime)
 import Coffer.Path (EntryPath)
@@ -54,10 +56,23 @@ newEntryTag t =
 getEntryTag :: EntryTag -> T.Text
 getEntryTag (UnsafeEntryTag t) = t
 
+data FieldVisibility = Public | Private
+  deriving stock (Show, Eq)
+
+instance A.ToJSON FieldVisibility where
+  toJSON = \case
+    Public -> A.toJSON @Text "public"
+    Private -> A.toJSON @Text "private"
+instance A.FromJSON FieldVisibility where
+  parseJSON = A.withText "visibility" \case
+    "public" -> pure Public
+    "private" -> pure Private
+    other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
+
 data Field =
   Field
   { fDateModified :: UTCTime
-  , fPrivate :: Bool
+  , fVisibility :: FieldVisibility
   , fValue :: T.Text
   }
   deriving stock (Show, Eq)
@@ -67,7 +82,7 @@ newField :: UTCTime -> T.Text -> Field
 newField time value =
   Field
   { fDateModified = time
-  , fPrivate = False
+  , fVisibility = Public
   , fValue = value
   }
 

@@ -39,6 +39,7 @@ import           Polysemy
 import           Control.Lens
 import Coffer.Path (entryPathSegments, pathSegments)
 import qualified Data.Aeson.Text as A
+import Entry (FieldVisibility)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -79,7 +80,7 @@ vaultKvCodec = VaultKvBackend
 
 data FieldMetadata = FieldMetadata
   { fmDateModified :: UTCTime
-  , fmPrivate :: Bool
+  , fmVisibility :: FieldVisibility
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
@@ -127,7 +128,7 @@ runVaultIO url token mount = interpret $
                 (\f ->
                 FieldMetadata
                 { fmDateModified = f ^. E.dateModified
-                , fmPrivate = f ^. E.private
+                , fmVisibility = f ^. E.visibility
                 })
               & HS.mapKeys E.getFieldKey
             , csTags = Set.map E.getEntryTag $ entry ^. E.tags
@@ -152,12 +153,12 @@ runVaultIO url token mount = interpret $
             let secrets = HS.toList $ HS.delete "#$coffer" _data
             let keyAndValueToField (key, value) = do
                   _modTime <- cofferSpecials ^? fields . at key . _Just . dateModified
-                  _private <- cofferSpecials ^? fields . at key . _Just . private
+                  _visibility <- cofferSpecials ^? fields . at key . _Just . visibility
                   _key <- E.newFieldKey key
 
                   Just (_key
                         , E.newField _modTime value
-                          & E.private .~ _private
+                          & E.visibility .~ _visibility
                         )
 
             fields <-

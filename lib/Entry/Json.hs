@@ -30,7 +30,7 @@ fieldConverter = prism' to from
         to field =
           A.object
           [ "date_modified" A..= (field ^. E.dateModified)
-          , "private" A..= (field ^. E.private)
+          , "visibility" A..= (field ^. E.visibility)
           , "value" A..= (field ^. E.value)
           ]
         from (A.Object o) = do
@@ -41,14 +41,10 @@ fieldConverter = prism' to from
                      >>= \case
                             A.String t -> Just t
                             _ -> Nothing
-          _private <- HS.lookup "private" o
-                        >>= \case
-                              A.Bool b -> Just b
-                              _ -> Nothing
-
+          _visibility <- HS.lookup "visibility" o >>= resultToMaybe . A.fromJSON
           pure
             $ E.newField dateModified value
-            & E.private .~ _private
+            & E.visibility .~ _visibility
         from _ = Nothing
 
 instance E.EntryConvertible JsonEntry where
@@ -91,3 +87,8 @@ instance E.EntryConvertible JsonEntry where
                   & E.fields .~ _fields
                   & E.tags .~ _tags
           from _ = Nothing
+
+resultToMaybe :: A.Result a -> Maybe a
+resultToMaybe = \case
+  A.Error _ -> Nothing
+  A.Success a -> Just a
