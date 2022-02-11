@@ -16,6 +16,9 @@ import qualified Data.Vector as V
 import qualified Data.Set as S
 import Control.Monad (forM)
 import Entry (Entry)
+import Fmt (pretty)
+import qualified Coffer.Path as Path
+import Data.Either.Extra (eitherToMaybe)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving stock (Show)
@@ -53,7 +56,7 @@ instance E.EntryConvertible JsonEntry where
     where to :: Entry -> JsonEntry
           to entry =
             JsonEntry $ A.object
-            [ "path" A..= T.intercalate "/" (entry ^. E.path)
+            [ "path" A..= pretty @_ @T.Text (entry ^. E.path)
             , "date_modified" A..= (entry ^. E.dateModified)
             , "master_field" A..= (entry ^. E.masterField)
             , "fields" A..= (HS.fromList . over (each . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
@@ -63,7 +66,7 @@ instance E.EntryConvertible JsonEntry where
               do
                 path <- HS.lookup "path" o
                   >>= (\case A.String t -> Just t ; _ -> Nothing)
-                  <&> T.split (== '/')
+                  >>= eitherToMaybe . Path.mkEntryPath
                 dateModified <- HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
                   >>= iso8601ParseM . T.unpack

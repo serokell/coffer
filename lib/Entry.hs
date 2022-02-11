@@ -21,6 +21,7 @@ import Control.Lens
 import qualified Data.Aeson.Types as A
 import Data.Hashable (Hashable)
 import Data.Time (UTCTime)
+import Coffer.Path (EntryPath)
 
 newtype FieldKey = UnsafeFieldKey T.Text
   deriving stock (Show, Eq)
@@ -72,7 +73,7 @@ newField time value =
 
 data Entry =
   Entry
-  { ePath :: [T.Text]
+  { ePath :: EntryPath
   , eDateModified :: UTCTime
   , eMasterField :: Maybe FieldKey
   , eFields :: HS.HashMap FieldKey Field
@@ -81,7 +82,7 @@ data Entry =
   deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Entry
 
-newEntry :: [T.Text] -> UTCTime -> Entry
+newEntry :: EntryPath -> UTCTime -> Entry
 newEntry path time =
   Entry
   { ePath = path

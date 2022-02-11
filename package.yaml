@@ -87,6 +87,8 @@ library:
   dependencies:
     - aeson
     - containers
+    - extra
+    - fmt
     - hashable
     - http-client
     - http-client-tls

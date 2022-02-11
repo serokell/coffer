@@ -37,6 +37,7 @@ import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
+import Coffer.Path (entryPathSegments, pathSegments)
 import qualified Data.Aeson.Text as A
 
 data VaultKvBackend =
@@ -140,9 +141,10 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        void $ embedCatchClientError (postSecret env (entry ^. E.path) secret)
+        void $ embedCatchClientError do
+          postSecret env (entry ^. E.path . to entryPathSegments) secret
       ReadSecret path ->
-        embedCatchClientErrorMaybe (readSecret env path Nothing) >>= \case
+        embedCatchClientErrorMaybe (readSecret env (entryPathSegments path) Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -177,10 +179,10 @@ runVaultIO url token mount = interpret $
               & E.tags .~ _tags
       ListSecrets path ->
         embedCatchClientErrorMaybe $ do
-          response <- listSecrets env path
+          response <- listSecrets env (pathSegments path)
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatchClientError (void $ deleteSecret env path)
+        embedCatchClientError (void $ deleteSecret env (entryPathSegments path))
 
   where
     postSecret env = (I.routes env ^. I.postSecret) mount token

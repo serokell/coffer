@@ -22,6 +22,7 @@ library
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       Backends
+      Coffer.Path
       Config
       Entry
       Entry.Json
@@ -84,6 +85,8 @@ library
       aeson
     , base >=4.14.3.0 && <5
     , containers
+    , extra
+    , fmt
     , hashable
     , http-client
     , http-client-tls
