@@ -6,7 +6,8 @@ module Entry
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
   , Field, FieldKey (..), newField, newFieldKey, getFieldKey, newEntryTag, getEntryTag
-  , private, value, tags
+  , visibility, value, tags
+  , FieldVisibility(..)
   )
 where
 
@@ -15,7 +16,7 @@ import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
 
 import Control.Lens
-import qualified Data.Aeson.Types as A
+import qualified Data.Aeson as A
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
@@ -63,10 +64,23 @@ newEntryTag t =
 getEntryTag :: EntryTag -> T.Text
 getEntryTag (EntryTag t) = t
 
+data FieldVisibility = Public | Private
+  deriving stock (Show, Eq)
+
+instance A.ToJSON FieldVisibility where
+  toJSON = \case
+    Public -> A.toJSON @Text "public"
+    Private -> A.toJSON @Text "private"
+instance A.FromJSON FieldVisibility where
+  parseJSON = A.withText "visibility" \case
+    "public" -> pure Public
+    "private" -> pure Private
+    other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
+
 data Field =
   Field
   { _fDateModified :: DateTime
-  , _private :: Bool
+  , _visibility :: FieldVisibility
   , _value :: T.Text
   }
   deriving (Show, Eq)
@@ -75,11 +89,11 @@ newField :: UTCTime -> T.Text -> Field
 newField time value =
   Field
   { _fDateModified = time
-  , _private = False
+  , _visibility = Private
   , _value = value
   }
 
-makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
+makeLensesFor [("_value", "value"), ("_visibility", "visibility")] ''Field
 
 data Entry =
   Entry

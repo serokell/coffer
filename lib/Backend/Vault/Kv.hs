@@ -42,6 +42,7 @@ import           Network.HTTP.Types           (statusCode)
 import           Polysemy
 import           Control.Lens
 import Coffer.Path (entryPathSegments, pathSegments)
+import Entry (FieldVisibility)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -81,7 +82,7 @@ vaultKvCodec = VaultKvBackend
 
 data FieldMetadata = FieldMetadata
   { _dateModified :: UTCTime
-  , _private :: Bool
+  , _visibility :: FieldVisibility
   }
   deriving (Show, Generic)
 makeLenses ''FieldMetadata
@@ -131,7 +132,7 @@ runVaultIO url token mount = interpret $
                                  (\f ->
                                  FieldMetadata
                                  { _dateModified = f ^. E.dateModified
-                                 , _private = f ^. E.private
+                                 , _visibility = f ^. E.visibility
                                  })
                                & HS.mapKeys E.getFieldKey
                              , _tags = map E.getEntryTag $ entry ^. E.tags
@@ -159,13 +160,13 @@ runVaultIO url token mount = interpret $
           let secrets = HS.toList $ foldr HS.delete _data ["#$coffer"]
           let keyToField key = do
                _modTime <- cofferSpecials ^. fields.at key <&> (^. dateModified)
-               _private <- cofferSpecials ^. fields.at key <&> (^. private)
+               _visibility <- cofferSpecials ^. fields.at key <&> (^. visibility)
                _value <- _data ^.at key
                _key <- E.newFieldKey key
 
                Just (_key
                     , E.newField _modTime _value
-                      & E.private .~ _private
+                      & E.visibility .~ _visibility
                     )
 
           fields <- maybeThrow $
