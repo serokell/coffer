@@ -20,6 +20,8 @@ import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
 import Language.Haskell.TH.Lens (_CaseE)
+import Data.Text (Text)
+import Coffer.Path (EntryPath)
 
 type DateTime = UTCTime
 
@@ -81,7 +83,7 @@ makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
 
 data Entry =
   Entry
-  { _path :: [T.Text]
+  { _path :: EntryPath
   , _eDateModified :: DateTime
   , _masterField :: Maybe FieldKey
   , _fields :: HS.HashMap FieldKey Field
@@ -89,7 +91,7 @@ data Entry =
   }
   deriving (Show, Eq)
 
-newEntry :: [T.Text] -> UTCTime -> Entry
+newEntry :: EntryPath -> UTCTime -> Entry
 newEntry path time =
   Entry
   { _path = path

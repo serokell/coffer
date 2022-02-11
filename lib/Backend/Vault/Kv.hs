@@ -41,6 +41,7 @@ import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
+import Coffer.Path (entryPathSegments, pathSegments)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -144,13 +145,14 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
+        response <- embedCatch (entry ^. E.path . to entryPathSegments) do
+          postSecret env (entry ^. E.path . to entryPathSegments) secret
 
         case response ^. I.ddata . at ("version" :: T.Text) of
           Just (A.Number i) -> maybe (throw MarshallingFailed) pure (S.toBoundedInteger i)
           _ -> throw MarshallingFailed
       ReadSecret path version ->
-        runMaybe $ embedCatchMaybe path (readSecret env path version)
+        runMaybe $ embedCatchMaybe (entryPathSegments path) (readSecret env (entryPathSegments path) version)
         >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
           cofferSpecials :: CofferSpecials <-
             maybeThrow (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
@@ -175,9 +177,9 @@ runVaultIO url token mount = interpret $
             & E.fields .~ fields
             & E.tags .~ _tags
       ListSecrets path ->
-        runMaybe (embedCatchMaybe path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list)
+        runMaybe (embedCatchMaybe (pathSegments path) (listSecrets env (pathSegments path)) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list)
       DeleteSecret path ->
-        embedCatch path (deleteSecret env path) <&> const ()
+        embedCatch (entryPathSegments path) (deleteSecret env (entryPathSegments path)) <&> const ()
   where postSecret env = (I.routes env ^. I.postSecret) mount token
         readSecret env = (I.routes env ^. I.readSecret) mount token
         listSecrets env = (I.routes env ^. I.listSecrets) mount token

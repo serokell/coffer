@@ -17,13 +17,14 @@ import Polysemy.Error                (Error)
 import Toml                          (TomlCodec)
 
 import Polysemy
+import Coffer.Path (EntryPath, Path)
 
 -- @TODO - rename Secret to Entry?
 data BackendEffect m a where
   WriteSecret  :: E.Entry -> BackendEffect m Int
-  ReadSecret   :: [T.Text] -> Maybe Int -> BackendEffect m (Maybe E.Entry)
-  ListSecrets  :: [T.Text] -> BackendEffect m (Maybe [T.Text])
-  DeleteSecret :: [T.Text] -> BackendEffect m ()
+  ReadSecret   :: EntryPath -> Maybe Int -> BackendEffect m (Maybe E.Entry)
+  ListSecrets  :: Path -> BackendEffect m (Maybe [T.Text])
+  DeleteSecret :: EntryPath -> BackendEffect m ()
 makeSem ''BackendEffect
 
 class Show a => Backend a where
