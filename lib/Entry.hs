@@ -2,14 +2,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Entry
-  ( newFieldKey
-  , dateModified
+  ( dateModified
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
-  , Field, FieldKey (..), newField, getFieldKey
-  , private, value
+  , Field, FieldKey (..), newField, newFieldKey, getFieldKey, newFieldTag, getFieldTag
+  , private, value, tags
   )
 where
+
 
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
@@ -19,6 +19,7 @@ import qualified Data.Aeson.Types as A
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
+import Language.Haskell.TH.Lens (_CaseE)
 
 type DateTime = UTCTime
 
@@ -43,11 +44,29 @@ newFieldKey t =
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (FieldKey t) = t
 
+newtype FieldTag = FieldTag T.Text
+  deriving (Generic, Show, Eq)
+
+instance A.ToJSON FieldTag where
+instance A.FromJSON FieldTag where
+
+newFieldTag :: T.Text -> Maybe FieldTag
+newFieldTag t =
+  if T.foldr ((&&) . (`elem` allowedChars)) True t then
+    Just $ FieldTag t
+  else
+    Nothing
+  where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-"
+
+getFieldTag :: FieldTag -> T.Text
+getFieldTag (FieldTag t) = t
+
 data Field =
   Field
   { _fDateModified :: DateTime
   , _private :: Bool
   , _value :: T.Text
+  , _tags :: [FieldTag]
   }
   deriving (Show, Eq)
 
@@ -57,9 +76,10 @@ newField time value =
   { _fDateModified = time
   , _private = False
   , _value = value
+  , _tags = []
   }
 
-makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
+makeLensesFor [("_value", "value"), ("_private", "private"), ("_tags", "tags")] ''Field
 
 data Entry =
   Entry

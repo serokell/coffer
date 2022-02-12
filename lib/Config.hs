@@ -17,11 +17,15 @@ import           Polysemy.Error      (Error, errorToIOFinal)
 import           Toml                (TomlCodec);
 
 import           Polysemy
+import           Control.Lens
 import           Backend             (BackendPacked (..)
                                      , Backend (..)
-                                     , readSecret
+                                     , readSecret, writeSecret
                                      )
 import           Backends            (backendPackedCodec, supportedBackends)
+
+import Data.Time (UTCTime(UTCTime, utctDay, utctDayTime))
+import Data.Time.Calendar.OrdinalDate (fromMondayStartWeek)
 
 
 data Config =
@@ -53,10 +57,27 @@ test = do
       case HS.lookup (mainBackend c) (backends c) of
         Just (PackBackend b) -> do
           let runEffect = _runEffect b 
-          runFinal . embedToFinal @IO . errorToIOFinal @CofferError
+          print "what"
+          secret <- runFinal . embedToFinal @IO . errorToIOFinal @CofferError
             $ runEffect $ do
-            secret <- readSecret ["test"] Nothing
-            pure 4
+            entry <- maybe undefined pure $ do
+                  k1 <- E.newFieldKey "haei"
+                  k2 <- E.newFieldKey "asdf"
+                  tags <- mapM E.newFieldTag [ "password", "token", "secure" ]
+                  let time = UTCTime { utctDay = fromMondayStartWeek 69 69 69, utctDayTime = 42 }
+
+
+                  pure $ E.newEntry ["test"] time
+                    & E.masterField ?~ k1
+                    & E.fields .~ HS.fromList
+                    [ ( k2
+                      , E.newField time "123123"
+                        & E.tags .~ tags
+                      )
+                    ]
+            writeSecret entry
+            readSecret ["test"] Nothing
+          print secret
           pure ()
         Nothing -> pure ()
 
