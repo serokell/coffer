@@ -162,7 +162,7 @@ runVaultIO url token mount = interpret $
                _modTime <- cofferSpecials ^. fields.at key <&> (^. dateModified)
                _visibility <- cofferSpecials ^. fields.at key <&> (^. visibility)
                _value <- _data ^.at key
-               _key <- E.newFieldKey key
+               _key <- either (const Nothing) Just $ E.newFieldKey key
 
                Just (_key
                     , E.newField _modTime _value
@@ -171,10 +171,10 @@ runVaultIO url token mount = interpret $
 
           fields <- maybeThrow $
             secrets & traverse %~ (keyToField . fst) & sequence <&> HS.fromList
-          _tags <- maybeThrow $ cofferSpecials ^. tags & mapM E.newEntryTag
+          _tags <- maybeThrow $ cofferSpecials ^. tags & mapM (either (const Nothing) Just . E.newEntryTag)
 
           pure $ E.newEntry path (cofferSpecials ^. globalDateModified)
-            & E.masterField .~ (cofferSpecials ^. masterKey >>= E.newFieldKey)
+            & E.masterField .~ (cofferSpecials ^. masterKey >>= either (const Nothing) Just . E.newFieldKey)
             & E.fields .~ fields
             & E.tags .~ _tags
       ListSecrets path ->

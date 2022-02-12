@@ -36,12 +36,13 @@ instance A.ToJSONKey FieldKey where
 instance A.FromJSON FieldKey where
 instance A.FromJSONKey FieldKey where
 
-newFieldKey :: T.Text -> Maybe FieldKey
-newFieldKey t =
-  if T.foldr ((&&) . (`elem` allowedChars)) True t then
-    Just $ FieldKey t
-  else
-    Nothing
+newFieldKey :: Text -> Either Text FieldKey
+newFieldKey t
+  | T.null t =
+      Left "Tags must contain at least 1 character"
+  | T.any (`notElem` allowedChars) t =
+      Left $ "Tags can only contain the following characters: '" <> T.pack allowedChars <> "'"
+  | otherwise = Right $ FieldKey t
   where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;:"
 
 getFieldKey :: FieldKey -> T.Text
@@ -53,12 +54,13 @@ newtype EntryTag = EntryTag T.Text
 instance A.ToJSON EntryTag where
 instance A.FromJSON EntryTag where
 
-newEntryTag :: T.Text -> Maybe EntryTag
-newEntryTag t =
-  if T.foldr ((&&) . (`elem` allowedChars)) True t then
-    Just $ EntryTag t
-  else
-    Nothing
+newEntryTag :: Text -> Either Text EntryTag
+newEntryTag tag
+  | T.null tag =
+      Left "Tags must contain at least 1 character"
+  | T.any (`notElem` allowedChars) tag =
+      Left $ "Tags can only contain the following characters: '" <> T.pack allowedChars <> "'"
+  | otherwise = Right $ EntryTag tag
   where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-"
 
 getEntryTag :: EntryTag -> T.Text
