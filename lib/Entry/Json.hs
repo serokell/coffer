@@ -12,8 +12,6 @@ import Control.Lens
 import qualified Data.HashMap.Strict as HS
 import qualified Data.Text as T
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import qualified Data.Vector as V
-import qualified Data.Set as S
 import Control.Monad (forM)
 import Entry (Entry)
 import Fmt (pretty)
@@ -66,20 +64,19 @@ instance E.EntryConvertible JsonEntry where
                 dateModified <- HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
                   >>= iso8601ParseM . T.unpack
-                let _masterField = HS.lookup "master_field" o
-                                     >>= \case A.String t -> E.newFieldKey t ; _ -> Nothing
+                let _masterField = HS.lookup "master_field" o >>= \case
+                      A.String t -> eitherToMaybe $ E.newFieldKey t
+                      _ -> Nothing
                 _fields <- do
                    value <- HS.lookup "fields" o
                    obj <- value ^? A._Object
                    keyFields <-
                       forM (HS.toList obj) $ \(text, value) -> do
-                        key <- E.newFieldKey text
+                        key <- eitherToMaybe $ E.newFieldKey text
                         field <- value ^? fieldConverter
                         pure (key, field)
                    pure $ HS.fromList keyFields
-                _tags <- HS.lookup "tags" o
-                   >>= \case A.Array a -> Just a ; _ -> Nothing
-                   >>= sequence . V.toList . V.map (\case A.String s -> E.newEntryTag s ; _ -> Nothing) <&> S.fromList
+                _tags <- HS.lookup "tags" o >>= resultToMaybe . A.fromJSON
 
                 pure
                   $ E.newEntry path dateModified

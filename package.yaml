@@ -104,7 +104,6 @@ library:
     - tomland
     - unordered-containers
     - validation-selective
-    - vector
 
 executables:
   coffer:

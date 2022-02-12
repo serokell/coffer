@@ -32,12 +32,13 @@ newtype FieldKey = UnsafeFieldKey T.Text
 keyCharSet :: [Char]
 keyCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 
-newFieldKey :: T.Text -> Maybe FieldKey
-newFieldKey t =
-  if T.all (`elem` keyCharSet) t && not (T.null t) then
-    Just $ UnsafeFieldKey t
-  else
-    Nothing
+newFieldKey :: Text -> Either Text FieldKey
+newFieldKey t
+  | T.null t =
+      Left "Tags must contain at least 1 character"
+  | T.any (`notElem` keyCharSet) t =
+      Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
+  | otherwise = Right $ UnsafeFieldKey t
 
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (UnsafeFieldKey t) = t
@@ -46,12 +47,13 @@ newtype EntryTag = UnsafeEntryTag T.Text
   deriving stock (Show, Eq, Ord)
   deriving newtype (A.ToJSON, A.FromJSON)
 
-newEntryTag :: T.Text -> Maybe EntryTag
-newEntryTag t =
-  if T.all (`elem` keyCharSet) t && not (T.null t) then
-    Just $ UnsafeEntryTag t
-  else
-    Nothing
+newEntryTag :: Text -> Either Text EntryTag
+newEntryTag tag
+  | T.null tag =
+      Left "Tags must contain at least 1 character"
+  | T.any (`notElem` keyCharSet) tag =
+      Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
+  | otherwise = Right $ UnsafeEntryTag tag
 
 getEntryTag :: EntryTag -> T.Text
 getEntryTag (UnsafeEntryTag t) = t

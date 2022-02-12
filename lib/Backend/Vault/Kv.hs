@@ -40,6 +40,7 @@ import           Control.Lens
 import Coffer.Path (entryPathSegments, pathSegments)
 import qualified Data.Aeson.Text as A
 import Entry (FieldVisibility)
+import Data.Either.Extra (eitherToMaybe)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -154,7 +155,7 @@ runVaultIO url token mount = interpret $
             let keyAndValueToField (key, value) = do
                   _modTime <- cofferSpecials ^? fields . at key . _Just . dateModified
                   _visibility <- cofferSpecials ^? fields . at key . _Just . visibility
-                  _key <- E.newFieldKey key
+                  _key <- eitherToMaybe $ E.newFieldKey key
 
                   Just (_key
                         , E.newField _modTime value
@@ -163,13 +164,18 @@ runVaultIO url token mount = interpret $
 
             fields <-
               (secrets & each %%~ keyAndValueToField <&> HS.fromList) `orThrow` MarshallingFailed
-            _tags <- (cofferSpecials ^. tags & \text -> Set.fromList <$> mapM E.newEntryTag (Set.toList text)) `orThrow` MarshallingFailed
+            _tags <- cofferSpecials ^. tags
+                  & Set.toList
+                  & mapM E.newEntryTag
+                  <&> Set.fromList
+                  & eitherToMaybe
+                  & (`orThrow` MarshallingFailed)
 
             fieldKey <-
               case cofferSpecials ^. masterKey of
                 Nothing -> pure Nothing
                 Just mKey ->
-                  case E.newFieldKey mKey of
+                  case eitherToMaybe $ E.newFieldKey mKey of
                     Nothing -> throw (OtherError $ "Attempted to create new field key from '" <> mKey <> "'")
                     Just fieldKey -> (pure . Just) fieldKey
 
