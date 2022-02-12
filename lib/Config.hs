@@ -21,6 +21,7 @@ import           Control.Lens
 import           Backend             (BackendPacked (..)
                                      , Backend (..)
                                      , readSecret, writeSecret
+                                     , deleteSecret
                                      )
 import           Backends            (backendPackedCodec, supportedBackends)
 
@@ -77,6 +78,7 @@ test = do
                     ]
             writeSecret entry
             readSecret ["test"] Nothing
+            deleteSecret ["test"]
           print secret
           pure ()
         Nothing -> pure ()

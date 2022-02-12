@@ -329,10 +329,10 @@ data Routes route =
   , _deleteSecret :: route
     :- "v1"
     :> Capture "mount" T.Text
-    :> "delete"
+    :> "metadata"
     :> VaultTokenHeader
     :> CaptureAll "segments" T.Text
-    :> Delete '[JSON] ()
+    :> Delete '[JSON] NoContent
   }
   deriving (Generic)
 makeLenses ''Routes
