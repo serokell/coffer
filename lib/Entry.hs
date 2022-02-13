@@ -5,7 +5,7 @@ module Entry
   ( dateModified
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
-  , Field, FieldKey (..), newField, newFieldKey, getFieldKey, newFieldTag, getFieldTag
+  , Field, FieldKey (..), newField, newFieldKey, getFieldKey, newEntryTag, getEntryTag
   , private, value, tags
   )
 where
@@ -44,29 +44,28 @@ newFieldKey t =
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (FieldKey t) = t
 
-newtype FieldTag = FieldTag T.Text
+newtype EntryTag = EntryTag T.Text
   deriving (Generic, Show, Eq)
 
-instance A.ToJSON FieldTag where
-instance A.FromJSON FieldTag where
+instance A.ToJSON EntryTag where
+instance A.FromJSON EntryTag where
 
-newFieldTag :: T.Text -> Maybe FieldTag
-newFieldTag t =
+newEntryTag :: T.Text -> Maybe EntryTag
+newEntryTag t =
   if T.foldr ((&&) . (`elem` allowedChars)) True t then
-    Just $ FieldTag t
+    Just $ EntryTag t
   else
     Nothing
   where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-"
 
-getFieldTag :: FieldTag -> T.Text
-getFieldTag (FieldTag t) = t
+getEntryTag :: EntryTag -> T.Text
+getEntryTag (EntryTag t) = t
 
 data Field =
   Field
   { _fDateModified :: DateTime
   , _private :: Bool
   , _value :: T.Text
-  , _tags :: [FieldTag]
   }
   deriving (Show, Eq)
 
@@ -76,10 +75,9 @@ newField time value =
   { _fDateModified = time
   , _private = False
   , _value = value
-  , _tags = []
   }
 
-makeLensesFor [("_value", "value"), ("_private", "private"), ("_tags", "tags")] ''Field
+makeLensesFor [("_value", "value"), ("_private", "private")] ''Field
 
 data Entry =
   Entry
@@ -87,6 +85,7 @@ data Entry =
   , _eDateModified :: DateTime
   , _masterField :: Maybe FieldKey
   , _fields :: HS.HashMap FieldKey Field
+  , _tags :: [EntryTag]
   }
   deriving (Show, Eq)
 
@@ -97,9 +96,10 @@ newEntry path time =
   , _eDateModified = time
   , _masterField = Nothing
   , _fields = HS.empty
+  , _tags = []
   }
 
-makeLensesFor [("_path", "path"), ("_masterField", "masterField"), ("_fields", "fields")] ''Entry
+makeLensesFor [("_path", "path"), ("_masterField", "masterField"), ("_fields", "fields"), ("_tags", "tags")] ''Entry
 
 class DateModified a where
   dateModified :: Lens' a DateTime

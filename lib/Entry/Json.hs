@@ -32,7 +32,6 @@ fieldConverter = prism' to from
           [ "date_modified" A..= (field ^. E.dateModified)
           , "private" A..= (field ^. E.private)
           , "value" A..= (field ^. E.value)
-          , "tags" A..= (field ^. E.tags)
           ]
         from (A.Object o) = do
           dateModified <- HS.lookup "date_modified" o
@@ -42,14 +41,10 @@ fieldConverter = prism' to from
                      >>= \case A.String t -> Just t ; _ -> Nothing
           _private <- HS.lookup "private" o
                         >>= \case A.Bool b -> Just b ; _ -> Nothing
-          _tags <- HS.lookup "tags" o
-                     >>= \case A.Array a -> Just a ; _ -> Nothing
-                     >>= sequence . V.toList . V.map (\case A.String s -> E.newFieldTag s ; _ -> Nothing)
 
           pure $
               E.newField dateModified value
             & E.private .~ _private
-            & E.tags .~ _tags
         from _ = Nothing
 
 instance E.EntryConvertible JsonEntry where
@@ -60,6 +55,7 @@ instance E.EntryConvertible JsonEntry where
             , "date_modified" A..= (entry ^. E.dateModified)
             , "master_field" A..= (entry ^. E.masterField)
             , "fields" A..= (HS.fromList . over (traverse . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
+            , "tags" A..= (entry ^. E.tags)
             ]
           from (JsonEntry (A.Object o)) =
               do
@@ -76,11 +72,15 @@ instance E.EntryConvertible JsonEntry where
                   <&> HS.map (^? fieldConverter)
                   >>= (mapM (uncurry (liftA2 (,)) . over _1 E.newFieldKey) . HS.toList)
                   <&> HS.fromList
+                _tags <- HS.lookup "tags" o
+                   >>= \case A.Array a -> Just a ; _ -> Nothing
+                   >>= sequence . V.toList . V.map (\case A.String s -> E.newEntryTag s ; _ -> Nothing)
 
                 pure $
                     E.newEntry path dateModified
                   & E.masterField .~ _masterField
                   & E.fields .~ _fields
+                  & E.tags .~ _tags
           from _ = Nothing
 
 -- |
@@ -88,13 +88,13 @@ instance E.EntryConvertible JsonEntry where
 -- >>> import Control.Lens
 -- >>> import Vault.Entry
 --
--- >>> testEntry <&> ((^. re entry) :: Entry -> JsonEntry) <&> A.encode >>= A.decode >>= (\x -> (JsonEntry x) ^? entry)
+-- >>> testEntry <&> ((^. re E.entry) :: E.Entry -> JsonEntry) <&> A.encode >>= A.decode >>= (\x -> (JsonEntry x) ^? E.entry)
 -- Just (Entry {_path = ["haei","aa"], _eDateModified = 0070-07-05 00:00:42 UTC, _masterField = Just (FieldKey "haei"), _fields = fromList [(FieldKey "asdf",Field {_fDateModified = 0070-07-05 00:00:42 UTC, _private = False, _value = "", _tags = []})]})
 
 testEntry = do
   k1 <- E.newFieldKey "haei"
   k2 <- E.newFieldKey "asdf"
-  tags <- mapM E.newFieldTag [ "password", "token", "secure" ]
+  tags <- mapM E.newEntryTag [ "password", "token", "secure" ]
   let time = UTCTime { utctDay = fromMondayStartWeek 69 69 69, utctDayTime = 42 }
 
 
@@ -103,9 +103,9 @@ testEntry = do
          & E.fields .~ HS.fromList
          [ ( k2
            , E.newField time ""
-             & E.tags .~ tags
            )
          ]
+         & E.tags .~ tags
   -- execStateT
   --   (do
   --     E.masterField .= Just k1

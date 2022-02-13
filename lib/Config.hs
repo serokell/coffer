@@ -64,7 +64,7 @@ test = do
             entry <- maybe undefined pure $ do
                   k1 <- E.newFieldKey "haei"
                   k2 <- E.newFieldKey "asdf"
-                  tags <- mapM E.newFieldTag [ "password", "token", "secure" ]
+                  tags <- mapM E.newEntryTag [ "password", "token", "secure" ]
                   let time = UTCTime { utctDay = fromMondayStartWeek 69 69 69, utctDayTime = 42 }
 
 
@@ -73,12 +73,13 @@ test = do
                     & E.fields .~ HS.fromList
                     [ ( k2
                       , E.newField time "123123"
-                        & E.tags .~ tags
                       )
                     ]
+                    & E.tags .~ tags
             writeSecret entry
-            readSecret ["test"] Nothing
+            sec <- readSecret ["test"] Nothing
             deleteSecret ["test"]
+            pure sec
           print secret
           pure ()
         Nothing -> pure ()
