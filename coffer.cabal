@@ -43,8 +43,10 @@ library
                     , http-client           ^>= 0.7.0
                     , http-client-tls       ^>= 0.3.5.0
 
-                    , Vault.Entry
+    exposed-modules:  Vault.Kv
+    other-modules:    Vault.Entry
                     , Vault.Entry.Json
+
     hs-source-dirs:   lib
     default-language: Haskell2010
 
