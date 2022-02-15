@@ -1,0 +1,5 @@
+packages: *.cabal
+
+package coffer
+
+write-ghc-environment-files: always
