@@ -1,0 +1,68 @@
+cabal-version:      2.4
+name:               coffer
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             Magic_RB
+maintainer:         magic_rb@redalder.org
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+common          deps
+    build-depends:    base                  ^>= 4.14.3.0
+                    , lens                  ^>= 5.1
+                    , generic-lens          ^>= 2.2.0.0
+                    , text                  ^>= 1.2.4.0
+                    , bytestring            ^>= 0.10.12.0
+                    , unordered-containers  ^>= 0.2.16.0
+                    , aeson                 ^>= 1.5.6.0
+                    , mtl                   ^>= 2.2.0.0
+                    , hashable              ^>= 1.3.5.0
+
+common          exts
+    extensions:       DeriveGeneric
+                    , OverloadedStrings
+
+library
+    import:           deps, exts
+    build-depends:    servant               ^>= 0.18.0
+                    , servant-client        ^>= 0.18.0
+                    , http-client           ^>= 0.7.0
+                    , http-client-tls       ^>= 0.3.5.0
+
+    hs-source-dirs:   lib
+    default-language: Haskell2010
+
+test-suite      doctests
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Doctests.hs
+    ghc-options:      -threaded
+    build-depends:    base, coffer, doctest-parallel >= 0.1
+    default-language: Haskell2010
+
+executable      coffer
+    import:           deps, exts
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    -- other-modules:
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:    coffer
+    hs-source-dirs:   app
+    default-language: Haskell2010
