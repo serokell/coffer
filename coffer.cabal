@@ -35,6 +35,8 @@ common          deps
 common          exts
     extensions:       DeriveGeneric
                     , OverloadedStrings
+                    , DerivingStrategies
+                    , GeneralizedNewtypeDeriving
 
 library
     import:           deps, exts
@@ -43,6 +45,8 @@ library
                     , http-client           ^>= 0.7.0
                     , http-client-tls       ^>= 0.3.5.0
 
+    exposed-modules:  Vault.Entry
+                    , Vault.Entry.Json
     hs-source-dirs:   lib
     default-language: Haskell2010
 
