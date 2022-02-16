@@ -1,28 +1,33 @@
 {-# LANGUAGE LambdaCase #-}
-module Vault.Entry.Json where
+module Entry.Json where
 
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 
-import Vault.Entry
-import qualified Vault.Entry as E
+import Entry
+import qualified Entry as E
 import Control.Lens
 import qualified Data.HashMap.Strict as HS
 import Control.Monad.State (execState, runState, execStateT, lift)
 import qualified Data.Text as T
 import Control.Applicative (liftA2)
 import qualified Control.Monad.Writer.Strict as T
+import GHC.Generics (Generic)
 
 newtype JsonEntry = JsonEntry A.Value
+  deriving (Show, Generic)
 
-fieldConverter :: (Lens Field (Maybe Field) A.Value A.Value)
-fieldConverter = lens getter setter
-  where getter field =
+instance A.ToJSON JsonEntry
+instance A.FromJSON JsonEntry
+
+fieldConverter :: (Prism A.Value A.Value Field Field)
+fieldConverter = prism' to from
+  where to field =
           A.object
           [ "date_modified" A..= (field ^. dateModified)
           , "value" A..= (field ^. value)
           ]
-        setter e (A.Object o) =
+        from (A.Object o) =
           (execStateT $
             do
               _dateModified <- lift $ HS.lookup "date_modified" o
@@ -31,37 +36,38 @@ fieldConverter = lens getter setter
                 >>= \case A.String t -> Just t ; _ -> Nothing
 
               dateModified .= _dateModified
-              value .= _value) e
-        setter _ _ = Nothing
+              value .= _value) emptyField
+        from _ = Nothing
 
 instance EntryConvertible JsonEntry where
-  entry = lens getter setter
-    where getter entry =
+  entry = prism' to from
+    where to entry =
             JsonEntry $ A.object
-            [ "path" A..= (entry ^. path)
+            [ "path" A..= T.intercalate "/" (entry ^. path)
             , "date_modified" A..= (entry ^. dateModified)
-            , "fields" A..= HS.map (\b -> let un = getter2 b in undefined :: A.Value) (entry ^. fields)
+            , "master_field" A..= over _2 (^. re fieldConverter) (entry ^. masterField)
+            , "fields" A..= (HS.fromList . over (traverse . _1) getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. fields))
             ]
-          getter2 field =
-            A.object
-            [ "date_modified" A..= (field ^. dateModified)
-            , "value" A..= (field ^. value)
-            ]
-          setter e (JsonEntry (A.Object o)) =
+          from (JsonEntry (A.Object o)) =
             (execStateT $
               do
                 _path <- lift $ HS.lookup "path" o
                   >>= (\case A.String t -> Just t ; _ -> Nothing)
-                  <&> T.split (== ' ')
+                  <&> T.split (== '/')
                 _dateModified <- lift $ HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
+                _masterField <- lift $ HS.lookup "master_field" o
+                  >>= \case A.Array t -> Just t ; _ -> Nothing
+                  >>= uncurry (liftA2 (,)) .
+                      \t -> (t ^? traversed.index 0 >>= \case A.String t -> newFieldKey t ; _ -> Nothing, t ^? traversed.index 1 >>= (^? fieldConverter))
                 _fields <- lift $ HS.lookup "fields" o
-                  >>= (\case A.Object a -> Just a ; _ -> Nothing)
-                  <&> HS.map (\v -> set fieldConverter v emptyField)
+                  >>= (\case A.Object t -> Just t ; _ -> Nothing)
+                  <&> HS.map (^? fieldConverter)
                   >>= (mapM (uncurry (liftA2 (,)) . over _1 newFieldKey) . HS.toList)
                   <&> HS.fromList
 
                 path .= _path
                 dateModified .= _dateModified
-                fields .= _fields) e
-          setter _ _ = Nothing
+                masterField .= _masterField
+                fields .= _fields) emptyEntry
+          from _ = Nothing
