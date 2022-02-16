@@ -24,6 +24,7 @@ module Backend.Vault.Kv.Internal
   , postSecret
   , patchSecret
   , updateMetadata
+  , deleteSecret
 
   , routes
   )
@@ -323,6 +324,15 @@ data Routes route =
     :> CaptureAll "segments" T.Text
     :> ReqBody '[JSON] UpdateMetadata
     :> Post '[JSON] ()
+    -- | To delete secret under a path use `deleteSecret`
+    -- >>> (routes clientEnv ^. deleteSecret) vaultToken "kv" ["testbed"]
+  , _deleteSecret :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "delete"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> Delete '[JSON] ()
   }
   deriving (Generic)
 makeLenses ''Routes

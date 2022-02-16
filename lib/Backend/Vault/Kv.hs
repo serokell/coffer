@@ -29,12 +29,17 @@ import           Control.Exception.Lens       (exception)
 import           Control.Monad.State          (evalState)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
-import           Backend                      (Backend (..), BackendEffect (..))
+import           Control.Applicative          (Alternative(empty))
+import           Validation                   (Validation(Success, Failure))
+import           Data.Time.Format.ISO8601     (iso8601ParseM, iso8601Show)
+import           Data.Time                    (UTCTime)
+import           Control.Exception            (catch)
 
 import           Polysemy
 import           Control.Lens
-import Control.Applicative (Alternative(empty))
-import Validation (Validation(Success, Failure))
+import Servant.Client.Core.Response (responseStatusCode)
+import Servant.Client.Core.Request (RequestF (Request))
+import Network.HTTP.Types (statusCode)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -159,12 +164,31 @@ runVaultIO url token mount = interpret $
               , E._fields = fields
               }
       ListSecrets path ->
-        embed (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
-
+        embedCatch path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
+      DeleteSecret path ->
+        embedCatch path (deleteSecret env path)
   where postSecret env = (I.routes env ^. I.postSecret) mount token
         readSecret env = (I.routes env ^. I.readSecret) mount token
         listSecrets env = (I.routes env ^. I.listSecrets) mount token
         updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
+        deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
+
+        exceptionHandler :: [T.Text] -> ClientError -> CofferError
+        exceptionHandler path =
+          \case FailureResponse _request response ->
+                    case statusCode $ responseStatusCode response of
+                      404 -> EntryNotFound path
+                      _ -> OtherError
+                DecodeFailure text response -> MarshallingFailed
+                UnsupportedContentType mediaType response -> MarshallingFailed
+                InvalidContentTypeHeader response -> MarshallingFailed
+                ConnectionError excepton -> ConnectError
+        embedCatch :: Member (Embed IO) r
+                       => Member (Error CofferError) r
+                       => [T.Text]
+                       -> IO a
+                       -> Sem r a
+        embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>= \case Left l -> pure l ; Right r -> throw r
 
 instance Backend VaultKvBackend where
   _name s = _vbName s
