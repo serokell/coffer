@@ -1,20 +1,12 @@
 module Error
-  ( VaultError (..)
-  , CofferError (..)
+  ( CofferError (..)
   ) where
 
-import qualified Data.Text         as T
-
-import           Servant.Client    (BaseUrl)
-import           Control.Exception (SomeException)
-
-data VaultError =
-  ConnectionFailed SomeException BaseUrl
-  | ParseResponseFailed T.Text
-  | EntryNotFound [T.Text]
-  deriving (Show)
+import qualified Data.Text as T
 
 data CofferError =
-  Vault VaultError
+  EntryNotFound [T.Text]
   | MarshallingFailed
+  | ConnectError
+  | OtherError
   deriving (Show)

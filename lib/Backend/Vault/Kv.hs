@@ -8,7 +8,8 @@ module Backend.Vault.Kv
 import qualified Entry                        as E
 import qualified Backend.Vault.Kv.Internal    as I
 
-import           Error                        (CofferError (MarshallingFailed), VaultError (ConnectionFailed))
+import           Error                        (CofferError (MarshallingFailed, EntryNotFound, OtherError, ConnectError))
+import           Backend                      (Backend (..), BackendEffect (..))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
@@ -80,8 +81,8 @@ vaultKvCodec = VaultKvBackend
 data CofferSpecials =
   CofferSpecials
   { _masterKey :: T.Text
-  , _datesModified :: HS.HashMap T.Text T.Text
-  , _globalDateModified :: T.Text
+  , _datesModified :: HS.HashMap T.Text UTCTime
+  , _globalDateModified :: UTCTime
   }
   deriving (Show, Generic)
 makeLenses ''CofferSpecials
@@ -131,21 +132,20 @@ runVaultIO url token mount = interpret $
               where fields = entry ^. E.fields
                     masterField = entry ^. E.masterField
 
-        response <- embed (postSecret env (entry ^. E.path) secret)
-        embed $ print cofferSpecials
+        response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
 
         case response ^. I.ddata . at ("version" :: T.Text) of
           Just (A.Number i) -> maybe (throw MarshallingFailed) pure (S.toBoundedInteger i)
           _ -> throw MarshallingFailed
       ReadSecret path version ->
-        embed (readSecret env path version)
+        embedCatch path (readSecret env path version)
         >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
           cofferSpecials :: CofferSpecials <-
             maybe (throw MarshallingFailed) pure
             (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
           let secrets = HS.toList $ foldr HS.delete _data ["#$coffer", cofferSpecials ^. masterKey]
           let keyToField key = do
-               modTime <- cofferSpecials ^.datesModified.at key
+               modTime <- cofferSpecials ^. datesModified.at key
                value <- _data ^.at key
                key <- E.newFieldKey key
 
