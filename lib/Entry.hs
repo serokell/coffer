@@ -20,7 +20,6 @@ import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
 
--- TODO - proper date time lib
 type DateTime = UTCTime
 
 newtype FieldKey = FieldKey T.Text
@@ -67,7 +66,7 @@ data Entry =
   Entry
   { _path :: [T.Text]
   , _eDateModified :: DateTime
-  , _masterField :: (FieldKey, Field)
+  , _masterField :: Maybe FieldKey
   , _fields :: HS.HashMap FieldKey Field
   }
   deriving (Show, Eq)

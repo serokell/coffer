@@ -35,12 +35,12 @@ import           Validation                   (Validation(Success, Failure))
 import           Data.Time.Format.ISO8601     (iso8601ParseM, iso8601Show)
 import           Data.Time                    (UTCTime)
 import           Control.Exception            (catch)
+import           Servant.Client.Core.Response (responseStatusCode)
+import           Servant.Client.Core.Request  (RequestF (Request))
+import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
-import Servant.Client.Core.Response (responseStatusCode)
-import Servant.Client.Core.Request (RequestF (Request))
-import Network.HTTP.Types (statusCode)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -51,6 +51,7 @@ data VaultKvBackend =
   }
   deriving (Show)
 
+{-# INLINE didimatch #-}
 didimatch
     :: (b -> Maybe a)  -- ^ Mapper for consumer
     -> (a -> Maybe b)     -- ^ Mapper for producer
@@ -64,7 +65,6 @@ didimatch matchB matchA codec = Toml.Codec
         Nothing -> empty
         Just d  -> Toml.codecWrite codec d >>= maybe empty pure . matchA
     }
-{-# INLINE didimatch #-}
 
 
 vaultKvCodec :: TomlCodec VaultKvBackend
@@ -80,7 +80,7 @@ vaultKvCodec = VaultKvBackend
 
 data CofferSpecials =
   CofferSpecials
-  { _masterKey :: T.Text
+  { _masterKey :: Maybe T.Text
   , _datesModified :: HS.HashMap T.Text UTCTime
   , _privates :: HS.HashMap T.Text Bool
   , _globalDateModified :: UTCTime
@@ -114,15 +114,12 @@ runVaultIO url token mount = interpret $
         let fields = entry ^. E.fields
         let masterField = entry ^. E.masterField
         let datesModified =
-              HS.mapKeys E.getFieldKey $
-              HS.insert (masterField ^. _1) (masterField ^. _2) fields
-              & traverse %~ (^. E.dateModified)
+              HS.map (^. E.dateModified) . HS.mapKeys E.getFieldKey $ fields
         let privates =
-              HS.mapKeys E.getFieldKey $
-              HS.insert (masterField ^. _1) (masterField ^. _2) (entry ^. E.fields)
-              & traverse %~ (^. E.private)
+              HS.map (^. E.private) . HS.mapKeys E.getFieldKey $ fields
+
         let cofferSpecials = CofferSpecials
-                             { _masterKey = entry ^. E.masterField . _1 & E.getFieldKey
+                             { _masterKey = entry ^. E.masterField <&> E.getFieldKey
                              , _datesModified = datesModified
                              , _globalDateModified = entry ^. E.dateModified
                              , _privates = privates
@@ -130,13 +127,11 @@ runVaultIO url token mount = interpret $
         let secret = I.PostSecret
               { I._cas = Nothing
               , I._pdata =
-                  HS.insert "#$coffer" (TL.toStrict . TL.decodeUtf8 $ A.encode cofferSpecials) $
-                  HS.mapKeys E.getFieldKey $
-                  HS.insert (masterField ^. _1) (masterField ^. _2) fields
-                  & traverse %~ (^. E.value)
+                    HS.insert "#$coffer" (TL.toStrict . TL.decodeUtf8 $ A.encode cofferSpecials)
+                  . HS.map (^. E.value)
+                  . HS.mapKeys E.getFieldKey
+                  $ entry ^. E.fields
               }
-              where fields = entry ^. E.fields
-                    masterField = entry ^. E.masterField
 
         response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
 
@@ -149,10 +144,10 @@ runVaultIO url token mount = interpret $
           cofferSpecials :: CofferSpecials <-
             maybe (throw MarshallingFailed) pure
             (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
-          let secrets = HS.toList $ foldr HS.delete _data ["#$coffer", cofferSpecials ^. masterKey]
+          let secrets = HS.toList $ foldr HS.delete _data ["#$coffer"]
           let keyToField key = do
                modTime <- cofferSpecials ^. datesModified.at key
-               private <- cofferSpecials ^. privates.at key
+               _private <- cofferSpecials ^. privates.at key
                value <- _data ^.at key
                key <- E.newFieldKey key
 
