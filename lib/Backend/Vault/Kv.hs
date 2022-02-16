@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Vault.Kv
-  (Vault (..)
+module Backend.Vault.Kv
+  ( VaultKvBackend
   , runVaultIO
   ) where
 
 import qualified Entry                        as E
-import qualified Vault.Kv.Internal            as I
+import qualified Backend.Vault.Kv.Internal    as I
 
 import           Error                        (CofferError (MarshallingFailed), VaultError (ConnectionFailed))
 

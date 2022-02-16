@@ -4,7 +4,7 @@
 , FlexibleInstances
 #-}
 
-module Vault.Kv.Internal
+module Backend.Vault.Kv.Internal
   ( KvResponse (..)
   , requestId, leaseId, renewable, leaseDuration, wrapInfo, warnings, auth
   , ReadSecret (..)
