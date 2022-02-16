@@ -18,10 +18,12 @@ import Toml                          (TomlCodec)
 
 import Polysemy
 
+-- @TODO - rename Secret to Entry?
 data BackendEffect m a where
-  WriteSecret :: E.Entry -> BackendEffect m Int
-  ReadSecret  :: [T.Text] -> Maybe Int -> BackendEffect m E.Entry
-  ListSecrets :: [T.Text] -> BackendEffect m [T.Text]
+  WriteSecret  :: E.Entry -> BackendEffect m Int
+  ReadSecret   :: [T.Text] -> Maybe Int -> BackendEffect m E.Entry
+  ListSecrets  :: [T.Text] -> BackendEffect m [T.Text]
+  DeleteSecret :: [T.Text] -> BackendEffect m ()
 makeSem ''BackendEffect
 
 class Show a => Backend a where
