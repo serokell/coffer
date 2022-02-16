@@ -1,31 +1,49 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE
+  TemplateHaskell
+, MultiParamTypeClasses
+, FlexibleInstances
+#-}
 
 module Vault.Kv.Internal
   ( KvResponse (..)
+  , requestId, leaseId, renewable, leaseDuration, wrapInfo, warnings, auth
   , ReadSecret (..)
+  , secret, createdTime, deletionTime, destroyed, version
   , ListSecrets (..)
   , PostSecret (..)
+  , cas
   , PatchSecret (..)
+  , UpdateMetadata (..)
+  , maxVersions, casRequired, deleteVersionAfter
   , VaultToken (..)
+
+  , ddata, customMetadata
 
   , readSecret
   , listSecrets
   , postSecret
   , patchSecret
+  , updateMetadata
+
+  , routes
   )
 where
 
-import qualified Data.Text           as T;
-import qualified Data.HashMap.Strict as HS;
-import qualified Data.Aeson          as A
+import qualified Data.Text              as T;
+import qualified Data.HashMap.Strict    as HS;
+import qualified Data.Aeson             as A
+import qualified Data.Aeson.Types       as AT
 
-import           Data.Aeson          ((.:)) -- Control.Lens shadows (.=), use (A..=) instead
-import           Control.Applicative ((<|>))
-import           Data.Proxy          (Proxy (Proxy))
+import           Data.Aeson             ((.:)) -- Control.Lens shadows (.=), use (A..=) instead
+import           Control.Applicative    ((<|>))
+import           Data.Proxy             (Proxy (Proxy))
+import           Servant.Client.Generic (AsClientT, genericClientHoist, genericClient)
+import           Control.Exception      (throwIO)
 
 import           Control.Lens
 import           Servant.API
 import           Servant.Client
+import           Servant.API.Generic
 
 -- |
 -- A type defining most responses from the Vault server, it wraps the data we're
@@ -46,13 +64,14 @@ data KvResponse a =
   { _requestId :: T.Text
   , _leaseId :: T.Text
   , _renewable :: Bool
-  , _lease_duration :: Int
+  , _leaseDuration :: Int
   , _kdata :: a
   , _wrapInfo :: Maybe ()
   , _warnings :: Maybe ()
   , _auth :: Maybe ()
   }
   deriving (Show)
+makeLenses ''KvResponse
 
 
 -- |
@@ -93,7 +112,7 @@ makeLenses ''ListSecrets
 data ReadSecret =
   ReadSecret
   { _secret :: HS.HashMap T.Text T.Text
-  , _customMetadata :: HS.HashMap T.Text T.Text
+  , _rCustomMetadata :: HS.HashMap T.Text T.Text
   , _createdTime :: T.Text
   , _deletionTime :: T.Text
   , _destroyed :: Bool
@@ -118,12 +137,55 @@ makeLenses ''ReadSecret
 -- }
 data PostSecret =
   PostSecret
-  { _cas :: Int
+  { _cas :: Maybe Int
   , _pdata :: HS.HashMap T.Text T.Text
   }
   deriving (Show)
 type PatchSecret = PostSecret
 makeLenses ''PostSecret
+
+
+-- |
+-- A type defining the request to the Vault servet at endpoint
+-- '/v1/<MOUNT>/metadata/<PATH>'.
+-- For example:
+--
+-- { "max_versions": 5
+-- , "cas_required": false
+-- , "delete_version_after": "40m"
+-- , "custom_metadata":
+--   { "example": ":)"
+--   }
+-- }
+data UpdateMetadata =
+  UpdateMetadata
+  { _maxVersions :: Maybe Int
+  , _casRequired :: Maybe Bool
+  , _deleteVersionAfter :: Maybe T.Text
+  , _uCustomMetadata :: HS.HashMap T.Text T.Text
+  }
+  deriving (Show)
+makeLenses ''UpdateMetadata
+
+-- Overloaded Lens accessors
+
+class DataLens a b where
+  ddata :: Lens' a b
+
+instance a ~ b => DataLens (KvResponse a) b where
+  ddata = kdata
+
+instance DataLens PostSecret (HS.HashMap T.Text T.Text) where
+  ddata = pdata
+
+class CustomMetadataLens a where
+  customMetadata :: Lens' a (HS.HashMap T.Text T.Text)
+
+instance CustomMetadataLens ReadSecret where
+  customMetadata = rCustomMetadata
+
+instance CustomMetadataLens UpdateMetadata where
+  customMetadata = uCustomMetadata
 
 -- JSON serialization/deserialization, logically some ADTs need to only be deserialized,
 -- others serialized, but never both.
@@ -155,11 +217,22 @@ instance A.FromJSON a => A.FromJSON (KvResponse a) where
     <*> pure Nothing
     <*> pure Nothing
 
+removeNull :: [AT.Pair] -> [AT.Pair]
+removeNull = filter (\(_, v) -> case v of A.Null -> False ; _ -> True)
+
 instance A.ToJSON PostSecret where
-  toJSON PostSecret { _cas = _cas, _pdata = _pdata } =
-    A.object [ "options" A..= A.object [ "cas" A..= _cas  ]
-           , "data" A..= _pdata
-           ]
+  toJSON postSecret =
+    A.object [ "options" A..= A.object (removeNull [ "cas" A..= (postSecret ^. cas)  ])
+             , "data" A..= ((postSecret ^. ddata) :: HS.HashMap T.Text T.Text)
+             ]
+
+instance A.ToJSON UpdateMetadata where
+  toJSON updateMetadata =
+    A.object (removeNull [ "max_versions" A..= (updateMetadata ^. maxVersions)
+                         , "cas_required" A..= (updateMetadata ^. casRequired)
+                         , "delete_version_after" A..= (updateMetadata ^. deleteVersionAfter)
+                         , "custom_metadata" A..= (updateMetadata ^. uCustomMetadata)
+                         ])
 
 -- Then we can declare the finalized API.
 
@@ -187,34 +260,6 @@ instance ToHttpApiData VaultToken where
 --   this is sufficient.
 type VaultTokenHeader = Header' '[Strict, Required] "X-Vault-Token" VaultToken
 
-type KvAPI =
-         "data"
-         :> VaultTokenHeader
-         :> Capture "mount" T.Text
-         :> CaptureAll "segments" T.Text
-         :> QueryParam "version" Int
-         :> Get '[JSON] (KvResponse ReadSecret)
-       :<|> "data"
-         :> VaultTokenHeader
-         :> Capture "mount" T.Text
-         :> CaptureAll "segments" T.Text
-         :> ReqBody '[JSON] PatchSecret
-         :> Patch '[JSON] (KvResponse ())
-       :<|> "data"
-         :> VaultTokenHeader
-         :> Capture "mount" T.Text
-         :> CaptureAll "segments" T.Text
-         :> ReqBody '[JSON] PostSecret
-         :> Post '[JSON] ()
-       :<|> "metadata"
-         :> VaultTokenHeader
-         :> Capture "mount" T.Text
-         :> CaptureAll "segments" T.Text
-         :> Verb 'LIST 200 '[JSON] (KvResponse ListSecrets)
-
-api :: Proxy ("v1" :> KvAPI)
-api = Proxy
-
 -- $setup
 -- >>> import Network.HTTP.Client.TLS (tlsManagerSettings)
 -- >>> import Network.HTTP.Client     (newManager)
@@ -226,34 +271,62 @@ api = Proxy
 -- >>>     manager     <- newManager tlsManagerSettings
 -- >>> let clientEnv   <- mkClientEnv manager (BaseUrl Https vaultAddress 8200 "")
 
--- | To read a secret under a path use `readSecret`
--- >>> runClientM (readSecret vaultToken "kv" ["testbed", "a1"]) clientEnv
-readSecret :<|>
-  _ :<|>
-  _ :<|>
-  _
-  = client api
 
--- | To patch a secret under a path use `patchSecret`
--- >>> runClientM (patchSecret vaultToken "kv" ["testbed", "a1"] secret) clientEnv
-_ :<|>
-  patchSecret :<|>
-  _ :<|>
-  _
-  = client api
+data Routes route =
+  Routes
+  { -- | To read a secret under a path use `readSecret`
+    -- >>> (routes clientEnv ^. readSecret) vaultToken "kv" ["testbed", "a1"]
+    _readSecret :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "data"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> QueryParam "version" Int
+    :> Get '[JSON] (KvResponse ReadSecret)
+    -- | To patch a secret under a path use `patchSecret`
+    -- >>> (routes clientEnv ^. patchSecret) vaultToken "kv" ["testbed", "a1"] secret
+  , _patchSecret :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "data"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> ReqBody '[JSON] PatchSecret
+    :> Patch '[JSON] (KvResponse (HS.HashMap T.Text A.Value))
+    -- | To post a secret to a path use `postSecret`
+    -- >>> (routes clientEnv ^. postSecret) vaultToken "kv" ["testbed", "a1"] secret
+  , _postSecret :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "data"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> ReqBody '[JSON] PostSecret
+    :> Post '[JSON] (KvResponse (HS.HashMap T.Text A.Value))
+    -- | To list the paths under a path use `listSecrets`
+    -- >>> (routes clientEnv ^. listSecrets) vaultToken "kv" ["testbed"]
+  , _listSecrets :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "metadata"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> Verb 'LIST 200 '[JSON] (KvResponse ListSecrets)
+    -- | To update metadata under a path use `updateMetadata`
+    -- >>> (routes clientEnv ^. updateMetadata) vaultToken "kv" ["testbed"] metadata
+  , _updateMetadata :: route
+    :- "v1"
+    :> Capture "mount" T.Text
+    :> "metadata"
+    :> VaultTokenHeader
+    :> CaptureAll "segments" T.Text
+    :> ReqBody '[JSON] UpdateMetadata
+    :> Post '[JSON] ()
+  }
+  deriving (Generic)
+makeLenses ''Routes
 
--- | To put a secret under a path use `postSecret`
--- >>> runClientM (postSecret vaultToken "kv" ["testbed", "a1"] secret) clientEnv
-_ :<|>
-  _ :<|>
-  postSecret :<|>
-  _
-  = client api
-
--- | To put a secret under a path use `listSecrets`
--- >>> runClientM (listSecrets vaultToken "kv" ["testbed"]) clientEnv
-_ :<|>
-  _ :<|>
-  _ :<|>
-  listSecrets
-  = client api
+routes :: ClientEnv -> Routes (AsClientT IO)
+routes env = genericClientHoist
+    (\x -> runClientM x env >>= either throwIO return)
