@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Vault.Entry
+module Entry
   ( newFieldKey
   , dateModified
   , Entry (..), EntryConvertible (..), emptyEntry
