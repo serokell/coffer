@@ -52,6 +52,7 @@ common          exts
                       , TypeFamilies
                       , DerivingStrategies
                       , GeneralizedNewtypeDeriving
+                      , DeriveAnyClass
 
 library
     import:           deps, exts
