@@ -5,8 +5,7 @@ module Error
 import qualified Data.Text as T
 
 data CofferError =
-  EntryNotFound [T.Text]
-  | MarshallingFailed
+  MarshallingFailed
   | ConnectError
   | OtherError T.Text
   deriving (Show)

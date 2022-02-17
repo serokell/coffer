@@ -8,7 +8,7 @@ module Backend.Vault.Kv
 import qualified Entry                        as E
 import qualified Backend.Vault.Kv.Internal    as I
 
-import           Error                        (CofferError (MarshallingFailed, EntryNotFound, OtherError, ConnectError))
+import           Error                        (CofferError (..))
 import           Backend                      (Backend (..), BackendEffect (..))
 
 import qualified Data.Text                    as T
@@ -25,7 +25,7 @@ import           Control.Monad                (void)
 import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, runClientM, ClientError (..), parseBaseUrl, showBaseUrl)
 import           Network.HTTP.Client.TLS      (tlsManagerSettings)
 import           Network.HTTP.Client          (newManager, defaultManagerSettings)
-import           Polysemy.Error               (Error, throw)
+import           Polysemy.Error               (Error, throw, runError)
 import           Control.Exception.Lens       (exception)
 import           Control.Monad.State          (evalState)
 import           Toml                         (TomlCodec)
@@ -150,7 +150,7 @@ runVaultIO url token mount = interpret $
           Just (A.Number i) -> maybe (throw MarshallingFailed) pure (S.toBoundedInteger i)
           _ -> throw MarshallingFailed
       ReadSecret path version ->
-        embedCatch path (readSecret env path version)
+        runMaybe $ embedCatchMaybe path (readSecret env path version)
         >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
           cofferSpecials :: CofferSpecials <-
             maybeThrow (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
@@ -175,31 +175,51 @@ runVaultIO url token mount = interpret $
             & E.fields .~ fields
             & E.tags .~ _tags
       ListSecrets path ->
-        embedCatch path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
+        runMaybe (embedCatchMaybe path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list)
       DeleteSecret path ->
-        embedCatch path (deleteSecret env path)
+        embedCatch path (deleteSecret env path) <&> const ()
   where postSecret env = (I.routes env ^. I.postSecret) mount token
         readSecret env = (I.routes env ^. I.readSecret) mount token
         listSecrets env = (I.routes env ^. I.listSecrets) mount token
         updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
         deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
 
-        exceptionHandler :: [T.Text] -> ClientError -> CofferError
+        exceptionHandler :: [T.Text] -> ClientError -> Maybe CofferError
         exceptionHandler path =
           \case FailureResponse _request response ->
                     case statusCode $ responseStatusCode response of
-                      404 -> EntryNotFound path
-                      e -> OtherError (T.pack $ show e)
-                DecodeFailure text response -> MarshallingFailed
-                UnsupportedContentType mediaType response -> MarshallingFailed
-                InvalidContentTypeHeader response -> MarshallingFailed
-                ConnectionError excepton -> ConnectError
+                      404 -> Nothing
+                      e -> Just $ OtherError (T.pack $ show e)
+                DecodeFailure text response -> Just MarshallingFailed
+                UnsupportedContentType mediaType response -> Just MarshallingFailed
+                InvalidContentTypeHeader response -> Just MarshallingFailed
+                ConnectionError excepton -> Just ConnectError
         embedCatch :: Member (Embed IO) r
                        => Member (Error CofferError) r
                        => [T.Text]
                        -> IO a
                        -> Sem r a
-        embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>= \case Left l -> pure l ; Right r -> throw r
+        embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>=
+          \case Left l -> pure l
+                Right (Just r) -> throw r
+                Right Nothing -> throw $ OtherError "404"
+
+        embedCatchMaybe :: Member (Embed IO) r
+                        => Member (Error CofferError) r
+                        => Member (Error ()) r
+                        => [T.Text]
+                        -> IO a
+                        -> Sem r a
+        embedCatchMaybe path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>=
+          \case Left l -> pure l
+                Right (Just r) -> throw r
+                Right Nothing -> throw ()
+
+        runMaybe :: Sem (Error () ': r) t
+                 -> Sem r (Maybe t)
+        runMaybe x = runError x <&> \case
+                       Left _ -> Nothing
+                       Right a -> Just a
 
         maybeThrow :: Member (Error CofferError) r
                       => Maybe a
