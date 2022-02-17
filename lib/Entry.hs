@@ -6,7 +6,7 @@ module Entry
   , dateModified
   , Entry (..), EntryConvertible (..), emptyEntry
   , path, masterField, fields
-  , Field (..), FieldKey, emptyField
+  , Field (..), FieldKey, emptyField, getFieldKey
   , value
   )
 where
@@ -36,11 +36,15 @@ newFieldKey t =
   else
     Nothing
 
+getFieldKey :: FieldKey -> T.Text
+getFieldKey (UnsafeFieldKey t) = t
+
 data Field =
   Field
   { _fDateModified :: DateTime
   , _value :: T.Text
   }
+  deriving (Show, Eq)
 
 -- TODO me no likey, better way? https://github.com/ekmett/lens/issues/286
 emptyField :: Field
