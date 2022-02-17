@@ -60,8 +60,10 @@ data Entry =
   Entry
   { _path :: [T.Text]
   , _eDateModified :: DateTime
+  , _masterField :: (FieldKey, Field)
   , _fields :: HS.HashMap FieldKey Field
   }
+  deriving (Show, Eq)
 
 -- TODO me no likey, better way? https://github.com/ekmett/lens/issues/286
 emptyEntry :: Entry
@@ -69,10 +71,11 @@ emptyEntry =
   Entry
   { _path = []
   , _eDateModified = ""
+  , _masterField = undefined
   , _fields = HS.empty
   }
 
-makeLensesFor [("_path", "path"), ("_fields", "fields")] ''Entry
+makeLensesFor [("_path", "path"), ("_masterField", "masterField"), ("_fields", "fields")] ''Entry
 
 class DateModified a where
   dateModified :: Lens' a DateTime
