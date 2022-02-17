@@ -151,20 +151,14 @@ runVaultIO url token mount = interpret $
                value <- _data ^.at key
                key <- E.newFieldKey key
 
-               Just (key, E.Field { E._fDateModified = modTime, E._value = value, E._private = private })
+               Just (key, E.newField modTime value & E.private .~ _private)
 
           fields <- maybe (throw MarshallingFailed) pure $
             over traversed (keyToField . fst) secrets & sequence <&> HS.fromList
 
-          embed $ print fields
-          maybe (throw MarshallingFailed) pure $ do
-            master <- keyToField (cofferSpecials ^. masterKey)
-            Just E.Entry
-              { E._path = path
-              , E._eDateModified = cofferSpecials ^. globalDateModified
-              , E._masterField = master
-              , E._fields = fields
-              }
+          pure $ E.newEntry path (cofferSpecials ^. globalDateModified)
+            & E.masterField .~ (cofferSpecials ^. masterKey >>= E.newFieldKey)
+            & E.fields .~ fields
       ListSecrets path ->
         embedCatch path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
       DeleteSecret path ->
