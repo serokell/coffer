@@ -40,9 +40,9 @@ fieldConverter = prism' to from
           _private <- HS.lookup "private" o
                        >>= \case A.Bool b -> Just b ; _ -> Nothing
 
-              dateModified .= _dateModified
-              private .= _private
-              value .= _value) emptyField
+          pure $
+              newField dateModified value
+            & private .~ _private
         from _ = Nothing
 
 instance EntryConvertible JsonEntry where
@@ -70,8 +70,8 @@ instance EntryConvertible JsonEntry where
                   >>= (mapM (uncurry (liftA2 (,)) . over _1 newFieldKey) . HS.toList)
                   <&> HS.fromList
 
-                path .= _path
-                dateModified .= _dateModified
-                masterField .= _masterField
-                fields .= _fields) emptyEntry
+                pure $
+                    newEntry path dateModified
+                  & masterField .~ _masterField
+                  & fields .~ _fields
           from _ = Nothing
