@@ -31,10 +31,21 @@ common          deps
                     , aeson                 ^>= 1.5.6.0
                     , mtl                   ^>= 2.2.0.0
                     , hashable              ^>= 1.3.5.0
+                    , polysemy              ^>= 1.7.1.0
 
 common          exts
-    extensions:       DeriveGeneric
-                    , OverloadedStrings
+    default-extensions: DeriveGeneric
+                      , OverloadedStrings
+                      , DataKinds
+                      , FlexibleContexts
+                      , GADTs
+                      , LambdaCase
+                      , PolyKinds
+                      , RankNTypes
+                      , ScopedTypeVariables
+                      , TypeApplications
+                      , TypeOperators
+                      , TypeFamilies
 
 library
     import:           deps, exts
@@ -44,7 +55,8 @@ library
                     , http-client-tls       ^>= 0.3.5.0
 
     exposed-modules:  Vault.Kv
-    other-modules:    Entry
+    other-modules:    Vault.Kv.Internal
+                    , Entry
                     , Entry.Json
 
     hs-source-dirs:   lib
