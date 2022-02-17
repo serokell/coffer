@@ -78,12 +78,21 @@ vaultKvCodec = VaultKvBackend
         baseUrlToText = Just . T.pack . showBaseUrl
         textToBaseUrl = parseBaseUrl . T.unpack
 
+data FieldMetadata = FieldMetadata
+  { _dateModified :: UTCTime
+  , _private :: Bool
+  }
+  deriving (Show, Generic)
+makeLenses ''FieldMetadata
+
+instance A.ToJSON FieldMetadata where
+instance A.FromJSON FieldMetadata where
+
 data CofferSpecials =
   CofferSpecials
   { _masterKey :: Maybe T.Text
-  , _datesModified :: HS.HashMap T.Text UTCTime
-  , _privates :: HS.HashMap T.Text Bool
   , _globalDateModified :: UTCTime
+  , _fields :: HS.HashMap T.Text FieldMetadata
   }
   deriving (Show, Generic)
 makeLenses ''CofferSpecials
@@ -111,18 +120,18 @@ runVaultIO url token mount = interpret $
 
     case x of
       WriteSecret entry -> do
-        let fields = entry ^. E.fields
-        let masterField = entry ^. E.masterField
-        let datesModified =
-              HS.map (^. E.dateModified) . HS.mapKeys E.getFieldKey $ fields
-        let privates =
-              HS.map (^. E.private) . HS.mapKeys E.getFieldKey $ fields
-
         let cofferSpecials = CofferSpecials
-                             { _masterKey = entry ^. E.masterField <&> E.getFieldKey
-                             , _datesModified = datesModified
+                             { _masterKey =
+                               entry ^. E.masterField <&> E.getFieldKey
                              , _globalDateModified = entry ^. E.dateModified
-                             , _privates = privates
+                             , _fields =
+                               entry ^. E.fields & traverse %~
+                                 (\f ->
+                                 FieldMetadata
+                                 { _dateModified = f ^. E.dateModified
+                                 , _private = f ^. E.private
+                                 })
+                               & HS.mapKeys E.getFieldKey
                              }
         let secret = I.PostSecret
               { I._cas = Nothing
@@ -142,19 +151,21 @@ runVaultIO url token mount = interpret $
         embedCatch path (readSecret env path version)
         >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
           cofferSpecials :: CofferSpecials <-
-            maybe (throw MarshallingFailed) pure
-            (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
+            maybeThrow (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
           let secrets = HS.toList $ foldr HS.delete _data ["#$coffer"]
           let keyToField key = do
-               modTime <- cofferSpecials ^. datesModified.at key
-               _private <- cofferSpecials ^. privates.at key
-               value <- _data ^.at key
-               key <- E.newFieldKey key
+               _modTime <- cofferSpecials ^. fields.at key <&> (^. dateModified)
+               _private <- cofferSpecials ^. fields.at key <&> (^. private)
+               _value <- _data ^.at key
+               _key <- E.newFieldKey key
 
-               Just (key, E.newField modTime value & E.private .~ _private)
+               Just (_key
+                    , E.newField _modTime _value
+                      & E.private .~ _private
+                    )
 
-          fields <- maybe (throw MarshallingFailed) pure $
-            over traversed (keyToField . fst) secrets & sequence <&> HS.fromList
+          fields <- maybeThrow $
+            secrets & traverse %~ (keyToField . fst) & sequence <&> HS.fromList
 
           pure $ E.newEntry path (cofferSpecials ^. globalDateModified)
             & E.masterField .~ (cofferSpecials ^. masterKey >>= E.newFieldKey)
@@ -174,7 +185,7 @@ runVaultIO url token mount = interpret $
           \case FailureResponse _request response ->
                     case statusCode $ responseStatusCode response of
                       404 -> EntryNotFound path
-                      _ -> OtherError
+                      e -> OtherError (T.pack $ show e)
                 DecodeFailure text response -> MarshallingFailed
                 UnsupportedContentType mediaType response -> MarshallingFailed
                 InvalidContentTypeHeader response -> MarshallingFailed
@@ -185,6 +196,11 @@ runVaultIO url token mount = interpret $
                        -> IO a
                        -> Sem r a
         embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>= \case Left l -> pure l ; Right r -> throw r
+
+        maybeThrow :: Member (Error CofferError) r
+                      => Maybe a
+                      -> Sem r a
+        maybeThrow = maybe (throw MarshallingFailed) pure
 
 instance Backend VaultKvBackend where
   _name s = _vbName s

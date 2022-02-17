@@ -8,5 +8,5 @@ data CofferError =
   EntryNotFound [T.Text]
   | MarshallingFailed
   | ConnectError
-  | OtherError
+  | OtherError T.Text
   deriving (Show)
