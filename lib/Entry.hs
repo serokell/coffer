@@ -2,14 +2,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Entry
-  ( newFieldKey
-  , dateModified
+  ( dateModified
   , Entry, EntryConvertible (..), newEntry
   , path, masterField, fields
   , Field (..), FieldKey,  newField, getFieldKey
-  , private, value
+  , newField, newFieldKey, getFieldKey, newEntryTag, getEntryTag
+  , private, value, tags, EntryTag
   )
 where
+
 
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HS
@@ -19,6 +20,7 @@ import qualified Data.Aeson.Types as A
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Time (UTCTime)
+import Language.Haskell.TH.Lens (_CaseE)
 
 type DateTime = UTCTime
 
@@ -38,6 +40,20 @@ newFieldKey t =
 
 getFieldKey :: FieldKey -> T.Text
 getFieldKey (UnsafeFieldKey t) = t
+
+newtype EntryTag = UnsafeEntryTag T.Text
+  deriving stock (Show, Eq)
+  deriving newtype (A.ToJSON, A.FromJSON)
+
+newEntryTag :: T.Text -> Maybe EntryTag
+newEntryTag t =
+  if T.all (`elem` keyCharSet) t && not (T.null t) then
+    Just $ UnsafeEntryTag t
+  else
+    Nothing
+
+getEntryTag :: EntryTag -> T.Text
+getEntryTag (UnsafeEntryTag t) = t
 
 data Field =
   Field
@@ -63,6 +79,7 @@ data Entry =
   , _eDateModified :: DateTime
   , _masterField :: Maybe FieldKey
   , _fields :: HS.HashMap FieldKey Field
+  , _tags :: [EntryTag]
   }
   deriving (Show, Eq)
 
@@ -73,9 +90,10 @@ newEntry path time =
   , _eDateModified = time
   , _masterField = Nothing
   , _fields = HS.empty
+  , _tags = []
   }
 
-makeLensesFor [("_path", "path"), ("_masterField", "masterField"), ("_fields", "fields")] ''Entry
+makeLensesFor [("_path", "path"), ("_masterField", "masterField"), ("_fields", "fields"), ("_tags", "tags")] ''Entry
 
 class DateModified a where
   dateModified :: Lens' a DateTime

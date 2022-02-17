@@ -91,6 +91,7 @@ data CofferSpecials =
   { _masterKey :: Maybe T.Text
   , _globalDateModified :: UTCTime
   , _fields :: HS.HashMap T.Text FieldMetadata
+  , _tags :: [T.Text]
   }
   deriving (Show, Generic)
 makeLenses ''CofferSpecials
@@ -131,15 +132,16 @@ runVaultIO url token mount = interpret $
                 , _private = f ^. E.private
                 })
               & HS.mapKeys E.getFieldKey
+            , _tags = map E.getEntryTag $ entry ^. E.tags
             }
           secret = I.PostSecret
-          { I._cas = Nothing
-          , I._pdata =
-                HS.insert "#$coffer" (TL.toStrict . TL.decodeUtf8 $ A.encode cofferSpecials)
-              . HS.map (^. E.value)
-              . HS.mapKeys E.getFieldKey
-              $ entry ^. E.fields
-          }
+            { I._cas = Nothing
+            , I._pdata =
+                  HS.insert "#$coffer" (TL.toStrict . TL.decodeUtf8 $ A.encode cofferSpecials)
+                . HS.map (^. E.value)
+                . HS.mapKeys E.getFieldKey
+                $ entry ^. E.fields
+            }
 
         response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
 
@@ -165,10 +167,12 @@ runVaultIO url token mount = interpret $
 
           fields <- maybeThrow $
             secrets & traverse %~ (keyToField . fst) & sequence <&> HS.fromList
+          _tags <- maybeThrow $ cofferSpecials ^. tags & mapM E.newEntryTag
 
           pure $ E.newEntry path (cofferSpecials ^. globalDateModified)
             & E.masterField .~ (cofferSpecials ^. masterKey >>= E.newFieldKey)
             & E.fields .~ fields
+            & E.tags .~ _tags
       ListSecrets path ->
         embedCatch path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list
       DeleteSecret path ->
