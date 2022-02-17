@@ -6,7 +6,7 @@ module Entry
   , dateModified
   , Entry (..), EntryConvertible (..), emptyEntry
   , path, masterField, fields
-  , Field (..), FieldKey (..), emptyField
+  , Field (..), FieldKey (..), emptyField, getFieldKey
   , value
   )
 where
@@ -28,9 +28,9 @@ newtype FieldKey = FieldKey T.Text
 instance Hashable FieldKey
 
 instance A.ToJSON FieldKey where
-  toJSON (FieldKey text) = A.toJSON text
-
 instance A.ToJSONKey FieldKey where
+instance A.FromJSON FieldKey where
+instance A.FromJSONKey FieldKey where
 
 newFieldKey :: T.Text -> Maybe FieldKey
 newFieldKey t =
@@ -40,11 +40,15 @@ newFieldKey t =
     Nothing
   where allowedChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;:"
 
+getFieldKey :: FieldKey -> T.Text
+getFieldKey (FieldKey t) = t
+
 data Field =
   Field
   { _fDateModified :: DateTime
   , _value :: T.Text
   }
+  deriving (Show, Eq)
 
 -- TODO me no likey, better way? https://github.com/ekmett/lens/issues/286
 emptyField :: Field
