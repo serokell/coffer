@@ -18,24 +18,59 @@ import qualified Data.HashMap.Internal.Strict as HS
 import qualified Data.Aeson                   as A
 import qualified Data.Aeson.Text              as A
 import qualified Data.Scientific              as S
+import qualified Toml
 
 import           Control.Monad                (void)
-import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, runClientM, ClientError (..))
+import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, runClientM, ClientError (..), parseBaseUrl, showBaseUrl)
 import           Network.HTTP.Client.TLS      (tlsManagerSettings)
 import           Network.HTTP.Client          (newManager, defaultManagerSettings)
 import           Polysemy.Error               (Error, throw)
 import           Control.Exception.Lens       (exception)
 import           Control.Monad.State          (evalState)
+import           Toml                         (TomlCodec)
+import           GHC.Generics                 (Generic)
+import           Backend                      (Backend (..), BackendEffect (..))
 
 import           Polysemy
 import           Control.Lens
-import GHC.Generics (Generic)
+import Control.Applicative (Alternative(empty))
+import Validation (Validation(Success, Failure))
 
-data Vault m a where
-  WriteSecret :: E.Entry -> Vault m Int
-  ReadSecret  :: [T.Text] -> Maybe Int -> Vault m E.Entry
-  ListSecrets :: [T.Text] -> Vault m [T.Text]
-makeSem ''Vault
+data VaultKvBackend =
+  VaultKvBackend
+  { _vbName :: T.Text
+  , _vbAddress :: BaseUrl
+  , _vbMount :: T.Text
+  , _vbToken :: I.VaultToken
+  }
+  deriving (Show)
+
+didimatch
+    :: (b -> Maybe a)  -- ^ Mapper for consumer
+    -> (a -> Maybe b)     -- ^ Mapper for producer
+    -> TomlCodec a  -- ^ Source 'Codec' object
+    -> TomlCodec b  -- ^ Target 'Codec' object
+didimatch matchB matchA codec = Toml.Codec
+    { Toml.codecRead = \t -> case Toml.codecRead codec t of
+        Success a -> maybe empty Success (matchA a)
+        Failure b -> Failure b
+    , Toml.codecWrite = \c -> case matchB c of
+        Nothing -> empty
+        Just d  -> Toml.codecWrite codec d >>= maybe empty pure . matchA
+    }
+{-# INLINE didimatch #-}
+
+
+vaultKvCodec :: TomlCodec VaultKvBackend
+vaultKvCodec = VaultKvBackend
+                  <$> Toml.text "name" Toml..= _vbName
+                  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= _vbAddress
+                  <*> Toml.text "mount" Toml..= _vbMount
+                  <*> didimatch tokenToText textToToken (Toml.text "token") Toml..= _vbToken
+  where tokenToText (I.VaultToken t) = Just t
+        textToToken t = Just $ I.VaultToken t
+        baseUrlToText = Just . T.pack . showBaseUrl
+        textToBaseUrl = parseBaseUrl . T.unpack
 
 data CofferSpecials =
   CofferSpecials
@@ -54,7 +89,7 @@ runVaultIO :: Member (Embed IO) r
            => BaseUrl
            -> I.VaultToken
            -> T.Text
-           -> Sem (Vault ': r) a
+           -> Sem (BackendEffect ': r) a
            -> Sem r a
 runVaultIO url token mount = interpret $
   \x -> do
@@ -130,3 +165,10 @@ runVaultIO url token mount = interpret $
         readSecret env = (I.routes env ^. I.readSecret) mount token
         listSecrets env = (I.routes env ^. I.listSecrets) mount token
         updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
+
+instance Backend VaultKvBackend where
+  _name s = _vbName s
+  _codecRead = Toml.codecRead vaultKvCodec
+  _codecWrite a = Toml.codecWrite vaultKvCodec a
+                  <* Toml.codecWrite (Toml.text "type") "vault"
+  _runEffect b = runVaultIO (_vbAddress b) (_vbToken b) (_vbMount b)
