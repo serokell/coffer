@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Backend
-  ( BackendEffect (..), readSecret, writeSecret, listSecrets
+  ( BackendEffect (..), readSecret, writeSecret, listSecrets, deleteSecret
   , Backend (..)
   , BackendPacked (..)
   )
@@ -21,8 +21,8 @@ import Polysemy
 -- @TODO - rename Secret to Entry?
 data BackendEffect m a where
   WriteSecret  :: E.Entry -> BackendEffect m Int
-  ReadSecret   :: [T.Text] -> Maybe Int -> BackendEffect m E.Entry
-  ListSecrets  :: [T.Text] -> BackendEffect m [T.Text]
+  ReadSecret   :: [T.Text] -> Maybe Int -> BackendEffect m (Maybe E.Entry)
+  ListSecrets  :: [T.Text] -> BackendEffect m (Maybe [T.Text])
   DeleteSecret :: [T.Text] -> BackendEffect m ()
 makeSem ''BackendEffect
 
