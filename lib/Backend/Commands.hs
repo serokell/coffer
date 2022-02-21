@@ -34,6 +34,7 @@ import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, E
 import qualified Coffer.Path as Path
 import Error (CofferError(..))
 import Coffer.Util (catchAndReturn)
+import Data.Either (rights)
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
@@ -77,7 +78,7 @@ viewCmd (ViewOptions path fieldNameMb) = do
             Nothing -> pure $ VREntryNoFieldMatch (entry ^. E.path) fieldName
 
 createCmd
-  :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CreateResult) r)
+  :: forall r. (Member BackendEffect r, Member (Embed IO) r, Member (Error CreateResult) r)
   => CreateOptions -> Sem r CreateResult
 createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
   nowUtc <- embed getCurrentTime
@@ -91,7 +92,10 @@ createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
       & E.fields .~ HashMap.fromList allFields
       & E.tags .~ tags
 
-  -- TODO: check that a directory does not exist at the given path.
+  whenM (pathIsDirectory entryPath) do
+    throw $ CRDirectoryAlreadyExists entryPath
+
+  checkForEntriesInEntryPath entryPath
 
   when (not force) do
     whenM (pathIsEntry entryPath) do
@@ -99,6 +103,28 @@ createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
 
   void $ writeSecret entry
   pure $ CRSuccess entry
+
+  where
+    -- | When attempting to create an entry at, e.g., @/a/b/c@, the directories
+    -- @/a@ and @/a/b@ will be implicitly created.
+    --
+    -- This function checks whether those paths are already
+    -- occupied by existing entries and, if so, fails.
+    --
+    -- Note: the root path @/@ cannot possibly be occupied by an entry,
+    -- therefore we skip the check for that path.
+    checkForEntriesInEntryPath :: EntryPath -> Sem r ()
+    checkForEntriesInEntryPath entryPath = do
+      let parentDirsExceptRoot = entryPath
+            & Path.entryPathParentDirs
+            & NE.toList
+            -- Ignore paths that cannot possibly point to an entry
+            <&> Path.pathAsEntryPath
+            & rights
+
+      filterM pathIsEntry parentDirsExceptRoot >>= \case
+        (clashed : _) -> throw $ CRParentPathContainsEntry clashed
+        [] -> pure ()
 
 setFieldCmd
   :: forall r

@@ -80,6 +80,8 @@ main = do
                 [ "An entry already exists at '" <> build path <> "'."
                 , "Use '--force' or '-f' to overwrite it."
                 ]
+              CRDirectoryAlreadyExists path -> printError $ "A directory already exists at '" <> build path <> "'."
+              CRParentPathContainsEntry path -> printError $ "An entry already exists at '" <> build path <> "'."
 
           SomeCommand cmd@(CmdSetField opts) -> do
             let fieldName = sfoFieldName opts

@@ -158,3 +158,21 @@ EOF
       second
 EOF
 }
+
+@test "creating an entry clashes with existing directory" {
+  coffer create /a/b/c
+
+  run coffer create /a/b
+
+  assert_failure
+  assert_output "[ERROR] A directory already exists at '/a/b'."
+}
+
+@test "creating a directory clashes with existing entry" {
+  coffer create /a/b
+
+  run coffer create /a/b/c
+
+  assert_failure
+  assert_output "[ERROR] An entry already exists at '/a/b'."
+}
