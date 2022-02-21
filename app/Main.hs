@@ -25,7 +25,7 @@ url :: BaseUrl
 url = BaseUrl Http "127.0.0.1" 8200 ""
 
 token :: VaultToken
-token = VaultToken "s.AnHJuzOxRiD12eLxALFytccC"
+token = VaultToken "s.TLo3KCoNmizcBB045l99wWm8"
 
 mount :: Text
 mount = "secret"
@@ -63,6 +63,7 @@ main = do
             [ "An entry already exists at '" <> build path <> "'."
             , "Use '--force' or '-f' to overwrite it."
             ]
+          CRDirectoryAlreadyExists path -> printError $ "A directory already exists at '" <> build path <> "'."
 
       SomeCommand cmd@(CmdSetField opts) -> do
         let fieldName = sfoFieldName opts

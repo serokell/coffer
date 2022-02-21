@@ -9,7 +9,7 @@ import Data.Time (getCurrentTime, UTCTime, utctDay)
 import qualified Data.Text as T
 import qualified Data.HashMap.Strict as HashMap
 import GHC.Exts (Down(..), sortWith)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
 import Data.Time.Calendar.Month.Compat (pattern MonthDay)
 import Control.Lens (view)
@@ -17,6 +17,7 @@ import Data.Functor (($>))
 import qualified Data.List as List
 import Polysemy.Error (throw, Error, runError)
 import Control.Monad.Extra (whenM)
+import qualified Data.List.NonEmpty as NE
 
 import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret)
 import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag)
@@ -87,7 +88,27 @@ createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
       & E.fields .~ HashMap.fromList allFields
       & E.tags .~ tags
 
-  -- TODO: check that a directory does not exist at the given path.
+    checkForEntriesInEntryPath :: Member BackendEffect r => EntryPath -> Sem r (Maybe EntryPath)
+    checkForEntriesInEntryPath entryPath =
+      let 
+        Path.EntryPath (start NE.:| rest) = entryPath
+        startPath = Path.EntryPath (start NE.:| [])
+        restPath = Path.Path rest
+      in process startPath restPath
+        where 
+          process :: Member BackendEffect r => EntryPath -> Path -> Sem r (Maybe EntryPath)
+          process _ (Path.Path []) = pure Nothing
+          process entryPath (Path.Path (x : xs)) = 
+            pathIsEntry entryPath >>= \case
+              True -> (pure . Just) entryPath
+              False -> process (Path.appendEntryName (Path.entryPathAsPath entryPath) x) (Path.Path xs)
+
+  whenM (pathIsDirectory entryPath) do
+    throw $ CRDirectoryAlreadyExists entryPath
+
+  mEntry <- checkForEntriesInEntryPath entryPath
+  when (isJust mEntry) do
+    throw $ CREntryAlreadyExists (mEntry ^?! _Just)
 
   when (not force) do
     whenM (pathIsEntry entryPath) do
