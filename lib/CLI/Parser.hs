@@ -46,8 +46,8 @@ parserInfo =
     <> header "TODO: coffer description goes here"
 
 parser :: Parser SomeCommand
-parser =
-  subparser $ mconcat
+parser = 
+  subparser (mconcat
     [ mkCommand "view" CmdView viewOptions
         "View entries under the specified path, optionally returning only the specified field for each entry"
     , mkCommand "create" CmdCreate createOptions
@@ -66,13 +66,16 @@ parser =
         "Delete an entry or directory"
     , mkCommand "tag" CmdTag tagOptions
         "Add or remove tags from an entry"
-    ]
+    ]) <|> defaultCommandParser
   where
     mkCommand :: String -> (opts -> Command res) -> Parser opts -> String -> Mod CommandFields SomeCommand
     mkCommand cmdName constructor optsParser cmdHelp =
       command cmdName $
         info (helper <*> (SomeCommand . constructor <$> optsParser)) $
         progDesc cmdHelp
+
+    defaultCommandParser :: Parser SomeCommand
+    defaultCommandParser = SomeCommand . CmdView <$> viewOptions
 
 ----------------------------------------------------------------------------
 -- Options
