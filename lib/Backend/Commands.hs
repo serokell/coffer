@@ -26,7 +26,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret)
-import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag)
+import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path)
 import qualified Entry as E
 import Coffer.Directory (Directory)
 import qualified Coffer.Directory as Dir
@@ -45,7 +45,7 @@ runCommand = \case
   CmdSetField opts -> catchAndReturn $ setFieldCmd opts
   CmdDeleteField opts -> deleteFieldCmd opts
   CmdFind opts -> findCmd opts
-  CmdRename opts -> renameCmd opts
+  CmdRename opts -> catchAndReturn $ renameCmd opts
   CmdCopy opts -> catchAndReturn $ copyCmd opts
   CmdDelete opts -> catchAndReturn $ deleteCmd opts
   CmdTag opts -> catchAndReturn $ tagCmd opts
@@ -267,25 +267,46 @@ findCmd (FindOptions pathMb textMb sortMb filters filterFields) = do
       OpLTE -> (<=)
       OpEQ -> (==)
 
-renameCmd :: RenameOptions -> Sem r RenameResult
-renameCmd (RenameOptions _oldPath _newPath _force) = do
-  -- TODO: reuse copy+delete operations
-  undefined
+renameCmd
+  :: forall r.
+     ( Member BackendEffect r
+     , Member (Embed IO) r
+     , Member (Error CofferError) r
+     , Member (Error RenameResult) r
+     )
+  => RenameOptions -> Sem r RenameResult
+renameCmd (RenameOptions oldPath newPath force) = do
+  operations <- buildCopyOperations oldPath newPath force
+  runCopyOperations operations
+  -- we don't want to delete clashed entries if renaming is forced.
+  let pathsToDelete =
+        flip filter operations \(CopyOperation old _) ->
+          none (\(CopyOperation _ new) -> old ^. path == new ^. path) operations
+
+  -- If directory/entry was successfully copied, then we can delete old directory/entry without delete errors.
+  forM_ pathsToDelete \(CopyOperation old _) -> do
+    void $ catchAndReturn $ deleteCmd (DeleteOptions (Path.entryPathAsPath (old ^. path)) False)
+
+  pure $ CPRSuccess $ getOperationPaths <$> operations
 
 data CopyOperation = CopyOperation
   { coOld :: Entry
   , coNew :: Entry
   }
+  deriving stock Show
 
-copyCmd
+getOperationPaths :: CopyOperation -> (EntryPath, EntryPath)
+getOperationPaths (CopyOperation old new) = (old ^. E.path, new ^. E.path)
+
+buildCopyOperations
   :: forall r
    . ( Member BackendEffect r
      , Member (Embed IO) r
      , Member (Error CofferError) r
      , Member (Error CopyResult) r
      )
-  => CopyOptions -> Sem r CopyResult
-copyCmd (CopyOptions oldPath newPath force) = do
+  => Path -> Path -> Bool -> Sem r [CopyOperation]
+buildCopyOperations oldPath newPath force = do
   entryOrDir <- getEntryOrDirThrow CPRPathNotFound oldPath
 
   -- Build a list of operations to perform.
@@ -308,10 +329,7 @@ copyCmd (CopyOptions oldPath newPath force) = do
       do \(CopyOperation _ new) -> pathIsEntry (new ^. E.path)
       do CPREntryAlreadyExists . fmap getOperationPaths
 
-  -- Write new entries.
-  let newEntries = coNew <$> operations
-  forM_ newEntries writeSecret
-  pure $ CPRSuccess $ getOperationPaths <$> operations
+  pure operations
 
   where
     copyEntry :: Entry -> Sem r [CopyOperation]
@@ -352,8 +370,22 @@ copyCmd (CopyOptions oldPath newPath force) = do
       whenJust (NE.nonEmpty invalidOperations) \invalidOperationsNE ->
         throw $ mkErr invalidOperationsNE
 
-    getOperationPaths :: CopyOperation -> (EntryPath, EntryPath)
-    getOperationPaths (CopyOperation old new) = (old ^. E.path, new ^. E.path)
+runCopyOperations :: (Member BackendEffect r) => [CopyOperation] -> Sem r ()
+runCopyOperations operations = do
+  let newEntries = coNew <$> operations
+  forM_ newEntries writeSecret
+
+copyCmd
+  :: ( Member BackendEffect r
+     , Member (Embed IO) r
+     , Member (Error CofferError) r
+     , Member (Error CopyResult) r
+     )
+  => CopyOptions -> Sem r CopyResult
+copyCmd (CopyOptions oldPath newPath force) = do
+  operations <- buildCopyOperations oldPath newPath force
+  runCopyOperations operations
+  pure $ CPRSuccess $ getOperationPaths <$> operations
 
 deleteCmd
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error DeleteResult) r)

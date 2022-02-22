@@ -114,8 +114,24 @@ main = do
 
           SomeCommand cmd@CmdRename{} -> do
             runCommand cmd >>= \case
-              -- TODO: print result
-              _ -> undefined
+              CPRSuccess copiedPaths ->
+                forM_ copiedPaths \(from, to) ->
+                  printSuccess $ "Renamed '" +| from |+ "' to '" +| to |+ "'."
+              CPRPathNotFound path -> pathNotFound path
+              CPRMissingEntryName -> printError
+                "The destination path is not a valid entry path. Please specify the new name of the entry."
+              CPRDestinationIsDirectory paths -> do
+                let header = "The following entries cannot be renamed because a directory already exists at the destination."
+                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot rename '" +| from |+ "' to '" +| to |+ "'."
+                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
+              CPREntryAlreadyExists paths -> do
+                let header = unlinesF @_ @Builder
+                      [ "The following entries cannot be renamed because an entry already exists at the destination."
+                      , "Use '--force' or '-f' to overwrite existing entries."
+                      ]
+                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot rename '" +| from |+ "' to '" +| to |+ "'."
+                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
+
           SomeCommand cmd@CmdCopy{} -> do
             runCommand cmd >>= \case
               CPRSuccess copiedPaths ->
