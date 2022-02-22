@@ -65,6 +65,7 @@ data CopyResult
   | CPRMissingEntryName
   | CPRDestinationIsDirectory (NonEmpty (EntryPath, EntryPath))
   | CPREntryAlreadyExists (NonEmpty (EntryPath, EntryPath))
+  | CPRDestinationHasEntry EntryPath
 
 data DeleteResult
   = DRSuccess [EntryPath]

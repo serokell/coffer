@@ -23,6 +23,10 @@ import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.List as List
+import Polysemy.Error (throw, Error, runError)
+import Control.Monad.Extra (whenM)
+import qualified Data.List.NonEmpty as NE
 
 import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret)
 import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path)
@@ -34,6 +38,7 @@ import qualified Coffer.Path as Path
 import Error (CofferError(..))
 import Coffer.Util (catchAndReturn)
 import Data.Either (rights)
+import Data.List (inits)
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
@@ -318,6 +323,8 @@ buildCopyOperations oldPath newPath force = do
       Left entry -> copyEntry entry
       Right dir -> copyDir dir
 
+  checkForEntriesInPath newPath
+
   -- Checks that the paths we're trying to copy entries to aren't already occupied
   -- by an existing directory.
   checkCopyOperations operations
@@ -389,6 +396,14 @@ copyCmd (CopyOptions dryRun oldPath newPath force) = do
   unless dryRun do
     runCopyOperations operations
   pure $ CPRSuccess $ getOperationPaths <$> operations
+
+    checkForEntriesInPath :: Path -> Sem r ()
+    checkForEntriesInPath path =
+      when (not (null (path ^. pathSegments))) do
+        let pathInits = Path.EntryPath . NE.fromList <$> (tail . inits) (path ^. pathSegments)
+        filterM pathIsEntry pathInits >>= \case
+          [] -> pure ()
+          (entry : _)  -> throw $ CPRDestinationHasEntry entry
 
 deleteCmd
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error DeleteResult) r)

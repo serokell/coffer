@@ -148,6 +148,8 @@ main = do
                 let header = "The following entries cannot be copied because a directory already exists at the destination."
                 let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot copy '" +| from |+ "' to '" +| to |+ "'."
                 printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
+              CPRDestinationHasEntry entry -> printError $
+                "The following entries cannot be copied because a destination directory has an entry '" +| build entry |+ "' in it's subpath."
               CPREntryAlreadyExists paths -> do
                 let header = unlinesF @_ @Builder
                       [ "The following entries cannot be copied because an entry already exists at the destination."
