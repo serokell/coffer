@@ -12,6 +12,12 @@ import Coffer.Directory (Directory)
 import Coffer.Path (Path, EntryPath)
 import Data.Set (Set)
 
+data Options = Options
+  { _backend :: Text 
+  , _someCommand :: SomeCommand
+  } 
+  deriving stock Show
+
 data Command res where
   CmdView :: ViewOptions -> Command ViewResult
   CmdCreate :: CreateOptions -> Command CreateResult
@@ -27,6 +33,8 @@ deriving stock instance Show (Command res)
 
 data SomeCommand where
   SomeCommand :: Command res -> SomeCommand
+
+deriving stock instance Show SomeCommand
 
 ----------------------------------------------------------------------------
 -- Command results

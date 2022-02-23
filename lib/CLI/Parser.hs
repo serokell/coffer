@@ -38,15 +38,28 @@ import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath)
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
-parserInfo :: ParserInfo SomeCommand
-parserInfo =
-  info (parser <**> helper) $
+parserInfo :: Text -> ParserInfo Options
+parserInfo defaultBackend =
+  info (parser defaultBackend <**> helper) $
     fullDesc
     <> progDesc "TODO: coffer description goes here"
     <> header "TODO: coffer description goes here"
 
-parser :: Parser SomeCommand
-parser =
+parser :: Text -> Parser Options
+parser defaultBackend = Options <$> optionalBackendParser <*> commandParser
+  where
+    optionalBackendParser :: Parser Text
+    optionalBackendParser =
+      option str $ mconcat
+        [ long "backend"
+        , short 'b'
+        , metavar "BACKEND"
+        , value defaultBackend
+        , help "Backend with which actions will be performed. If not specified, then main backend would be chosen"
+        ]
+
+commandParser :: Parser SomeCommand
+commandParser =
   subparser (mconcat
     [ mkCommand "view" CmdView viewOptions
         "View entries under the specified path, optionally returning only the specified field for each entry"

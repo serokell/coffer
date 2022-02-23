@@ -55,13 +55,16 @@ readConfig = do
 main :: IO ()
 main = do
   config <- readConfig
-  let mainBackendName = mainBackend config
-      mBackend = HS.lookup mainBackendName (backends config)
+  let defaultBackend = mainBackend config
+  options <- execParser (parserInfo defaultBackend)
+  let someCommand = _someCommand options
+      backendName = _backend options
+      mBackend = HS.lookup backendName (backends config)
   case mBackend of
-    Nothing -> TIO.putStrLn ("Can't find backend '" <> mainBackendName <> "' in 'config.toml'") >> exitFailure
+    Nothing -> TIO.putStrLn ("Can't find backend '" <> backendName <> "' in 'config.toml'") >> exitFailure
     Just packedBackend -> do
       runBackend packedBackend do
-        embed (execParser parserInfo) >>= \case
+        case someCommand of
           SomeCommand cmd@CmdView{} -> do
             runCommand cmd >>= \case
               VRDirectory dir -> pprint $ buildDirectory dir
