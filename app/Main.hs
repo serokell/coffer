@@ -9,6 +9,7 @@ import Control.Monad (forM_, forM, when)
 import Options.Applicative ( execParser )
 import Polysemy
 import Polysemy.Error (errorToIOFinal, Error)
+import Data.Text (pack)
 import System.Exit (die, exitFailure)
 import Fmt
 import qualified Data.Text.IO as TIO
@@ -40,22 +41,23 @@ runBackendIO action =
       Left err -> do
         die $ show err
 
-readConfig :: IO Config
-readConfig = do
-  text <- TIO.readFile "./config.toml"
+readConfig :: FilePath -> IO Config
+readConfig configPath = do
+  text <- TIO.readFile configPath
   let config = Toml.decode configCodec text
   case config of
     Left err -> do
-      TIO.putStrLn "An error occurred while decoding 'config.toml':"
+      TIO.putStrLn $ "An error occurred while decoding '" <> pack configPath <> "':"
       TIO.putStrLn $ Toml.prettyTomlDecodeErrors err
       exitFailure
     Right config -> pure config
 
 main :: IO ()
 main = do
-  config <- readConfig
   options <- execParser parserInfo
   let someCommand = oSomeCommand options
+  let configPath = oConfigPath options
+  config <- readConfig configPath
   runBackendIO do
     case someCommand of
       SomeCommand cmd@CmdView{} -> do

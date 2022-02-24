@@ -12,7 +12,10 @@ import Coffer.Directory (Directory)
 import Coffer.Path (Path, EntryPath, QualifiedPath)
 import Data.Set (Set)
 
-newtype Options = Options { oSomeCommand :: SomeCommand }
+data Options = Options
+  { oConfigPath :: FilePath
+  , oSomeCommand :: SomeCommand
+  }
   deriving stock Show
 
 data Command res where
