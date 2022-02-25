@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Lens
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, forM, when)
 import Options.Applicative ( execParser )
 import Polysemy
 import Polysemy.Error (errorToIOFinal, Error)
@@ -14,7 +14,6 @@ import Fmt
 import qualified Data.Text.IO as TIO
 import qualified Toml
 import qualified Data.HashMap.Strict as HS
-import qualified Data.List.NonEmpty as NE
 
 import CLI.Parser
 import CLI.Types
@@ -26,6 +25,7 @@ import Coffer.Path ( Path, EntryPath )
 import qualified Entry as E
 import qualified Coffer.Directory as Dir
 import Config (configCodec, Config (..))
+import Entry (path, Entry)
 
 runBackend
   :: SomeBackend
@@ -76,12 +76,9 @@ main = do
           SomeCommand cmd@(CmdCreate opts) -> do
             runCommand cmd >>= \case
               CRSuccess _ -> printSuccess $ "Entry created at '"  +| coPath opts |+ "'."
-              CREntryAlreadyExists path -> printError $ unlinesF
-                [ "An entry already exists at '" <> build path <> "'."
-                , "Use '--force' or '-f' to overwrite it."
-                ]
-              CRDirectoryAlreadyExists path -> printError $ "A directory already exists at '" <> build path <> "'."
-              CRParentPathContainsEntry path -> printError $ "An entry already exists at '" <> build path <> "'."
+              CRCreateError error -> do
+                let errorMsg = createErrorToBuilder error
+                printError $ unlinesF @_ @Builder $ "The entry cannot be created:" : "" : [errorMsg]
 
           SomeCommand cmd@(CmdSetField opts) -> do
             let fieldName = sfoFieldName opts
@@ -122,17 +119,9 @@ main = do
               CPRPathNotFound path -> pathNotFound path
               CPRMissingEntryName -> printError
                 "The destination path is not a valid entry path. Please specify the new name of the entry."
-              CPRDestinationIsDirectory paths -> do
-                let header = "The following entries cannot be renamed because a directory already exists at the destination."
-                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot rename '" +| from |+ "' to '" +| to |+ "'."
-                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
-              CPREntryAlreadyExists paths -> do
-                let header = unlinesF @_ @Builder
-                      [ "The following entries cannot be renamed because an entry already exists at the destination."
-                      , "Use '--force' or '-f' to overwrite existing entries."
-                      ]
-                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot rename '" +| from |+ "' to '" +| to |+ "'."
-                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
+              CPRCreateErrors errors -> do
+                errorMsgs <- buildErrorMessages errors
+                printError $ unlinesF @_ @Builder $ "The following entries cannot be renamed:" : "" : errorMsgs
 
           SomeCommand cmd@(CmdCopy opts) -> do
             runCommand cmd >>= \case
@@ -144,19 +133,9 @@ main = do
               CPRPathNotFound path -> pathNotFound path
               CPRMissingEntryName -> printError
                 "The destination path is not a valid entry path. Please specify the new name of the entry."
-              CPRDestinationIsDirectory paths -> do
-                let header = "The following entries cannot be copied because a directory already exists at the destination."
-                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot copy '" +| from |+ "' to '" +| to |+ "'."
-                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
-              CPRDestinationHasEntry entry -> printError $
-                "The following entries cannot be copied because a destination directory has an entry '" +| build entry |+ "' in it's subpath."
-              CPREntryAlreadyExists paths -> do
-                let header = unlinesF @_ @Builder
-                      [ "The following entries cannot be copied because an entry already exists at the destination."
-                      , "Use '--force' or '-f' to overwrite existing entries."
-                      ]
-                let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot copy '" +| from |+ "' to '" +| to |+ "'."
-                printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
+              CPRCreateErrors errors -> do
+                errorMsgs <- buildErrorMessages errors
+                printError $ unlinesF @_ @Builder $ "The following entries cannot be copied:" : "" : errorMsgs
 
           SomeCommand cmd@(CmdDelete opts) -> do
             runCommand cmd >>= \case
@@ -200,3 +179,27 @@ main = do
 
       pathNotFound :: Member (Embed IO) r => Path -> Sem r ()
       pathNotFound path = printError $ "Entry or directory not found at '" +| path |+ "'."
+
+      createErrorToBuilder :: CreateError -> Builder
+      createErrorToBuilder = \case
+        CEEntryAlreadyExists entryTo -> unlinesF @_ @Builder
+          [ "An entry already exists at '" +| entryTo ^. path |+ "'."
+          , "Use '--force' or '-f' to overwrite existing entries."
+          ]
+        CEDestinationIsDirectory entryTo -> "'" +| entryTo ^. path |+ "' is a directory."
+        CEParentDirectoryIsEntry (_, clashed) ->
+          "Attempted to create the directory '" +| clashed |+ "' but an entry exists at that path."
+
+      getEntryFromCreateError :: CreateError -> Entry
+      getEntryFromCreateError = \case
+        CEParentDirectoryIsEntry (entryTo, _) -> entryTo
+        CEDestinationIsDirectory entryTo -> entryTo
+        CEEntryAlreadyExists entryTo -> entryTo
+
+      buildErrorMessages :: [(EntryPath, CreateError)] -> Sem r [Builder]
+      buildErrorMessages errors = do
+        forM errors \(from, err) -> do
+          let entryTo = getEntryFromCreateError err
+          let header = "'" +| from |+ "' to '" +| entryTo ^. path |+ "':"
+          let errorMsg = createErrorToBuilder err
+          pure $ unlinesF @_ @Builder $ header : [indentF 2 errorMsg]

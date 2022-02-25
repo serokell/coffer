@@ -11,7 +11,6 @@ import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag)
 import Coffer.Directory (Directory)
 import Coffer.Path (Path, EntryPath)
 import Data.Set (Set)
-import Data.List.NonEmpty ( NonEmpty )
 
 data Command res where
   CmdView :: ViewOptions -> Command ViewResult
@@ -41,11 +40,14 @@ data ViewResult
   | VRDirectoryNoFieldMatch Path FieldKey
   | VREntryNoFieldMatch EntryPath FieldKey
 
+data CreateError
+  = CEParentDirectoryIsEntry (Entry, EntryPath)
+  | CEDestinationIsDirectory Entry
+  | CEEntryAlreadyExists Entry
+
 data CreateResult
   = CRSuccess Entry
-  | CREntryAlreadyExists EntryPath
-  | CRDirectoryAlreadyExists EntryPath
-  | CRParentPathContainsEntry EntryPath
+  | CRCreateError CreateError
 
 data SetFieldResult
   = SFRSuccess Entry
@@ -63,9 +65,7 @@ data CopyResult
   = CPRSuccess [(EntryPath, EntryPath)]
   | CPRPathNotFound Path
   | CPRMissingEntryName
-  | CPRDestinationIsDirectory (NonEmpty (EntryPath, EntryPath))
-  | CPREntryAlreadyExists (NonEmpty (EntryPath, EntryPath))
-  | CPRDestinationHasEntry EntryPath
+  | CPRCreateErrors [(EntryPath, CreateError)]
 
 data DeleteResult
   = DRSuccess [EntryPath]
