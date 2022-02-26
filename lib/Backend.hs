@@ -10,11 +10,9 @@ where
 import qualified Data.Text           as T
 import qualified Entry               as E
 import qualified Toml
-import qualified Data.HashMap.Strict as HS
 
 import Error                         (CofferError)
 import Polysemy.Error                (Error)
-import Toml                          (TomlCodec)
 
 import Polysemy
 

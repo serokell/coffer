@@ -16,7 +16,7 @@ module Backend.Vault.Kv.Internal
   , unListSecrets
   , PostSecret (..)
   , cas
-  , PatchSecret (..)
+  , PatchSecret
   , UpdateMetadata (..)
   , maxVersions, casRequired, deleteVersionAfter
   , VaultToken (..)
@@ -36,13 +36,10 @@ where
 
 import qualified Data.Text              as T;
 import qualified Data.HashMap.Strict    as HS;
-import qualified Data.Aeson             as A
 import qualified Data.Aeson.Types       as AT
 
-import           Data.Aeson             
-import           Control.Applicative    ((<|>))
-import           Data.Proxy             (Proxy (Proxy))
-import           Servant.Client.Generic (AsClientT, genericClientHoist, genericClient)
+import           Data.Aeson
+import           Servant.Client.Generic (AsClientT, genericClientHoist)
 import           Control.Exception      (throwIO)
 
 import           Control.Lens hiding ((.=))
@@ -72,7 +69,7 @@ data KvResponse a =
   , krLeaseDuration :: Int
   , krKdata :: a
   }
-  deriving (Show)
+  deriving stock (Show)
 makeLensesWith abbreviatedFields ''KvResponse
 
 
@@ -88,7 +85,7 @@ makeLensesWith abbreviatedFields ''KvResponse
 -- >    ]
 -- >  }
 newtype ListSecrets = ListSecrets { _unListSecrets :: [T.Text] }
-  deriving (Show)
+  deriving stock (Show)
 makeLenses ''ListSecrets
 
 -- |
@@ -120,7 +117,7 @@ data ReadSecret =
   , rsDestroyed :: Bool
   , rsVersion :: Int
   }
-  deriving (Show)
+  deriving stock (Show)
 makeLensesWith abbreviatedFields ''ReadSecret
 
 
@@ -142,7 +139,7 @@ data PostSecret =
   { psCas :: Maybe Int
   , psDdata :: HS.HashMap T.Text T.Text
   }
-  deriving (Show)
+  deriving stock (Show)
 type PatchSecret = PostSecret
 makeLensesWith abbreviatedFields ''PostSecret
 
@@ -166,7 +163,7 @@ data UpdateMetadata =
   , umDeleteVersionAfter :: Maybe T.Text
   , umCustomMetadata :: HS.HashMap T.Text T.Text
   }
-  deriving (Show)
+  deriving stock (Show)
 makeLensesWith abbreviatedFields ''UpdateMetadata
 
 -- Overloaded Lens accessors
@@ -202,20 +199,20 @@ instance FromJSON a => FromJSON (KvResponse a) where
     <*> o .: "data"
 
 removeNull :: [AT.Pair] -> [AT.Pair]
-removeNull = filter \case 
-  (_, Null) -> False 
+removeNull = filter \case
+  (_, Null) -> False
   _         -> True
 
 instance ToJSON PostSecret where
   toJSON postSecret =
-    object 
+    object
       [ "options" .= object (removeNull [ "cas" .= (postSecret ^. cas)  ])
       , "data" .= (postSecret ^. ddata)
       ]
 
 instance ToJSON UpdateMetadata where
   toJSON updateMetadata =
-    object $ removeNull 
+    object $ removeNull
       [ "max_versions" .= (updateMetadata ^. maxVersions)
       , "cas_required" .= (updateMetadata ^. casRequired)
       , "delete_version_after" .= (updateMetadata ^. deleteVersionAfter)
@@ -237,7 +234,7 @@ instance ReflectMethod 'LIST where
 -- TODO - A place holder, for a perhaps more complicated type. One with pinned memory which is
 --        overwritten many times or something like that
 newtype VaultToken = VaultToken T.Text
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 -- Could this be somehow automated? newtypes are just meaningless wrapper anyways, at least to GHC.
 instance ToHttpApiData VaultToken where
@@ -303,7 +300,7 @@ data Routes route =
     :> CaptureAll "segments" T.Text
     :> Delete '[JSON] NoContent
   }
-  deriving (Generic)
+  deriving stock (Generic)
 makeLensesWith abbreviatedFields ''Routes
 
 routes :: ClientEnv -> Routes (AsClientT IO)

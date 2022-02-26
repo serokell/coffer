@@ -8,4 +8,4 @@ data CofferError =
   MarshallingFailed
   | ConnectError
   | OtherError T.Text
-  deriving (Show)
+  deriving stock (Show)

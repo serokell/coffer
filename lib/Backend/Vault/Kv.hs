@@ -15,35 +15,29 @@ import           Backend                      (Backend (..), BackendEffect (..))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
-import qualified Data.Text.Lazy.Encoding      as TL
 import qualified Data.Text.Lazy               as TL
 import qualified Data.HashMap.Internal.Strict as HS
 import qualified Data.Set                     as Set
 import qualified Data.Aeson                   as A
-import qualified Data.Aeson.Text              as A
-import qualified Data.Scientific              as S
 import qualified Toml
 
 import           Control.Monad                (void)
-import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, runClientM, ClientError (..), parseBaseUrl, showBaseUrl)
+import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, ClientError (..), parseBaseUrl, showBaseUrl)
 import           Network.HTTP.Client.TLS      (tlsManagerSettings)
 import           Network.HTTP.Client          (newManager, defaultManagerSettings)
-import           Polysemy.Error               (Error, throw, runError)
-import           Control.Exception.Lens       (exception)
-import           Control.Monad.State          (evalState)
+import           Polysemy.Error               (Error, throw)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
 import           Control.Applicative          (Alternative(empty))
 import           Validation                   (Validation(Success, Failure))
-import           Data.Time.Format.ISO8601     (iso8601ParseM, iso8601Show)
 import           Data.Time                    (UTCTime)
 import           Control.Exception            (catch)
 import           Servant.Client.Core.Response (responseStatusCode)
-import           Servant.Client.Core.Request  (RequestF (Request))
 import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
+import qualified Data.Aeson.Text as A
 
 data VaultKvBackend =
   VaultKvBackend
@@ -52,7 +46,7 @@ data VaultKvBackend =
   , vbMount :: T.Text
   , vbToken :: I.VaultToken
   }
-  deriving (Show)
+  deriving stock (Show)
 
 {-# INLINE didimatch #-}
 didimatch
@@ -76,7 +70,7 @@ vaultKvCodec = VaultKvBackend
                   <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
                   <*> Toml.text "mount" Toml..= vbMount
                   <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
-  where 
+  where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
     baseUrlToText = Just . T.pack . showBaseUrl
@@ -145,9 +139,9 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        void $ embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
+        void $ embedCatch (postSecret env (entry ^. E.path) secret)
       ReadSecret path ->
-        embedCatchMaybe path (readSecret env path Nothing) >>= \case
+        embedCatchMaybe (readSecret env path Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -181,20 +175,19 @@ runVaultIO url token mount = interpret $
               & E.fields .~ fields
               & E.tags .~ _tags
       ListSecrets path ->
-        embedCatchMaybe path $ do
+        embedCatchMaybe $ do
           response <- listSecrets env path
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatch path (void $ deleteSecret env path)
+        embedCatch (void $ deleteSecret env path)
 
-  where 
+  where
     postSecret env = (I.routes env ^. I.postSecret) mount token
     readSecret env = (I.routes env ^. I.readSecret) mount token
     listSecrets env = (I.routes env ^. I.listSecrets) mount token
-    updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
     deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
 
-    -- | Handles @ClientError@ in the following way: 
+    -- | Handles @ClientError@ in the following way:
     -- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error. It status code is 404, the result would be Nothing
     -- 2. If it is @ConnectionError@, then we would get @ConnectError@
     -- 3. Otherwise we would get @MarshallingFailed@
@@ -204,18 +197,17 @@ runVaultIO url token mount = interpret $
                 case statusCode $ responseStatusCode response of
                   404 -> Nothing
                   e -> Just $ OtherError (T.pack $ show e)
-            DecodeFailure text response -> Just MarshallingFailed
-            UnsupportedContentType mediaType response -> Just MarshallingFailed
-            InvalidContentTypeHeader response -> Just MarshallingFailed
-            ConnectionError exception -> Just ConnectError
+            DecodeFailure _ _ -> Just MarshallingFailed
+            UnsupportedContentType _ _ -> Just MarshallingFailed
+            InvalidContentTypeHeader _ -> Just MarshallingFailed
+            ConnectionError _ -> Just ConnectError
 
     -- | Runs an IO action and throws an error if happens.
     embedCatch :: Member (Embed IO) r
                     => Member (Error CofferError) r
-                    => [T.Text]
-                    -> IO a
+                    => IO a
                     -> Sem r a
-    embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatch io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> pure l
             Right (Just r) -> throw r
             Right Nothing -> throw $ OtherError "404"
@@ -224,10 +216,9 @@ runVaultIO url token mount = interpret $
     --   Otherwise, it would be Nothing.
     embedCatchMaybe :: Member (Embed IO) r
                     => Member (Error CofferError) r
-                    => [T.Text]
-                    -> IO a
+                    => IO a
                     -> Sem r (Maybe a)
-    embedCatchMaybe path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatchMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> (pure . Just) l
             Right (Just r) -> throw r
             Right Nothing -> pure Nothing

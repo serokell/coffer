@@ -13,19 +13,6 @@ extra-source-files:
 
 dependencies:
   - base >= 4.14.3.0 && < 5
-  - lens
-  - generic-lens
-  - text
-  - bytestring
-  - unordered-containers
-  - aeson
-  - mtl
-  - hashable
-  - polysemy
-  - scientific
-  - tomland
-  - validation-selective
-  - time
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -94,22 +81,29 @@ ghc-options:
 library:
   source-dirs:      lib
   dependencies:
-    - servant
-    - servant-client
-    - servant-client-core
+    - aeson
+    - containers
+    - hashable
     - http-client
     - http-client-tls
     - http-types
-    - vector
-    - containers
+    - lens
     - lens-aeson
+    - polysemy
+    - servant
+    - servant-client
+    - servant-client-core
+    - text
+    - time
+    - tomland
+    - unordered-containers
+    - validation-selective
+    - vector
 
 executables:
   coffer:
     source-dirs:      app
     main:             Main.hs
-    dependencies:
-      - coffer
 
 tests:
   test:
@@ -119,15 +113,17 @@ tests:
     ghc-options:
       - -threaded
     dependencies:
-      - coffer
-      - megaparsec
       - tasty
-      - tasty-hunit
   doctests:
     source-dirs:      tests/doctests
     main:             Doctests.hs
     ghc-options:
       - -threaded
+      # `doctest` does not depend on `coffer` at compile-time, but it does
+      # depend on it at runtime.
+      # GHC will flag the `coffer` package as an unused dependency,
+      # so we have to turn off that warning.
+      - -Wno-unused-packages
     dependencies:
-      - coffer
       - doctest-parallel
+      - coffer
