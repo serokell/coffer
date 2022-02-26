@@ -79,6 +79,7 @@ library
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
   build-depends:
       aeson
     , base >=4.14.3.0 && <5
@@ -160,6 +161,7 @@ executable coffer
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations
   build-depends:
       aeson
     , base >=4.14.3.0 && <5
@@ -234,7 +236,7 @@ test-suite doctests
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -threaded
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded
   build-depends:
       aeson
     , base >=4.14.3.0 && <5
@@ -311,7 +313,7 @@ test-suite test
       UndecidableInstances
       UndecidableSuperClasses
       ViewPatterns
-  ghc-options: -threaded
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:

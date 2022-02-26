@@ -77,6 +77,20 @@ default-extensions:
   - UndecidableSuperClasses
   - ViewPatterns
 
+ghc-options:
+  - -Weverything
+  - -Wno-implicit-prelude
+  - -Wno-name-shadowing
+  - -Wno-missing-import-lists
+  - -Wno-missing-export-lists
+  - -Wno-unsafe
+  - -Wno-safe
+  - -Wno-missing-safe-haskell-mode
+  - -Wno-prepositive-qualified-module
+  - -Wno-monomorphism-restriction
+  - -Wno-missed-specialisations
+  - -Wno-all-missed-specialisations
+
 library:
   source-dirs:      lib
   dependencies:
