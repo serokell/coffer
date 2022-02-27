@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-.PHONY: coffer test haddock haddock-no-deps stylish lint clean all
+.PHONY: coffer test haddock haddock-no-deps stylish lint clean bats all
 
 # Build target from the common utility Makefile
 MAKEU = $(MAKE) -C make/
@@ -23,6 +23,10 @@ haddock-no-deps:
 	$(MAKE_PACKAGE) haddock-no-deps
 clean:
 	$(MAKE_PACKAGE) clean
+bats:
+	git submodule update --init --recursive
+	./tests/golden/helpers/bats/bin/bats ./tests/golden/**
+
 
 all:
 	$(MAKEU) PACKAGE=""
