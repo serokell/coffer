@@ -2,3 +2,4 @@
 /.ghc.environment.*
 /.direnv
 .stack-work
+hie.yaml
