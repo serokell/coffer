@@ -22,7 +22,12 @@ let
         # collect all *.dump-hi files (required for weeder)
         postInstall = weeder-hacks.collect-dump-hi-files;
 
+        # enable haddock for local packages
+        doHaddock = true;
       };
+
+      # disable haddock for dependencies
+      doHaddock = false;
     }];
   };
 in project

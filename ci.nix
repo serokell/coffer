@@ -36,6 +36,7 @@ rec {
   cli = project.coffer.components.exes.coffer;
   tests = project.coffer.components.tests.test;
   doctests = project.coffer.components.tests.doctests;
+  haddock = project.coffer.components.library.haddock;
 
   coffer-static = (import ./coffer.nix { linux-static = true; }).coffer.components.exes.coffer;
   coffer-windows = (import ./coffer.nix { windows = true; }).coffer.components.exes.coffer;
