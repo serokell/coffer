@@ -17,6 +17,11 @@ rec {
     }
   );
 
+  local-packages = [{
+      name = "coffer";
+      subdirectory = ".";
+  }];
+
   project-src = pkgs.haskell-nix.haskellLib.cleanGit {
     name = "coffer";
     src = pkgs.haskell-nix.haskellLib.cleanSourceWith {
@@ -36,6 +41,21 @@ rec {
   coffer-windows = (import ./coffer.nix { windows = true; }).coffer.components.exes.coffer;
 
   trailing-whitespace-check = pkgs.build.checkTrailingWhitespace project-src;
+
+  weeder-hacks = import sources.haskell-nix-weeder { inherit pkgs; };
+
+  # nixpkgs has weeder 2, but we use weeder 1
+  weeder-legacy = pkgs.haskellPackages.callHackageDirect {
+    pkg = "weeder";
+    ver = "1.0.9";
+    sha256 = "0gfvhw7n8g2274k74g8gnv1y19alr1yig618capiyaix6i9wnmpa";
+  } {};
+
+  weeder-script = weeder-hacks.weeder-script {
+    weeder = weeder-legacy;
+    hs-pkgs = project;
+    local-packages = local-packages;
+  };
 
   # stack2cabal is broken because of strict constraints, set 'jailbreak' to ignore them
   stack2cabal = pkgs.haskell.lib.overrideCabal pkgs.haskellPackages.stack2cabal (drv: {
