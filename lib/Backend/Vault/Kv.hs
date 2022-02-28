@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Backend.Vault.Kv
   ( VaultKvBackend
@@ -16,6 +18,7 @@ import qualified Data.Text.Encoding           as T
 import qualified Data.Text.Lazy.Encoding      as TL
 import qualified Data.Text.Lazy               as TL
 import qualified Data.HashMap.Internal.Strict as HS
+import qualified Data.Set                     as Set
 import qualified Data.Aeson                   as A
 import qualified Data.Aeson.Text              as A
 import qualified Data.Scientific              as S
@@ -44,10 +47,10 @@ import           Control.Lens
 
 data VaultKvBackend =
   VaultKvBackend
-  { _vbName :: T.Text
-  , _vbAddress :: BaseUrl
-  , _vbMount :: T.Text
-  , _vbToken :: I.VaultToken
+  { vbName :: T.Text
+  , vbAddress :: BaseUrl
+  , vbMount :: T.Text
+  , vbToken :: I.VaultToken
   }
   deriving (Show)
 
@@ -69,33 +72,34 @@ didimatch matchB matchA codec = Toml.Codec
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
-                  <$> Toml.text "name" Toml..= _vbName
-                  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= _vbAddress
-                  <*> Toml.text "mount" Toml..= _vbMount
-                  <*> didimatch tokenToText textToToken (Toml.text "token") Toml..= _vbToken
-  where tokenToText (I.VaultToken t) = Just t
-        textToToken t = Just $ I.VaultToken t
-        baseUrlToText = Just . T.pack . showBaseUrl
-        textToBaseUrl = parseBaseUrl . T.unpack
+                  <$> Toml.text "name" Toml..= vbName
+                  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
+                  <*> Toml.text "mount" Toml..= vbMount
+                  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
+  where 
+    tokenToText (I.VaultToken t) = Just t
+    textToToken t = I.VaultToken t
+    baseUrlToText = Just . T.pack . showBaseUrl
+    textToBaseUrl = parseBaseUrl . T.unpack
 
 data FieldMetadata = FieldMetadata
-  { _dateModified :: UTCTime
-  , _private :: Bool
+  { fmDateModified :: UTCTime
+  , fmPrivate :: Bool
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
-makeLenses ''FieldMetadata
+makeLensesWith abbreviatedFields ''FieldMetadata
 
 data CofferSpecials =
   CofferSpecials
-  { _masterKey :: Maybe T.Text
-  , _globalDateModified :: UTCTime
-  , _fields :: HS.HashMap T.Text FieldMetadata
-  , _tags :: [T.Text]
+  { csMasterKey :: Maybe T.Text
+  , csGlobalDateModified :: UTCTime
+  , csFields :: HS.HashMap T.Text FieldMetadata
+  , csTags :: Set.Set T.Text
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
-makeLenses ''CofferSpecials
+makeLensesWith abbreviatedFields ''CofferSpecials
 
 runVaultIO :: Member (Embed IO) r
            => Member (Error CofferError) r
@@ -105,7 +109,7 @@ runVaultIO :: Member (Embed IO) r
            -> Sem (BackendEffect ': r) a
            -> Sem r a
 runVaultIO url token mount = interpret $
-  \x -> do
+  \operation -> do
     env <-
       case url of
         (BaseUrl Http _ _ _) -> do
@@ -115,117 +119,126 @@ runVaultIO url token mount = interpret $
           manager <- embed $ newManager tlsManagerSettings
           pure $ mkClientEnv manager url
 
-    case x of
+    case operation of
       WriteSecret entry -> do
         let
           cofferSpecials = CofferSpecials
-            { _masterKey =
+            { csMasterKey =
               entry ^. E.masterField <&> E.getFieldKey
-            , _globalDateModified = entry ^. E.dateModified
-            , _fields =
-              entry ^. E.fields & traverse %~
+            , csGlobalDateModified = entry ^. E.dateModified
+            , csFields =
+              entry ^. E.fields & each %~
                 (\f ->
                 FieldMetadata
-                { _dateModified = f ^. E.dateModified
-                , _private = f ^. E.private
+                { fmDateModified = f ^. E.dateModified
+                , fmPrivate = f ^. E.private
                 })
               & HS.mapKeys E.getFieldKey
-            , _tags = map E.getEntryTag $ entry ^. E.tags
+            , csTags = Set.map E.getEntryTag $ entry ^. E.tags
             }
           secret = I.PostSecret
-            { I._cas = Nothing
-            , I._pdata =
-                  HS.insert "#$coffer" (TL.toStrict . TL.decodeUtf8 $ A.encode cofferSpecials)
-                . HS.map (^. E.value)
-                . HS.mapKeys E.getFieldKey
-                $ entry ^. E.fields
-            }
+            { I.psCas = Nothing
+            , I.psDdata =
+                    HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
+                  . HS.map (^. E.value)
+                  . HS.mapKeys E.getFieldKey
+                  $ entry ^. E.fields
+              }
 
-        response <- embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
+        void $ embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
+      ReadSecret path ->
+        embedCatchMaybe path (readSecret env path Nothing) >>= \case
+          Nothing -> pure Nothing
+          Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
+            cofferSpecials :: CofferSpecials <-
+              (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8) `orThrow` MarshallingFailed
+            let secrets = HS.toList $ HS.delete "#$coffer" _data
+            let keyAndValueToField (key, value) = do
+                  _modTime <- cofferSpecials ^? fields . at key . _Just . dateModified
+                  _private <- cofferSpecials ^? fields . at key . _Just . private
+                  _key <- E.newFieldKey key
 
-        case response ^. I.ddata . at ("version" :: T.Text) of
-          Just (A.Number i) -> maybe (throw MarshallingFailed) pure (S.toBoundedInteger i)
-          _ -> throw MarshallingFailed
-      ReadSecret path version ->
-        runMaybe $ embedCatchMaybe path (readSecret env path version)
-        >>= \(I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _) _ _ _) -> do
-          cofferSpecials :: CofferSpecials <-
-            maybeThrow (_data ^.at "#$coffer" >>= A.decodeStrict' . T.encodeUtf8)
-          let secrets = HS.toList $ foldr HS.delete _data ["#$coffer"]
-          let keyToField key = do
-               _modTime <- cofferSpecials ^. fields.at key <&> (^. dateModified)
-               _private <- cofferSpecials ^. fields.at key <&> (^. private)
-               _value <- _data ^.at key
-               _key <- E.newFieldKey key
+                  Just (_key
+                        , E.newField _modTime value
+                          & E.private .~ _private
+                        )
 
-               Just (_key
-                    , E.newField _modTime _value
-                      & E.private .~ _private
-                    )
+            fields <-
+              (secrets & each %%~ keyAndValueToField <&> HS.fromList) `orThrow` MarshallingFailed
+            _tags <- (cofferSpecials ^. tags & \text -> Set.fromList <$> mapM E.newEntryTag (Set.toList text)) `orThrow` MarshallingFailed
 
-          fields <- maybeThrow $
-            secrets & traverse %~ (keyToField . fst) & sequence <&> HS.fromList
-          _tags <- maybeThrow $ cofferSpecials ^. tags & mapM E.newEntryTag
+            fieldKey <-
+              case cofferSpecials ^. masterKey of
+                Nothing -> pure Nothing
+                Just mKey ->
+                  case E.newFieldKey mKey of
+                    Nothing -> throw (OtherError $ "Attempted to create new field key from '" <> mKey <> "'")
+                    Just fieldKey -> (pure . Just) fieldKey
 
-          pure $ E.newEntry path (cofferSpecials ^. globalDateModified)
-            & E.masterField .~ (cofferSpecials ^. masterKey >>= E.newFieldKey)
-            & E.fields .~ fields
-            & E.tags .~ _tags
+            pure . Just
+              $ E.newEntry path (cofferSpecials ^. globalDateModified)
+              & E.masterField .~ fieldKey
+              & E.fields .~ fields
+              & E.tags .~ _tags
       ListSecrets path ->
-        runMaybe (embedCatchMaybe path (listSecrets env path) <&> (^. I.ddata) <&> \(I.ListSecrets list) -> list)
+        embedCatchMaybe path $ do
+          response <- listSecrets env path
+          pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatch path (deleteSecret env path) <&> const ()
-  where postSecret env = (I.routes env ^. I.postSecret) mount token
-        readSecret env = (I.routes env ^. I.readSecret) mount token
-        listSecrets env = (I.routes env ^. I.listSecrets) mount token
-        updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
-        deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
+        embedCatch path (void $ deleteSecret env path)
 
-        exceptionHandler :: [T.Text] -> ClientError -> Maybe CofferError
-        exceptionHandler path =
-          \case FailureResponse _request response ->
-                    case statusCode $ responseStatusCode response of
-                      404 -> Nothing
-                      e -> Just $ OtherError (T.pack $ show e)
-                DecodeFailure text response -> Just MarshallingFailed
-                UnsupportedContentType mediaType response -> Just MarshallingFailed
-                InvalidContentTypeHeader response -> Just MarshallingFailed
-                ConnectionError exception -> Just ConnectError
-        embedCatch :: Member (Embed IO) r
-                       => Member (Error CofferError) r
-                       => [T.Text]
-                       -> IO a
-                       -> Sem r a
-        embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>=
-          \case Left l -> pure l
-                Right (Just r) -> throw r
-                Right Nothing -> throw $ OtherError "404"
+  where 
+    postSecret env = (I.routes env ^. I.postSecret) mount token
+    readSecret env = (I.routes env ^. I.readSecret) mount token
+    listSecrets env = (I.routes env ^. I.listSecrets) mount token
+    updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
+    deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
 
-        embedCatchMaybe :: Member (Embed IO) r
-                        => Member (Error CofferError) r
-                        => Member (Error ()) r
-                        => [T.Text]
-                        -> IO a
-                        -> Sem r a
-        embedCatchMaybe path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler path)) >>=
-          \case Left l -> pure l
-                Right (Just r) -> throw r
-                Right Nothing -> throw ()
+    -- | Handles @ClientError@ in the following way: 
+    -- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error. It status code is 404, the result would be Nothing
+    -- 2. If it is @ConnectionError@, then we would get @ConnectError@
+    -- 3. Otherwise we would get @MarshallingFailed@
+    exceptionHandler :: ClientError -> Maybe CofferError
+    exceptionHandler =
+      \case FailureResponse _request response ->
+                case statusCode $ responseStatusCode response of
+                  404 -> Nothing
+                  e -> Just $ OtherError (T.pack $ show e)
+            DecodeFailure text response -> Just MarshallingFailed
+            UnsupportedContentType mediaType response -> Just MarshallingFailed
+            InvalidContentTypeHeader response -> Just MarshallingFailed
+            ConnectionError exception -> Just ConnectError
 
-        runMaybe :: Sem (Error () ': r) t
-                 -> Sem r (Maybe t)
-        runMaybe x = runError x <&> \case
-                       Left _ -> Nothing
-                       Right a -> Just a
+    -- | Runs an IO action and throws an error if happens.
+    embedCatch :: Member (Embed IO) r
+                    => Member (Error CofferError) r
+                    => [T.Text]
+                    -> IO a
+                    -> Sem r a
+    embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+      \case Left l -> pure l
+            Right (Just r) -> throw r
+            Right Nothing -> throw $ OtherError "404"
 
-        maybeThrow :: Member (Error CofferError) r
-                      => Maybe a
-                      -> Sem r a
-        maybeThrow = maybe (throw MarshallingFailed) pure
+    -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
+    --   Otherwise, it would be Nothing.
+    embedCatchMaybe :: Member (Embed IO) r
+                    => Member (Error CofferError) r
+                    => [T.Text]
+                    -> IO a
+                    -> Sem r (Maybe a)
+    embedCatchMaybe path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+      \case Left l -> (pure . Just) l
+            Right (Just r) -> throw r
+            Right Nothing -> pure Nothing
+
+    orThrow :: Member (Error e) r
+            => Maybe a
+            -> e
+            -> Sem r a
+    orThrow m e = maybe (throw e) pure m
 
 instance Backend VaultKvBackend where
-  _name s = _vbName s
-  _codecRead = Toml.codecRead vaultKvCodec
-  _codecWrite a = Toml.codecWrite vaultKvCodec a
-                  <* Toml.codecWrite (Toml.text "type") "vault"
-  _runEffect b = runVaultIO (_vbAddress b) (_vbToken b) (_vbMount b)
+  _name kvBackend = vbName kvBackend
+  _codec = vaultKvCodec
+  _runEffect kvBackend = runVaultIO (vbAddress kvBackend) (vbToken kvBackend) (vbMount kvBackend)

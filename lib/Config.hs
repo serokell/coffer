@@ -12,12 +12,13 @@ import qualified Data.Text.IO        as TIO
 import qualified Entry               as E
 import qualified Data.HashMap.Strict as HS
 import qualified Toml;
+import           Data.Foldable       (toList)
 
 import           Polysemy.Error      (Error, errorToIOFinal)
 import           Toml                (TomlCodec);
 
 import           Polysemy
-import           Backend             (BackendPacked (..)
+import           Backend             (SomeBackend (..)
                                      , Backend (..)
                                      , readSecret
                                      )
@@ -26,7 +27,7 @@ import           Backends            (backendPackedCodec, supportedBackends)
 
 data Config =
   Config
-  { backends :: HS.HashMap T.Text BackendPacked
+  { backends :: HS.HashMap T.Text SomeBackend
   , mainBackend :: T.Text
   }
   deriving (Show)
@@ -34,8 +35,8 @@ data Config =
 
 configCodec :: TomlCodec Config
 configCodec = Config
-  <$> Toml.dimap hsToList listToHs
-  (Toml.list (backendPackedCodec supportedBackends) "backend") Toml..= backends
+  <$> Toml.dimap toList listToHs
+  (Toml.list backendPackedCodec "backend") Toml..= backends
   <*> Toml.text "main_backend" Toml..= mainBackend
-  where hsToList hs = snd <$> HS.toList hs
-        listToHs list = HS.fromList $ fmap (\y@(PackBackend x) -> (_name x, y)) list
+  where 
+    listToHs list = HS.fromList $ fmap (\y@(SomeBackend x) -> (_name x, y)) list

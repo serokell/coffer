@@ -8,18 +8,16 @@ import qualified Toml
 
 import           Backend.Vault.Kv    (VaultKvBackend)
 import           Toml                (TomlCodec)
-import           Backend             (BackendPacked (..), Backend (..))
+import           Backend             (SomeBackend (..), Backend (..))
 import qualified Data.HashMap.Strict as HS
 import Validation (Validation(Failure))
 
-backendPackedCodec
-  :: (T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv BackendPacked))
-  -> TomlCodec BackendPacked
-backendPackedCodec backends = Toml.Codec input output
-  where input :: Toml.TomlEnv BackendPacked
+backendPackedCodec :: TomlCodec SomeBackend
+backendPackedCodec = Toml.Codec input output
+  where input :: Toml.TomlEnv SomeBackend
         input toml = case HS.lookup "type" $ Toml.tomlPairs toml of
                        Just t -> do
-                         case Toml.backward Toml._Text t >>= backends of
+                         case Toml.backward Toml._Text t >>= supportedBackends of
                            Right c -> c toml
                            Left e -> Failure
                                      [ Toml.BiMapError "type" e
@@ -28,9 +26,10 @@ backendPackedCodec backends = Toml.Codec input output
                                   [ Toml.BiMapError "type" $ Toml.ArbitraryError
                                     "Backend doesn't have a `type` key"
                                   ]
-        output (PackBackend a) =  PackBackend <$> _codecWrite a
+        output (SomeBackend a) =  SomeBackend <$> Toml.codecWrite _codec a
+                  <* Toml.codecWrite (Toml.text "type") "vault"
 
 supportedBackends
-  :: T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv BackendPacked)
-supportedBackends "vault-kv" = Right $ fmap PackBackend . _codecRead @VaultKvBackend
-supportedBackends _ = Left (Toml.ArbitraryError "Unknow backend type")
+  :: T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
+supportedBackends "vault-kv" = Right $ fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend)
+supportedBackends _ = Left (Toml.ArbitraryError "Unknown backend type")

@@ -2,14 +2,18 @@
   TemplateHaskell
 , MultiParamTypeClasses
 , FlexibleInstances
+, FunctionalDependencies
+, UndecidableInstances
+, BlockArguments
 #-}
 
 module Backend.Vault.Kv.Internal
   ( KvResponse (..)
-  , requestId, leaseId, renewable, leaseDuration, wrapInfo, warnings, auth
+  , requestId, leaseId, renewable, leaseDuration
   , ReadSecret (..)
   , secret, createdTime, deletionTime, destroyed, version
   , ListSecrets (..)
+  , unListSecrets
   , PostSecret (..)
   , cas
   , PatchSecret (..)
@@ -35,13 +39,13 @@ import qualified Data.HashMap.Strict    as HS;
 import qualified Data.Aeson             as A
 import qualified Data.Aeson.Types       as AT
 
-import           Data.Aeson             ((.:)) -- Control.Lens shadows (.=), use (A..=) instead
+import           Data.Aeson             
 import           Control.Applicative    ((<|>))
 import           Data.Proxy             (Proxy (Proxy))
 import           Servant.Client.Generic (AsClientT, genericClientHoist, genericClient)
 import           Control.Exception      (throwIO)
 
-import           Control.Lens
+import           Control.Lens hiding ((.=))
 import           Servant.API
 import           Servant.Client
 import           Servant.API.Generic
@@ -51,25 +55,25 @@ import           Servant.API.Generic
 -- actually trying to read as some sort of super class.
 -- For example:
 --
--- { "request_id": "00000000-0000-0000-0000-000000000000"
--- , "lease_id": ""
--- , "renewable": false
--- , "lease_duration": 0
--- , "data": <DATA>
--- , "wrap_info": null
--- , "warnings": null
--- , "auth": null
--- }
+-- >  { "request_id": "00000000-0000-0000-0000-000000000000"
+-- >  , "lease_id": ""
+-- >  , "renewable": false
+-- >  , "lease_duration": 0
+-- >  , "data": <DATA>
+-- >  , "wrap_info": null
+-- >  , "warnings": null
+-- >  , "auth": null
+-- >  }
 data KvResponse a =
   KvResponse
-  { _requestId :: T.Text
-  , _leaseId :: T.Text
-  , _renewable :: Bool
-  , _leaseDuration :: Int
-  , _kdata :: a
+  { krRequestId :: T.Text
+  , krLeaseId :: T.Text
+  , krRenewable :: Bool
+  , krLeaseDuration :: Int
+  , krKdata :: a
   }
   deriving (Show)
-makeLenses ''KvResponse
+makeLensesWith abbreviatedFields ''KvResponse
 
 
 -- |
@@ -78,12 +82,12 @@ makeLenses ''KvResponse
 -- in 'KvResponse' at the 'data' key.
 -- For example:
 --
--- { "keys":
---   [ "a1"
---   , "q1"
---   ]
--- }
-newtype ListSecrets = ListSecrets [T.Text]
+-- >  { "keys":
+-- >    [ "a1"
+-- >    , "q1"
+-- >    ]
+-- >  }
+newtype ListSecrets = ListSecrets { _unListSecrets :: [T.Text] }
   deriving (Show)
 makeLenses ''ListSecrets
 
@@ -93,31 +97,31 @@ makeLenses ''ListSecrets
 -- in 'KvResponse' at the 'data' key.
 -- For example:
 --
--- { "data":
---   { "token": "stuff"
---   }
--- , "metadata": <ReadSecretMetadata>
---   { "created_time": "2018-03-22T02:24:06.945319214Z",
---     "custom_metadata":
---     { "owner": "jdoe",
---       "mission_critical": "false"
---     },
---     "deletion_time": "",
---     "destroyed": false,
---     "version": 2
---   }
--- }
+-- >  { "data":
+-- >    { "token": "stuff"
+-- >    }
+-- >  , "metadata": <ReadSecretMetadata>
+-- >    { "created_time": "2018-03-22T02:24:06.945319214Z",
+-- >      "custom_metadata":
+-- >      { "owner": "jdoe",
+-- >        "mission_critical": "false"
+-- >      },
+-- >      "deletion_time": "",
+-- >      "destroyed": false,
+-- >      "version": 2
+-- >    }
+-- >  }
 data ReadSecret =
   ReadSecret
-  { _secret :: HS.HashMap T.Text T.Text
-  , _rCustomMetadata :: HS.HashMap T.Text T.Text
-  , _createdTime :: T.Text
-  , _deletionTime :: T.Text
-  , _destroyed :: Bool
-  , _version :: Int
+  { rsSecret :: HS.HashMap T.Text T.Text
+  , rsCustomMetadata :: HS.HashMap T.Text T.Text
+  , rsCreatedTime :: T.Text
+  , rsDeletionTime :: T.Text
+  , rsDestroyed :: Bool
+  , rsVersion :: Int
   }
   deriving (Show)
-makeLenses ''ReadSecret
+makeLensesWith abbreviatedFields ''ReadSecret
 
 
 -- |
@@ -125,22 +129,22 @@ makeLenses ''ReadSecret
 -- '/v1/<MOUNT>/data/<PATH>'.
 -- For example:
 --
--- { "options":
--- , { "cas": 0
---   }
--- , "data":
---   { "foo": "bar"
---   , "zip": "zap"
---   }
--- }
+-- >  { "options":
+-- >  , { "cas": 0
+-- >    }
+-- >  , "data":
+-- >    { "foo": "bar"
+-- >    , "zip": "zap"
+-- >    }
+-- >  }
 data PostSecret =
   PostSecret
-  { _cas :: Maybe Int
-  , _pdata :: HS.HashMap T.Text T.Text
+  { psCas :: Maybe Int
+  , psDdata :: HS.HashMap T.Text T.Text
   }
   deriving (Show)
 type PatchSecret = PostSecret
-makeLenses ''PostSecret
+makeLensesWith abbreviatedFields ''PostSecret
 
 
 -- |
@@ -148,86 +152,75 @@ makeLenses ''PostSecret
 -- '/v1/<MOUNT>/metadata/<PATH>'.
 -- For example:
 --
--- { "max_versions": 5
--- , "cas_required": false
--- , "delete_version_after": "40m"
--- , "custom_metadata":
---   { "example": ":)"
---   }
--- }
+-- >  { "max_versions": 5
+-- >  , "cas_required": false
+-- >  , "delete_version_after": "40m"
+-- >  , "custom_metadata":
+-- >    { "example": ":)"
+-- >    }
+-- >  }
 data UpdateMetadata =
   UpdateMetadata
-  { _maxVersions :: Maybe Int
-  , _casRequired :: Maybe Bool
-  , _deleteVersionAfter :: Maybe T.Text
-  , _uCustomMetadata :: HS.HashMap T.Text T.Text
+  { umMaxVersions :: Maybe Int
+  , umCasRequired :: Maybe Bool
+  , umDeleteVersionAfter :: Maybe T.Text
+  , umCustomMetadata :: HS.HashMap T.Text T.Text
   }
   deriving (Show)
-makeLenses ''UpdateMetadata
+makeLensesWith abbreviatedFields ''UpdateMetadata
 
 -- Overloaded Lens accessors
 
-class DataLens a b where
-  ddata :: Lens' a b
-
-instance a ~ b => DataLens (KvResponse a) b where
+instance {-# OVERLAPPABLE #-} a ~ b => HasDdata (KvResponse a) b where
   ddata = kdata
-
-instance DataLens PostSecret (HS.HashMap T.Text T.Text) where
-  ddata = pdata
-
-class CustomMetadataLens a where
-  customMetadata :: Lens' a (HS.HashMap T.Text T.Text)
-
-instance CustomMetadataLens ReadSecret where
-  customMetadata = rCustomMetadata
-
-instance CustomMetadataLens UpdateMetadata where
-  customMetadata = uCustomMetadata
 
 -- JSON serialization/deserialization, logically some ADTs need to only be deserialized,
 -- others serialized, but never both.
 
-instance A.FromJSON ListSecrets where
-  parseJSON = A.withObject "ListSecrets" $ \o ->
+instance FromJSON ListSecrets where
+  parseJSON = withObject "ListSecrets" $ \o ->
     ListSecrets <$> o .: "keys"
 
-instance A.FromJSON ReadSecret where
-  parseJSON = A.withObject "ReadSecret" $ \o -> do
+instance FromJSON ReadSecret where
+  parseJSON = withObject "ReadSecret" $ \o -> do
     metadata <- o .: "metadata"
     ReadSecret
       <$> o .: "data"
-      <*> (metadata .: "custom_metadata" <|> pure (HS.fromList []))
+      <*> metadata .:? "custom_metadata" .!= HS.fromList []
       <*> metadata .: "created_time"
       <*> metadata .: "deletion_time"
       <*> metadata .: "destroyed"
       <*> metadata .: "version"
 
-instance A.FromJSON a => A.FromJSON (KvResponse a) where
-  parseJSON = A.withObject "KvResponse" $ \o ->
+instance FromJSON a => FromJSON (KvResponse a) where
+  parseJSON = withObject "KvResponse" $ \o ->
     KvResponse
     <$> o .: "request_id"
     <*> o .: "lease_id"
     <*> o .: "renewable"
     <*> o .: "lease_duration"
-    <*> (o .: "data" >>= A.parseJSON)
+    <*> o .: "data"
 
 removeNull :: [AT.Pair] -> [AT.Pair]
-removeNull = filter (\(_, v) -> case v of A.Null -> False ; _ -> True)
+removeNull = filter \case 
+  (_, Null) -> False 
+  _         -> True
 
-instance A.ToJSON PostSecret where
+instance ToJSON PostSecret where
   toJSON postSecret =
-    A.object [ "options" A..= A.object (removeNull [ "cas" A..= (postSecret ^. cas)  ])
-             , "data" A..= ((postSecret ^. ddata) :: HS.HashMap T.Text T.Text)
-             ]
+    object 
+      [ "options" .= object (removeNull [ "cas" .= (postSecret ^. cas)  ])
+      , "data" .= (postSecret ^. ddata)
+      ]
 
-instance A.ToJSON UpdateMetadata where
+instance ToJSON UpdateMetadata where
   toJSON updateMetadata =
-    A.object (removeNull [ "max_versions" A..= (updateMetadata ^. maxVersions)
-                         , "cas_required" A..= (updateMetadata ^. casRequired)
-                         , "delete_version_after" A..= (updateMetadata ^. deleteVersionAfter)
-                         , "custom_metadata" A..= (updateMetadata ^. uCustomMetadata)
-                         ])
+    object $ removeNull 
+      [ "max_versions" .= (updateMetadata ^. maxVersions)
+      , "cas_required" .= (updateMetadata ^. casRequired)
+      , "delete_version_after" .= (updateMetadata ^. deleteVersionAfter)
+      , "custom_metadata" .= (updateMetadata ^. customMetadata)
+      ]
 
 -- Then we can declare the finalized API.
 
@@ -255,23 +248,10 @@ instance ToHttpApiData VaultToken where
 --   this is sufficient.
 type VaultTokenHeader = Header' '[Strict, Required] "X-Vault-Token" VaultToken
 
--- $setup
--- >>> import Network.HTTP.Client.TLS (tlsManagerSettings)
--- >>> import Network.HTTP.Client     (newManager)
--- >>> import Servant.Clieng          (BaseUrl, Https)
---
--- >>> let vaultToken   = "TOKEN"
--- >>> let vaultAddress = "vault.example.org"
---
--- >>>     manager     <- newManager tlsManagerSettings
--- >>> let clientEnv   <- mkClientEnv manager (BaseUrl Https vaultAddress 8200 "")
-
-
 data Routes route =
   Routes
   { -- | To read a secret under a path use `readSecret`
-    -- >>> (routes clientEnv ^. readSecret) vaultToken "kv" ["testbed", "a1"]
-    _readSecret :: route
+    rReadSecret :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "data"
@@ -280,28 +260,25 @@ data Routes route =
     :> QueryParam "version" Int
     :> Get '[JSON] (KvResponse ReadSecret)
     -- | To patch a secret under a path use `patchSecret`
-    -- >>> (routes clientEnv ^. patchSecret) vaultToken "kv" ["testbed", "a1"] secret
-  , _patchSecret :: route
+  , rPatchSecret :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "data"
     :> VaultTokenHeader
     :> CaptureAll "segments" T.Text
     :> ReqBody '[JSON] PatchSecret
-    :> Patch '[JSON] (KvResponse (HS.HashMap T.Text A.Value))
+    :> Patch '[JSON] (KvResponse (HS.HashMap T.Text Value))
     -- | To post a secret to a path use `postSecret`
-    -- >>> (routes clientEnv ^. postSecret) vaultToken "kv" ["testbed", "a1"] secret
-  , _postSecret :: route
+  , rPostSecret :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "data"
     :> VaultTokenHeader
     :> CaptureAll "segments" T.Text
     :> ReqBody '[JSON] PostSecret
-    :> Post '[JSON] (KvResponse (HS.HashMap T.Text A.Value))
+    :> Post '[JSON] (KvResponse (HS.HashMap T.Text Value))
     -- | To list the paths under a path use `listSecrets`
-    -- >>> (routes clientEnv ^. listSecrets) vaultToken "kv" ["testbed"]
-  , _listSecrets :: route
+  , rListSecrets :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "metadata"
@@ -309,8 +286,7 @@ data Routes route =
     :> CaptureAll "segments" T.Text
     :> Verb 'LIST 200 '[JSON] (KvResponse ListSecrets)
     -- | To update metadata under a path use `updateMetadata`
-    -- >>> (routes clientEnv ^. updateMetadata) vaultToken "kv" ["testbed"] metadata
-  , _updateMetadata :: route
+  , rUpdateMetadata :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "metadata"
@@ -319,8 +295,7 @@ data Routes route =
     :> ReqBody '[JSON] UpdateMetadata
     :> Post '[JSON] ()
     -- | To delete secret under a path use `deleteSecret`
-    -- >>> (routes clientEnv ^. deleteSecret) vaultToken "kv" ["testbed"]
-  , _deleteSecret :: route
+  , rDeleteSecret :: route
     :- "v1"
     :> Capture "mount" T.Text
     :> "metadata"
@@ -329,7 +304,7 @@ data Routes route =
     :> Delete '[JSON] NoContent
   }
   deriving (Generic)
-makeLenses ''Routes
+makeLensesWith abbreviatedFields ''Routes
 
 routes :: ClientEnv -> Routes (AsClientT IO)
 routes env = genericClientHoist

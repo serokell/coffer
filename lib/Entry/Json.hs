@@ -5,6 +5,7 @@ module Entry.Json where
 
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
+import qualified Data.Aeson.Lens as A
 
 import qualified Entry as E
 import Control.Lens
@@ -18,6 +19,8 @@ import Data.Time (UTCTime(..))
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Data.Time.Calendar.OrdinalDate (fromMondayStartWeek)
 import qualified Data.Vector as V
+import qualified Data.Set as S
+import Control.Monad (forM)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving stock (Show)
@@ -36,12 +39,16 @@ fieldConverter = prism' to from
                                >>= \case A.String t -> Just t ; _ -> Nothing
                                >>= iso8601ParseM . T.unpack
           value <- HS.lookup "value" o
-                     >>= \case A.String t -> Just t ; _ -> Nothing
+                     >>= \case 
+                            A.String t -> Just t
+                            _ -> Nothing
           _private <- HS.lookup "private" o
-                        >>= \case A.Bool b -> Just b ; _ -> Nothing
+                        >>= \case 
+                              A.Bool b -> Just b
+                              _ -> Nothing
 
-          pure $
-              E.newField dateModified value
+          pure
+            $ E.newField dateModified value
             & E.private .~ _private
         from _ = Nothing
 
@@ -52,7 +59,7 @@ instance E.EntryConvertible JsonEntry where
             [ "path" A..= T.intercalate "/" (entry ^. E.path)
             , "date_modified" A..= (entry ^. E.dateModified)
             , "master_field" A..= (entry ^. E.masterField)
-            , "fields" A..= (HS.fromList . over (traverse . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
+            , "fields" A..= (HS.fromList . over (each . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
             , "tags" A..= (entry ^. E.tags)
             ]
           from (JsonEntry (A.Object o)) =
@@ -65,17 +72,21 @@ instance E.EntryConvertible JsonEntry where
                   >>= iso8601ParseM . T.unpack
                 let _masterField = HS.lookup "master_field" o
                                      >>= \case A.String t -> E.newFieldKey t ; _ -> Nothing
-                _fields <- HS.lookup "fields" o
-                  >>= (\case A.Object t -> Just t ; _ -> Nothing)
-                  <&> HS.map (^? fieldConverter)
-                  >>= (mapM (uncurry (liftA2 (,)) . over _1 E.newFieldKey) . HS.toList)
-                  <&> HS.fromList
+                _fields <- do
+                   value <- HS.lookup "fields" o
+                   obj <- value ^? A._Object
+                   keyFields <- 
+                      forM (HS.toList obj) $ \(text, value) -> do
+                        key <- E.newFieldKey text
+                        field <- value ^? fieldConverter
+                        pure (key, field)
+                   pure $ HS.fromList keyFields
                 _tags <- HS.lookup "tags" o
                    >>= \case A.Array a -> Just a ; _ -> Nothing
-                   >>= sequence . V.toList . V.map (\case A.String s -> E.newEntryTag s ; _ -> Nothing)
+                   >>= sequence . V.toList . V.map (\case A.String s -> E.newEntryTag s ; _ -> Nothing) <&> S.fromList
 
-                pure $
-                    E.newEntry path dateModified
+                pure
+                  $ E.newEntry path dateModified
                   & E.masterField .~ _masterField
                   & E.fields .~ _fields
                   & E.tags .~ _tags

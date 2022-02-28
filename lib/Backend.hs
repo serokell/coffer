@@ -3,7 +3,7 @@
 module Backend
   ( BackendEffect (..), readSecret, writeSecret, listSecrets, deleteSecret
   , Backend (..)
-  , BackendPacked (..)
+  , SomeBackend (..)
   )
 where
 
@@ -20,24 +20,30 @@ import Polysemy
 
 -- @TODO - rename Secret to Entry?
 data BackendEffect m a where
-  WriteSecret  :: E.Entry -> BackendEffect m Int
-  ReadSecret   :: [T.Text] -> Maybe Int -> BackendEffect m (Maybe E.Entry)
+  -- | Overwrites any entry that might already exist at that path. 
+  --   It does /not overwrite/ directories. 
+  --   If a directory with that path already exists, you'll end up with an entry /and/ a directory sharing the same path.
+  WriteSecret  :: E.Entry -> BackendEffect m ()
+  -- | Returns path segments: if the segment is suffixed by @/@ then that indicates a directory;
+  --   otherwise it's an entry 
+  ReadSecret   :: [T.Text] -> BackendEffect m (Maybe E.Entry) 
   ListSecrets  :: [T.Text] -> BackendEffect m (Maybe [T.Text])
-  DeleteSecret :: [T.Text] -> BackendEffect m ()
+  -- | Once all entries are deleted from a directory, then the directory disappears
+  --   (i.e. @ListSecrets@ will no longer list that directory)
+  DeleteSecret :: [T.Text] -> BackendEffect m () 
 makeSem ''BackendEffect
 
 class Show a => Backend a where
   _name :: a -> T.Text
-  _codecRead :: Toml.TomlEnv a
-  _codecWrite :: a -> Toml.TomlState a
+  _codec :: Toml.TomlCodec a
   _runEffect :: Member (Embed IO) r
              => Member (Error CofferError) r
              => a
              -> Sem (BackendEffect ': r) t
              -> Sem r t
 
-data BackendPacked where
-  PackBackend :: Backend a => a -> BackendPacked
+data SomeBackend where
+  SomeBackend :: Backend a => a -> SomeBackend
 
-instance Show BackendPacked where
-  show (PackBackend a) = show a
+instance Show SomeBackend where
+  show (SomeBackend a) = show a
