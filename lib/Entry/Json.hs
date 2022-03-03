@@ -2,9 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE LambdaCase
-           , OverloadedStrings
-#-}
 module Entry.Json where
 
 import qualified Data.Aeson as A

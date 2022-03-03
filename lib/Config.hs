@@ -2,11 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE AllowAmbiguousTypes
-           , TypeApplications
-           , MultiParamTypeClasses
-#-}
-
 module Config where
 
 ;

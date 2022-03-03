@@ -2,15 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE
-  TemplateHaskell
-, MultiParamTypeClasses
-, FlexibleInstances
-, FunctionalDependencies
-, UndecidableInstances
-, BlockArguments
-#-}
-
 module Backend.Vault.Kv.Internal
   ( KvResponse (..)
   , requestId, leaseId, renewable, leaseDuration

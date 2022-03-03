@@ -2,10 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 module Backend.Vault.Kv
   ( VaultKvBackend
   , runVaultIO

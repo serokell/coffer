@@ -2,11 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-
 module Entry
   ( dateModified
   , Entry, EntryConvertible (..), newEntry
