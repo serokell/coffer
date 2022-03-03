@@ -54,12 +54,12 @@ packages:
   original:
     hackage: tomland-1.3.3.1@sha256:83a8fd26a97164100541f7b26aa40ffdc6f230b21e94cbb3eae1fb7093c4356e,8924
 - completed:
-    hackage: doctest-parallel-0.2.1@sha256:c6c0d095dd6e0b8ce1bd9f6f5fc4e0cf5cf50b6895b557356ac41b8aa2947399,5631
+    hackage: doctest-parallel-0.2.2@sha256:4c5787c681211dc21d3b9cecc009422f724295584700c661b5ac33b29dc031ba,5803
     pantry-tree:
-      size: 7415
-      sha256: 8dbc2bc8c5dc5a97f3f0c4fa49f77bddc6d55a5b524f15432a8fb9c3a5aae2ce
+      size: 7976
+      sha256: 26d5feee20fe09059678ca3916a151a79098283e25ac6635a93ab19075ca5984
   original:
-    hackage: doctest-parallel-0.2.1
+    hackage: doctest-parallel-0.2.2
 snapshots:
 - completed:
     size: 587819
