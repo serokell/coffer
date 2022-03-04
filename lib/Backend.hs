@@ -17,6 +17,7 @@ import Error                         (CofferError)
 import Polysemy.Error                (Error)
 
 import Polysemy
+import Coffer.Path (EntryPath, Path)
 
 -- @TODO - rename Secret to Entry?
 data BackendEffect m a where
@@ -26,11 +27,11 @@ data BackendEffect m a where
   WriteSecret  :: E.Entry -> BackendEffect m ()
   -- | Returns path segments: if the segment is suffixed by @/@ then that indicates a directory;
   --   otherwise it's an entry
-  ReadSecret   :: [T.Text] -> BackendEffect m (Maybe E.Entry)
-  ListSecrets  :: [T.Text] -> BackendEffect m (Maybe [T.Text])
+  ReadSecret   :: EntryPath -> BackendEffect m (Maybe E.Entry)
+  ListSecrets  :: Path -> BackendEffect m (Maybe [T.Text])
   -- | Once all entries are deleted from a directory, then the directory disappears
   --   (i.e. @ListSecrets@ will no longer list that directory)
-  DeleteSecret :: [T.Text] -> BackendEffect m ()
+  DeleteSecret :: EntryPath -> BackendEffect m ()
 makeSem ''BackendEffect
 
 class Show a => Backend a where

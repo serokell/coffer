@@ -22,6 +22,9 @@ library
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       Backends
+      CLI.Parser
+      CLI.Types
+      Coffer.Path
       Config
       Entry
       Entry.Json
@@ -84,22 +87,26 @@ library
       aeson
     , base >=4.14.3.0 && <5
     , containers
+    , extra
+    , fmt
     , hashable
     , http-client
     , http-client-tls
     , http-types
     , lens
     , lens-aeson
+    , megaparsec
+    , optparse-applicative
     , polysemy
     , servant
     , servant-client
     , servant-client-core
     , text
     , time
+    , time-compat
     , tomland
     , unordered-containers
     , validation-selective
-    , vector
   default-language: Haskell2010
 
 executable coffer

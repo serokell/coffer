@@ -12,10 +12,11 @@ import Control.Lens
 import qualified Data.HashMap.Strict as HS
 import qualified Data.Text as T
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import qualified Data.Vector as V
-import qualified Data.Set as S
 import Control.Monad (forM)
 import Entry (Entry)
+import Fmt (pretty)
+import qualified Coffer.Path as Path
+import Data.Either.Extra (eitherToMaybe)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving stock (Show)
@@ -27,7 +28,7 @@ fieldConverter = prism' to from
         to field =
           A.object
           [ "date_modified" A..= (field ^. E.dateModified)
-          , "private" A..= (field ^. E.private)
+          , "visibility" A..= (field ^. E.visibility)
           , "value" A..= (field ^. E.value)
           ]
         from (A.Object o) = do
@@ -38,14 +39,10 @@ fieldConverter = prism' to from
                      >>= \case
                             A.String t -> Just t
                             _ -> Nothing
-          _private <- HS.lookup "private" o
-                        >>= \case
-                              A.Bool b -> Just b
-                              _ -> Nothing
-
+          _visibility <- HS.lookup "visibility" o >>= resultToMaybe . A.fromJSON
           pure
             $ E.newField dateModified value
-            & E.private .~ _private
+            & E.visibility .~ _visibility
         from _ = Nothing
 
 instance E.EntryConvertible JsonEntry where
@@ -53,7 +50,7 @@ instance E.EntryConvertible JsonEntry where
     where to :: Entry -> JsonEntry
           to entry =
             JsonEntry $ A.object
-            [ "path" A..= T.intercalate "/" (entry ^. E.path)
+            [ "path" A..= pretty @_ @T.Text (entry ^. E.path)
             , "date_modified" A..= (entry ^. E.dateModified)
             , "master_field" A..= (entry ^. E.masterField)
             , "fields" A..= (HS.fromList . over (each . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
@@ -63,24 +60,23 @@ instance E.EntryConvertible JsonEntry where
               do
                 path <- HS.lookup "path" o
                   >>= (\case A.String t -> Just t ; _ -> Nothing)
-                  <&> T.split (== '/')
+                  >>= eitherToMaybe . Path.mkEntryPath
                 dateModified <- HS.lookup "date_modified" o
                   >>= \case A.String t -> Just t ; _ -> Nothing
                   >>= iso8601ParseM . T.unpack
-                let _masterField = HS.lookup "master_field" o
-                                     >>= \case A.String t -> E.newFieldKey t ; _ -> Nothing
+                let _masterField = HS.lookup "master_field" o >>= \case
+                      A.String t -> eitherToMaybe $ E.newFieldKey t
+                      _ -> Nothing
                 _fields <- do
                    value <- HS.lookup "fields" o
                    obj <- value ^? A._Object
                    keyFields <-
                       forM (HS.toList obj) $ \(text, value) -> do
-                        key <- E.newFieldKey text
+                        key <- eitherToMaybe $ E.newFieldKey text
                         field <- value ^? fieldConverter
                         pure (key, field)
                    pure $ HS.fromList keyFields
-                _tags <- HS.lookup "tags" o
-                   >>= \case A.Array a -> Just a ; _ -> Nothing
-                   >>= sequence . V.toList . V.map (\case A.String s -> E.newEntryTag s ; _ -> Nothing) <&> S.fromList
+                _tags <- HS.lookup "tags" o >>= resultToMaybe . A.fromJSON
 
                 pure
                   $ E.newEntry path dateModified
@@ -88,3 +84,8 @@ instance E.EntryConvertible JsonEntry where
                   & E.fields .~ _fields
                   & E.tags .~ _tags
           from _ = Nothing
+
+resultToMaybe :: A.Result a -> Maybe a
+resultToMaybe = \case
+  A.Error _ -> Nothing
+  A.Success a -> Just a

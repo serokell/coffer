@@ -37,7 +37,11 @@ import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
+import Coffer.Path (pathSegments, unPathSegment, HasPathSegments, PathSegment)
 import qualified Data.Aeson.Text as A
+import Entry (FieldVisibility)
+import Data.Either.Extra (eitherToMaybe)
+import Data.Text (Text)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -78,7 +82,7 @@ vaultKvCodec = VaultKvBackend
 
 data FieldMetadata = FieldMetadata
   { fmDateModified :: UTCTime
-  , fmPrivate :: Bool
+  , fmVisibility :: FieldVisibility
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
@@ -126,7 +130,7 @@ runVaultIO url token mount = interpret $
                 (\f ->
                 FieldMetadata
                 { fmDateModified = f ^. E.dateModified
-                , fmPrivate = f ^. E.private
+                , fmVisibility = f ^. E.visibility
                 })
               & HS.mapKeys E.getFieldKey
             , csTags = Set.map E.getEntryTag $ entry ^. E.tags
@@ -140,9 +144,10 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        void $ embedCatchClientError (postSecret env (entry ^. E.path) secret)
+        void $ embedCatchClientError do
+          postSecret env (entry ^. E.path . to getPathSegments) secret
       ReadSecret path ->
-        embedCatchClientErrorMaybe (readSecret env path Nothing) >>= \case
+        embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -150,23 +155,28 @@ runVaultIO url token mount = interpret $
             let secrets = HS.toList $ HS.delete "#$coffer" _data
             let keyAndValueToField (key, value) = do
                   _modTime <- cofferSpecials ^? fields . at key . _Just . dateModified
-                  _private <- cofferSpecials ^? fields . at key . _Just . private
-                  _key <- E.newFieldKey key
+                  _visibility <- cofferSpecials ^? fields . at key . _Just . visibility
+                  _key <- eitherToMaybe $ E.newFieldKey key
 
                   Just (_key
                         , E.newField _modTime value
-                          & E.private .~ _private
+                          & E.visibility .~ _visibility
                         )
 
             fields <-
               (secrets & each %%~ keyAndValueToField <&> HS.fromList) `orThrow` MarshallingFailed
-            _tags <- (cofferSpecials ^. tags & \text -> Set.fromList <$> mapM E.newEntryTag (Set.toList text)) `orThrow` MarshallingFailed
+            _tags <- cofferSpecials ^. tags
+                  & Set.toList
+                  & mapM E.newEntryTag
+                  <&> Set.fromList
+                  & eitherToMaybe
+                  & (`orThrow` MarshallingFailed)
 
             fieldKey <-
               case cofferSpecials ^. masterKey of
                 Nothing -> pure Nothing
                 Just mKey ->
-                  case E.newFieldKey mKey of
+                  case eitherToMaybe $ E.newFieldKey mKey of
                     Nothing -> throw (OtherError $ "Attempted to create new field key from '" <> mKey <> "'")
                     Just fieldKey -> (pure . Just) fieldKey
 
@@ -177,10 +187,10 @@ runVaultIO url token mount = interpret $
               & E.tags .~ _tags
       ListSecrets path ->
         embedCatchClientErrorMaybe $ do
-          response <- listSecrets env path
+          response <- listSecrets env (getPathSegments path)
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatchClientError (void $ deleteSecret env path)
+        embedCatchClientError (void $ deleteSecret env (getPathSegments path))
 
   where
     postSecret env = (I.routes env ^. I.postSecret) mount token
@@ -232,6 +242,11 @@ runVaultIO url token mount = interpret $
       -> e
       -> Sem r a
     orThrow m e = maybe (throw e) pure m
+
+    getPathSegments
+      :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+      => s -> [Text]
+    getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
 instance Backend VaultKvBackend where
   _name kvBackend = vbName kvBackend
