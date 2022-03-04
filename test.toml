@@ -1,0 +1,15 @@
+main_backend = "vault-local"
+
+[[backend]]
+type = "vault-kv"
+name = "vault-local"
+address = "localhost:8200"
+mount = "secret"
+token = "s.ZBvpH9lbTnIkwxoTkl28PMDv"
+
+[[backend]]
+type = "vault-kv"
+name = "vault-serokell"
+address = "secrets.serokell.team:8200"
+mount = "kv"
+token = "token"

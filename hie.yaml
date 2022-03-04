@@ -1,0 +1,7 @@
+cradle:
+  cabal:
+    - path: "./"
+      component: "lib:coffer"
+
+    - path: "app/Main.hs"
+      component: "coffer:exe:coffer"

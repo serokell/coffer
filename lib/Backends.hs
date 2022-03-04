@@ -1,0 +1,35 @@
+module Backends
+  ( supportedBackends
+  , backendPackedCodec
+  ) where
+
+import qualified Data.Text           as T
+import qualified Toml
+
+import           Backend.Vault.Kv    (VaultKvBackend)
+import           Toml                (TomlCodec)
+import           Backend             (SomeBackend (..), Backend (..))
+import qualified Data.HashMap.Strict as HS
+import Validation (Validation(Failure))
+
+backendPackedCodec :: TomlCodec SomeBackend
+backendPackedCodec = Toml.Codec input output
+  where input :: Toml.TomlEnv SomeBackend
+        input toml = case HS.lookup "type" $ Toml.tomlPairs toml of
+                       Just t -> do
+                         case Toml.backward Toml._Text t >>= supportedBackends of
+                           Right c -> c toml
+                           Left e -> Failure
+                                     [ Toml.BiMapError "type" e
+                                     ]
+                       Nothing -> Failure
+                                  [ Toml.BiMapError "type" $ Toml.ArbitraryError
+                                    "Backend doesn't have a `type` key"
+                                  ]
+        output (SomeBackend a) =  SomeBackend <$> Toml.codecWrite _codec a
+                  <* Toml.codecWrite (Toml.text "type") "vault"
+
+supportedBackends
+  :: T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
+supportedBackends "vault-kv" = Right $ fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend)
+supportedBackends _ = Left (Toml.ArbitraryError "Unknown backend type")
