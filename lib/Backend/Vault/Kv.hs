@@ -50,10 +50,10 @@ data VaultKvBackend =
 
 {-# INLINE didimatch #-}
 didimatch
-    :: (b -> Maybe a)  -- ^ Mapper for consumer
-    -> (a -> Maybe b)     -- ^ Mapper for producer
-    -> TomlCodec a  -- ^ Source 'Codec' object
-    -> TomlCodec b  -- ^ Target 'Codec' object
+  :: (b -> Maybe a)  -- ^ Mapper for consumer
+  -> (a -> Maybe b)     -- ^ Mapper for producer
+  -> TomlCodec a  -- ^ Source 'Codec' object
+  -> TomlCodec b  -- ^ Target 'Codec' object
 didimatch matchB matchA codec = Toml.Codec
     { Toml.codecRead = \t -> case Toml.codecRead codec t of
         Success a -> maybe empty Success (matchA a)
@@ -95,13 +95,14 @@ data CofferSpecials =
   deriving anyclass (A.ToJSON, A.FromJSON)
 makeLensesWith abbreviatedFields ''CofferSpecials
 
-runVaultIO :: Member (Embed IO) r
-           => Member (Error CofferError) r
-           => BaseUrl
-           -> I.VaultToken
-           -> T.Text
-           -> Sem (BackendEffect ': r) a
-           -> Sem r a
+runVaultIO
+  :: Member (Embed IO) r
+  => Member (Error CofferError) r
+  => BaseUrl
+  -> I.VaultToken
+  -> T.Text
+  -> Sem (BackendEffect ': r) a
+  -> Sem r a
 runVaultIO url token mount = interpret $
   \operation -> do
     env <-
@@ -139,9 +140,9 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        void $ embedCatch (postSecret env (entry ^. E.path) secret)
+        void $ embedCatchClientError (postSecret env (entry ^. E.path) secret)
       ReadSecret path ->
-        embedCatchMaybe (readSecret env path Nothing) >>= \case
+        embedCatchClientErrorMaybe (readSecret env path Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -175,11 +176,11 @@ runVaultIO url token mount = interpret $
               & E.fields .~ fields
               & E.tags .~ _tags
       ListSecrets path ->
-        embedCatchMaybe $ do
+        embedCatchClientErrorMaybe $ do
           response <- listSecrets env path
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatch (void $ deleteSecret env path)
+        embedCatchClientError (void $ deleteSecret env path)
 
   where
     postSecret env = (I.routes env ^. I.postSecret) mount token
@@ -203,30 +204,33 @@ runVaultIO url token mount = interpret $
             ConnectionError _ -> Just ConnectError
 
     -- | Runs an IO action and throws an error if happens.
-    embedCatch :: Member (Embed IO) r
-                    => Member (Error CofferError) r
-                    => IO a
-                    -> Sem r a
-    embedCatch io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatchClientError
+      :: Member (Embed IO) r
+      => Member (Error CofferError) r
+      => IO a
+      -> Sem r a
+    embedCatchClientError io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> pure l
             Right (Just r) -> throw r
             Right Nothing -> throw $ OtherError "404"
 
     -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
     --   Otherwise, it would be Nothing.
-    embedCatchMaybe :: Member (Embed IO) r
-                    => Member (Error CofferError) r
-                    => IO a
-                    -> Sem r (Maybe a)
-    embedCatchMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatchClientErrorMaybe
+      :: Member (Embed IO) r
+      => Member (Error CofferError) r
+      => IO a
+      -> Sem r (Maybe a)
+    embedCatchClientErrorMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> (pure . Just) l
             Right (Just r) -> throw r
             Right Nothing -> pure Nothing
 
-    orThrow :: Member (Error e) r
-            => Maybe a
-            -> e
-            -> Sem r a
+    orThrow
+      :: Member (Error e) r
+      => Maybe a
+      -> e
+      -> Sem r a
     orThrow m e = maybe (throw e) pure m
 
 instance Backend VaultKvBackend where
