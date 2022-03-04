@@ -1,0 +1,133 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+name:                coffer
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/serokell/coffer/
+license:             BSD3
+author:              Serokell
+maintainer:          Serokell <hi@serokell.io>
+copyright:           2022 Serokell
+category:            Command Line Tools
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.14.3.0 && < 5
+
+default-extensions:
+  - AllowAmbiguousTypes
+  - ApplicativeDo
+  - BangPatterns
+  - BlockArguments
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveAnyClass
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveTraversable
+  - DerivingStrategies
+  - DerivingVia
+  - EmptyCase
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - LambdaCase
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
+  - NegativeLiterals
+  - NumDecimals
+  - NumericUnderscores
+  - OverloadedLabels
+  - OverloadedStrings
+  - PatternSynonyms
+  - PolyKinds
+  - QuantifiedConstraints
+  - QuasiQuotes
+  - RankNTypes
+  - RecordWildCards
+  - RecursiveDo
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - StrictData
+  - TemplateHaskell
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeOperators
+  - UndecidableInstances
+  - UndecidableSuperClasses
+  - ViewPatterns
+
+ghc-options:
+  - -Weverything
+  - -Wno-implicit-prelude
+  - -Wno-name-shadowing
+  - -Wno-missing-import-lists
+  - -Wno-missing-export-lists
+  - -Wno-unsafe
+  - -Wno-safe
+  - -Wno-missing-safe-haskell-mode
+  - -Wno-prepositive-qualified-module
+  - -Wno-monomorphism-restriction
+  - -Wno-missed-specialisations
+  - -Wno-all-missed-specialisations
+
+library:
+  source-dirs:      lib
+  dependencies:
+    - aeson
+    - containers
+    - hashable
+    - http-client
+    - http-client-tls
+    - http-types
+    - lens
+    - lens-aeson
+    - polysemy
+    - servant
+    - servant-client
+    - servant-client-core
+    - text
+    - time
+    - tomland
+    - unordered-containers
+    - validation-selective
+    - vector
+
+executables:
+  coffer:
+    source-dirs:      app
+    main:             Main.hs
+
+tests:
+  test:
+    source-dirs:      tests/test
+    main:             Main.hs
+    build-tools:      tasty-discover:tasty-discover
+    ghc-options:
+      - -threaded
+    dependencies:
+      - tasty
+  doctests:
+    source-dirs:      tests/doctests
+    main:             Doctests.hs
+    ghc-options:
+      - -threaded
+      # `doctest` does not depend on `coffer` at compile-time, but it does
+      # depend on it at runtime.
+      # GHC will flag the `coffer` package as an unused dependency,
+      # so we have to turn off that warning.
+      - -Wno-unused-packages
+    dependencies:
+      - doctest-parallel
+      - coffer

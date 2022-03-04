@@ -1,26 +1,21 @@
-{-# LANGUAGE LambdaCase
-           , OverloadedStrings
-#-}
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+--
+-- SPDX-License-Identifier: MPL-2.0
+
 module Entry.Json where
 
 import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
 import qualified Data.Aeson.Lens as A
 
 import qualified Entry as E
 import Control.Lens
 import qualified Data.HashMap.Strict as HS
-import Control.Monad.State (execState, runState, execStateT, lift)
 import qualified Data.Text as T
-import Control.Applicative (liftA2)
-import qualified Control.Monad.Writer.Strict as T
-import GHC.Generics (Generic)
-import Data.Time (UTCTime(..))
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import Data.Time.Calendar.OrdinalDate (fromMondayStartWeek)
 import qualified Data.Vector as V
 import qualified Data.Set as S
 import Control.Monad (forM)
+import Entry (Entry)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving stock (Show)
@@ -28,7 +23,8 @@ newtype JsonEntry = JsonEntry A.Value
 
 fieldConverter :: (Prism A.Value A.Value E.Field E.Field)
 fieldConverter = prism' to from
-  where to field =
+  where to :: E.Field -> A.Value
+        to field =
           A.object
           [ "date_modified" A..= (field ^. E.dateModified)
           , "private" A..= (field ^. E.private)
@@ -39,11 +35,11 @@ fieldConverter = prism' to from
                                >>= \case A.String t -> Just t ; _ -> Nothing
                                >>= iso8601ParseM . T.unpack
           value <- HS.lookup "value" o
-                     >>= \case 
+                     >>= \case
                             A.String t -> Just t
                             _ -> Nothing
           _private <- HS.lookup "private" o
-                        >>= \case 
+                        >>= \case
                               A.Bool b -> Just b
                               _ -> Nothing
 
@@ -54,7 +50,8 @@ fieldConverter = prism' to from
 
 instance E.EntryConvertible JsonEntry where
   entry = prism' to from
-    where to entry =
+    where to :: Entry -> JsonEntry
+          to entry =
             JsonEntry $ A.object
             [ "path" A..= T.intercalate "/" (entry ^. E.path)
             , "date_modified" A..= (entry ^. E.dateModified)
@@ -75,7 +72,7 @@ instance E.EntryConvertible JsonEntry where
                 _fields <- do
                    value <- HS.lookup "fields" o
                    obj <- value ^? A._Object
-                   keyFields <- 
+                   keyFields <-
                       forM (HS.toList obj) $ \(text, value) -> do
                         key <- E.newFieldKey text
                         field <- value ^? fieldConverter

@@ -1,6 +1,6 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+--
+-- SPDX-License-Identifier: MPL-2.0
 
 module Backend.Vault.Kv
   ( VaultKvBackend
@@ -15,35 +15,29 @@ import           Backend                      (Backend (..), BackendEffect (..))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
-import qualified Data.Text.Lazy.Encoding      as TL
 import qualified Data.Text.Lazy               as TL
 import qualified Data.HashMap.Internal.Strict as HS
 import qualified Data.Set                     as Set
 import qualified Data.Aeson                   as A
-import qualified Data.Aeson.Text              as A
-import qualified Data.Scientific              as S
 import qualified Toml
 
 import           Control.Monad                (void)
-import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, runClientM, ClientError (..), parseBaseUrl, showBaseUrl)
+import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, ClientError (..), parseBaseUrl, showBaseUrl)
 import           Network.HTTP.Client.TLS      (tlsManagerSettings)
 import           Network.HTTP.Client          (newManager, defaultManagerSettings)
-import           Polysemy.Error               (Error, throw, runError)
-import           Control.Exception.Lens       (exception)
-import           Control.Monad.State          (evalState)
+import           Polysemy.Error               (Error, throw)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
 import           Control.Applicative          (Alternative(empty))
 import           Validation                   (Validation(Success, Failure))
-import           Data.Time.Format.ISO8601     (iso8601ParseM, iso8601Show)
 import           Data.Time                    (UTCTime)
 import           Control.Exception            (catch)
 import           Servant.Client.Core.Response (responseStatusCode)
-import           Servant.Client.Core.Request  (RequestF (Request))
 import           Network.HTTP.Types           (statusCode)
 
 import           Polysemy
 import           Control.Lens
+import qualified Data.Aeson.Text as A
 
 data VaultKvBackend =
   VaultKvBackend
@@ -52,14 +46,14 @@ data VaultKvBackend =
   , vbMount :: T.Text
   , vbToken :: I.VaultToken
   }
-  deriving (Show)
+  deriving stock (Show)
 
 {-# INLINE didimatch #-}
 didimatch
-    :: (b -> Maybe a)  -- ^ Mapper for consumer
-    -> (a -> Maybe b)     -- ^ Mapper for producer
-    -> TomlCodec a  -- ^ Source 'Codec' object
-    -> TomlCodec b  -- ^ Target 'Codec' object
+  :: (b -> Maybe a)  -- ^ Mapper for consumer
+  -> (a -> Maybe b)     -- ^ Mapper for producer
+  -> TomlCodec a  -- ^ Source 'Codec' object
+  -> TomlCodec b  -- ^ Target 'Codec' object
 didimatch matchB matchA codec = Toml.Codec
     { Toml.codecRead = \t -> case Toml.codecRead codec t of
         Success a -> maybe empty Success (matchA a)
@@ -76,7 +70,7 @@ vaultKvCodec = VaultKvBackend
                   <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
                   <*> Toml.text "mount" Toml..= vbMount
                   <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
-  where 
+  where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
     baseUrlToText = Just . T.pack . showBaseUrl
@@ -101,13 +95,14 @@ data CofferSpecials =
   deriving anyclass (A.ToJSON, A.FromJSON)
 makeLensesWith abbreviatedFields ''CofferSpecials
 
-runVaultIO :: Member (Embed IO) r
-           => Member (Error CofferError) r
-           => BaseUrl
-           -> I.VaultToken
-           -> T.Text
-           -> Sem (BackendEffect ': r) a
-           -> Sem r a
+runVaultIO
+  :: Member (Embed IO) r
+  => Member (Error CofferError) r
+  => BaseUrl
+  -> I.VaultToken
+  -> T.Text
+  -> Sem (BackendEffect ': r) a
+  -> Sem r a
 runVaultIO url token mount = interpret $
   \operation -> do
     env <-
@@ -145,9 +140,9 @@ runVaultIO url token mount = interpret $
                   $ entry ^. E.fields
               }
 
-        void $ embedCatch (entry ^. E.path) (postSecret env (entry ^. E.path) secret)
+        void $ embedCatchClientError (postSecret env (entry ^. E.path) secret)
       ReadSecret path ->
-        embedCatchMaybe path (readSecret env path Nothing) >>= \case
+        embedCatchClientErrorMaybe (readSecret env path Nothing) >>= \case
           Nothing -> pure Nothing
           Just (I.KvResponse _ _ _ _ (I.ReadSecret _data _ _ _ _ _)) -> do
             cofferSpecials :: CofferSpecials <-
@@ -181,20 +176,19 @@ runVaultIO url token mount = interpret $
               & E.fields .~ fields
               & E.tags .~ _tags
       ListSecrets path ->
-        embedCatchMaybe path $ do
+        embedCatchClientErrorMaybe $ do
           response <- listSecrets env path
           pure $ response ^. I.ddata . I.unListSecrets
       DeleteSecret path ->
-        embedCatch path (void $ deleteSecret env path)
+        embedCatchClientError (void $ deleteSecret env path)
 
-  where 
+  where
     postSecret env = (I.routes env ^. I.postSecret) mount token
     readSecret env = (I.routes env ^. I.readSecret) mount token
     listSecrets env = (I.routes env ^. I.listSecrets) mount token
-    updateMetadata env = (I.routes env ^. I.updateMetadata) mount token
     deleteSecret env = (I.routes env ^. I.deleteSecret) mount token
 
-    -- | Handles @ClientError@ in the following way: 
+    -- | Handles @ClientError@ in the following way:
     -- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error. It status code is 404, the result would be Nothing
     -- 2. If it is @ConnectionError@, then we would get @ConnectError@
     -- 3. Otherwise we would get @MarshallingFailed@
@@ -204,38 +198,39 @@ runVaultIO url token mount = interpret $
                 case statusCode $ responseStatusCode response of
                   404 -> Nothing
                   e -> Just $ OtherError (T.pack $ show e)
-            DecodeFailure text response -> Just MarshallingFailed
-            UnsupportedContentType mediaType response -> Just MarshallingFailed
-            InvalidContentTypeHeader response -> Just MarshallingFailed
-            ConnectionError exception -> Just ConnectError
+            DecodeFailure _ _ -> Just MarshallingFailed
+            UnsupportedContentType _ _ -> Just MarshallingFailed
+            InvalidContentTypeHeader _ -> Just MarshallingFailed
+            ConnectionError _ -> Just ConnectError
 
     -- | Runs an IO action and throws an error if happens.
-    embedCatch :: Member (Embed IO) r
-                    => Member (Error CofferError) r
-                    => [T.Text]
-                    -> IO a
-                    -> Sem r a
-    embedCatch path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatchClientError
+      :: Member (Embed IO) r
+      => Member (Error CofferError) r
+      => IO a
+      -> Sem r a
+    embedCatchClientError io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> pure l
             Right (Just r) -> throw r
             Right Nothing -> throw $ OtherError "404"
 
     -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
     --   Otherwise, it would be Nothing.
-    embedCatchMaybe :: Member (Embed IO) r
-                    => Member (Error CofferError) r
-                    => [T.Text]
-                    -> IO a
-                    -> Sem r (Maybe a)
-    embedCatchMaybe path io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
+    embedCatchClientErrorMaybe
+      :: Member (Embed IO) r
+      => Member (Error CofferError) r
+      => IO a
+      -> Sem r (Maybe a)
+    embedCatchClientErrorMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
       \case Left l -> (pure . Just) l
             Right (Just r) -> throw r
             Right Nothing -> pure Nothing
 
-    orThrow :: Member (Error e) r
-            => Maybe a
-            -> e
-            -> Sem r a
+    orThrow
+      :: Member (Error e) r
+      => Maybe a
+      -> e
+      -> Sem r a
     orThrow m e = maybe (throw e) pure m
 
 instance Backend VaultKvBackend where

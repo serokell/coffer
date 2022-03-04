@@ -2,7 +2,4 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module Main where
-
-main :: IO ()
-main = putStrLn "Hello, Haskell!"
+{-# OPTIONS_GHC -F -pgmF tasty-discover -optF --tree-display -optF --generated-module -optF Tree #-}

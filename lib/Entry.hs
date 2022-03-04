@@ -1,7 +1,6 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
+-- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+--
+-- SPDX-License-Identifier: MPL-2.0
 
 module Entry
   ( dateModified
@@ -21,10 +20,7 @@ import qualified Data.Set as S
 import Control.Lens
 import qualified Data.Aeson.Types as A
 import Data.Hashable (Hashable)
-import GHC.Generics (Generic)
 import Data.Time (UTCTime)
-import Language.Haskell.TH.Lens (_CaseE)
-import Data.Maybe (fromMaybe)
 
 newtype FieldKey = UnsafeFieldKey T.Text
   deriving stock (Show, Eq)
@@ -63,7 +59,7 @@ data Field =
   , fPrivate :: Bool
   , fValue :: T.Text
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Field
 
 newField :: UTCTime -> T.Text -> Field
@@ -82,7 +78,7 @@ data Entry =
   , eFields :: HS.HashMap FieldKey Field
   , eTags :: S.Set EntryTag
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Entry
 
 newEntry :: [T.Text] -> UTCTime -> Entry

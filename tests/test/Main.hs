@@ -2,7 +2,12 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-module Main where
+module Main
+  ( main
+  ) where
+
+import Test.Tasty
+import Tree (tests)
 
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = tests >>= defaultMain
