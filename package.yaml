@@ -88,6 +88,7 @@ library:
     - aeson
     - containers
     - extra
+    - extra
     - fmt
     - hashable
     - http-client
@@ -96,6 +97,7 @@ library:
     - lens
     - lens-aeson
     - megaparsec
+    - mtl
     - optparse-applicative
     - polysemy
     - servant
@@ -112,6 +114,14 @@ executables:
   coffer:
     source-dirs:      app
     main:             Main.hs
+    dependencies:
+      - coffer
+      - fmt
+      - lens
+      - optparse-applicative
+      - polysemy
+      - servant-client
+      - text
 
 tests:
   test:

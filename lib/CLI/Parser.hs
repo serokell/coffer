@@ -38,14 +38,14 @@ import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath)
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
-parserInfo :: ParserInfo Command
+parserInfo :: ParserInfo SomeCommand
 parserInfo =
   info (parser <**> helper) $
     fullDesc
     <> progDesc "TODO: coffer description goes here"
     <> header "TODO: coffer description goes here"
 
-parser :: Parser Command
+parser :: Parser SomeCommand
 parser =
   subparser $ mconcat
     [ mkCommand "view" CmdView viewOptions
@@ -68,10 +68,10 @@ parser =
         "Add or remove tags from an entry"
     ]
   where
-    mkCommand :: String -> (opts -> a) -> Parser opts -> String -> Mod CommandFields a
+    mkCommand :: String -> (opts -> Command res) -> Parser opts -> String -> Mod CommandFields SomeCommand
     mkCommand cmdName constructor optsParser cmdHelp =
       command cmdName $
-        info (helper <*> (constructor <$> optsParser)) $
+        info (helper <*> (SomeCommand . constructor <$> optsParser)) $
         progDesc cmdHelp
 
 ----------------------------------------------------------------------------
