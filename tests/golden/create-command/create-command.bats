@@ -91,8 +91,10 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] An entry already exists at '/a/b/c'.
-Use '--force' or '-f' to overwrite it.
+[ERROR] The entry cannot be created:
+
+An entry already exists at '/a/b/c'.
+Use '--force' or '-f' to overwrite existing entries.
 EOF
 }
 
@@ -165,7 +167,11 @@ EOF
   run coffer create /a/b
 
   assert_failure
-  assert_output "[ERROR] A directory already exists at '/a/b'."
+  assert_output - <<EOF
+[ERROR] The entry cannot be created:
+
+'/a/b' is a directory.
+EOF
 }
 
 @test "creating a directory clashes with existing entry" {
@@ -174,5 +180,9 @@ EOF
   run coffer create /a/b/c
 
   assert_failure
-  assert_output "[ERROR] An entry already exists at '/a/b'."
+  assert_output - <<EOF
+[ERROR] The entry cannot be created:
+
+Attempted to create the directory '/a/b' but an entry exists at that path.
+EOF
 }

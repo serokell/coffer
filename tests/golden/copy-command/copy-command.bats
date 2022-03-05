@@ -83,18 +83,20 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be copied because a directory already exists at the destination.
+[ERROR] The following entries cannot be copied:
 
-Cannot copy '/a' to '/b/c'.
+'/a' to '/b/c':
+  '/b/c' is a directory.
 EOF
 
   run coffer copy /a /b/c -f
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be copied because a directory already exists at the destination.
+[ERROR] The following entries cannot be copied:
 
-Cannot copy '/a' to '/b/c'.
+'/a' to '/b/c':
+  '/b/c' is a directory.
 EOF
 }
 
@@ -110,11 +112,14 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be copied because an entry already exists at the destination.
-Use '--force' or '-f' to overwrite existing entries.
+[ERROR] The following entries cannot be copied:
 
-Cannot copy '/a/b/c' to '/d/b/c'.
-Cannot copy '/a/b/x' to '/d/b/x'.
+'/a/b/c' to '/d/b/c':
+  An entry already exists at '/d/b/c'.
+  Use '--force' or '-f' to overwrite existing entries.
+'/a/b/x' to '/d/b/x':
+  An entry already exists at '/d/b/x'.
+  Use '--force' or '-f' to overwrite existing entries.
 EOF
 }
 
@@ -157,21 +162,21 @@ EOF
 
   run coffer copy /a /x
 
-  assert_failure
-  assert_output - <<EOF
-[ERROR] The following entries cannot be copied because a directory already exists at the destination.
+  EXPECTED=$(cat <<EOF
+[ERROR] The following entries cannot be copied:
 
-Cannot copy '/a/b' to '/x/b'.
+'/a/b' to '/x/b':
+  '/x/b' is a directory.
 EOF
+)
+
+  assert_failure
+  assert_output "$EXPECTED"
 
   run coffer copy /a /x -f
 
   assert_failure
-  assert_output - <<EOF
-[ERROR] The following entries cannot be copied because a directory already exists at the destination.
-
-Cannot copy '/a/b' to '/x/b'.
-EOF
+  assert_output "$EXPECTED"
 }
 
 @test "copy dry-run" {
@@ -194,5 +199,58 @@ EOF
     b/
       c - [2000-01-01 01:01:01]
       d - [2000-01-01 01:01:01]
+EOF
+}
+
+@test "directory-entry copy conflict" {
+  coffer create /a/b
+  coffer create /c/d/e
+
+  run coffer copy /c/d/e /a/b/c
+
+  assert_failure
+  assert_output - <<EOF
+[ERROR] The following entries cannot be copied:
+
+'/c/d/e' to '/a/b/c':
+  Attempted to create the directory '/a/b' but an entry exists at that path.
+EOF
+}
+
+@test "entry-directory copy conflict" {
+  coffer create /test/dir/entry1
+  coffer create /test/dir/entry2
+  coffer create /test2/dir
+
+  run coffer copy test test2
+
+  assert_failure
+  assert_output - <<EOF
+[ERROR] The following entries cannot be copied:
+
+'/test/dir/entry1' to '/test2/dir/entry1':
+  Attempted to create the directory '/test2/dir' but an entry exists at that path.
+'/test/dir/entry2' to '/test2/dir/entry2':
+  Attempted to create the directory '/test2/dir' but an entry exists at that path.
+EOF
+}
+
+@test "copy multierrors" {
+  coffer create /a/b
+  coffer create /x/b/c
+  coffer create /a/d
+  coffer create /x/d
+
+  run coffer copy /a /x
+
+  assert_failure
+  assert_output - <<EOF
+[ERROR] The following entries cannot be copied:
+
+'/a/b' to '/x/b':
+  '/x/b' is a directory.
+'/a/d' to '/x/d':
+  An entry already exists at '/x/d'.
+  Use '--force' or '-f' to overwrite existing entries.
 EOF
 }
