@@ -89,3 +89,19 @@ EOF
   assert_success
   assert_output "kek"
 }
+
+@test "view command by default" {
+  coffer create /a/b/c --field test=kek
+  coffer create /a/d
+
+  run cleanOutput coffer /a/b
+
+  assert_success
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+        test: kek [2000-01-01 01:01:01]
+EOF
+}

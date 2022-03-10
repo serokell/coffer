@@ -46,7 +46,7 @@ parserInfo =
     <> header "TODO: coffer description goes here"
 
 parser :: Parser SomeCommand
-parser = 
+parser =
   subparser (mconcat
     [ mkCommand "view" CmdView viewOptions
         "View entries under the specified path, optionally returning only the specified field for each entry"
