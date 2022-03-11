@@ -11,5 +11,6 @@ import qualified Data.Text as T
 data CofferError =
   MarshallingFailed
   | ConnectError
+  | BackendNotFound T.Text
   | OtherError T.Text
   deriving stock (Show)

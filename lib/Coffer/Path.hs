@@ -19,6 +19,7 @@ module Coffer.Path
   , pathAsEntryPath
   , entryPathAsPath
   , replacePathPrefix
+  , QualifiedPath (..)
   ) where
 
 import Data.Text (Text)
@@ -170,6 +171,18 @@ replacePathPrefix (Path oldPrefix) (Path newPrefix) (Path fullpath) =
     & List.stripPrefix oldPrefix
     <&> mappend newPrefix
     <&> Path
+
+data QualifiedPath path = QualifiedPath
+  { qpBackendName :: Maybe Text
+  , qpPath :: path
+  }
+  deriving stock (Show)
+
+instance (Buildable path) => Buildable (QualifiedPath path) where
+  build (QualifiedPath backendNameMb path) =
+    case backendNameMb of
+      Just backendName -> build backendName <> "#" <> build path
+      Nothing -> build path
 
 ----------------------------------------------------------------------------
 -- Optics

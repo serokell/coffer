@@ -9,13 +9,10 @@ import Data.Time.Compat (Day, UTCTime , Year)
 import Data.Time.Calendar.Month.Compat (Month)
 import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag)
 import Coffer.Directory (Directory)
-import Coffer.Path (Path, EntryPath)
+import Coffer.Path (Path, EntryPath, QualifiedPath)
 import Data.Set (Set)
 
-data Options = Options
-  { _backend :: Text 
-  , _someCommand :: SomeCommand
-  } 
+newtype Options = Options { oSomeCommand :: SomeCommand }
   deriving stock Show
 
 data Command res where
@@ -91,13 +88,13 @@ data TagResult
 ----------------------------------------------------------------------------
 
 data ViewOptions = ViewOptions
-  { voPath :: Path
+  { voQPath :: QualifiedPath Path
   , voFieldName :: Maybe FieldKey
   }
   deriving stock Show
 
 data CreateOptions = CreateOptions
-  { coPath :: EntryPath
+  { coQPath :: QualifiedPath EntryPath
   , coEdit :: Bool
   , coForce :: Bool
   , coTags :: Set EntryTag
@@ -107,7 +104,7 @@ data CreateOptions = CreateOptions
   deriving stock Show
 
 data SetFieldOptions = SetFieldOptions
-  { sfoPath :: EntryPath
+  { sfoQPath :: QualifiedPath EntryPath
   , sfoFieldName :: FieldKey
   , sfoFieldContents :: Maybe Text
   , sfoVisibility :: Maybe FieldVisibility
@@ -115,13 +112,14 @@ data SetFieldOptions = SetFieldOptions
   deriving stock Show
 
 data DeleteFieldOptions = DeleteFieldOptions
-  { dfoPath :: EntryPath
+  { dfoQPath :: QualifiedPath EntryPath
   , dfoFieldName :: FieldKey
   }
   deriving stock Show
 
 data FindOptions = FindOptions
-  { foPath :: Maybe Path
+  { foBackend :: Maybe Text
+  , foPath :: Maybe Path
   , foText :: Maybe Text
   , foSort :: Maybe (Sort, Direction)
   , foFilters :: [Filter]
@@ -131,6 +129,7 @@ data FindOptions = FindOptions
 
 data RenameOptions = RenameOptions
   { roDryRun :: Bool
+  , roBackend :: Maybe Text
   , roOldPath :: Path
   , roNewPath :: Path
   , roForce :: Bool
@@ -139,21 +138,21 @@ data RenameOptions = RenameOptions
 
 data CopyOptions = CopyOptions
   { cpoDryRun :: Bool
-  , cpoOldPath :: Path
-  , cpoNewPath :: Path
+  , cpoQOldPath :: QualifiedPath Path
+  , cpoQNewPath :: QualifiedPath Path
   , cpoForce :: Bool
   }
   deriving stock Show
 
 data DeleteOptions = DeleteOptions
   { doDryRun :: Bool
-  , doPath :: Path
+  , doQPath :: QualifiedPath Path
   , doRecursive :: Bool
   }
   deriving stock Show
 
 data TagOptions = TagOptions
-  { toPath :: EntryPath
+  { toQPath :: QualifiedPath EntryPath
   , toTagName :: EntryTag
   , toDelete :: Bool
   }

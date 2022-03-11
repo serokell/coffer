@@ -21,6 +21,7 @@ library
   exposed-modules:
       Backend
       Backend.Commands
+      Backend.Interpreter
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       Backends
@@ -180,7 +181,6 @@ executable coffer
     , polysemy
     , text
     , tomland
-    , unordered-containers
   default-language: Haskell2010
 
 test-suite doctests

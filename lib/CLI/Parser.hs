@@ -34,29 +34,19 @@ import qualified Data.Set as Set
 
 import CLI.Types
 import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private))
-import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath)
+import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath, QualifiedPath (QualifiedPath))
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
-parserInfo :: Text -> ParserInfo Options
-parserInfo defaultBackend =
-  info (parser defaultBackend <**> helper) $
+parserInfo :: ParserInfo Options
+parserInfo =
+  info (parser <**> helper) $
     fullDesc
     <> progDesc "TODO: coffer description goes here"
     <> header "TODO: coffer description goes here"
 
-parser :: Text -> Parser Options
-parser defaultBackend = Options <$> optionalBackendParser <*> commandParser
-  where
-    optionalBackendParser :: Parser Text
-    optionalBackendParser =
-      option str $ mconcat
-        [ long "backend"
-        , short 'b'
-        , metavar "BACKEND"
-        , value defaultBackend
-        , help "Backend with which actions will be performed. If not specified, then main backend would be chosen"
-        ]
+parser :: Parser Options
+parser = Options <$> commandParser
 
 commandParser :: Parser SomeCommand
 commandParser =
@@ -97,7 +87,7 @@ commandParser =
 viewOptions :: Parser ViewOptions
 viewOptions = do
   ViewOptions
-    <$> argument readPath ( mconcat
+    <$> argument readQualifiedPath ( mconcat
           [ metavar "PATH"
           , help "The path to either a directory of entries, or a single entry"
           ])
@@ -111,7 +101,7 @@ viewOptions = do
 createOptions :: Parser CreateOptions
 createOptions =
   CreateOptions
-    <$> argument readEntryPath ( mconcat
+    <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
           , help "The path to insert the new entry into, this must not already be a directory or an entry unless `-f` is specified"
           ])
@@ -153,7 +143,7 @@ createOptions =
 setFieldOptions :: Parser SetFieldOptions
 setFieldOptions =
   SetFieldOptions
-    <$> argument readEntryPath ( mconcat
+    <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
           , help "The path to set the field value on, this must already exist as an entry"
           ])
@@ -180,7 +170,7 @@ setFieldOptions =
 deleteFieldOptions :: Parser DeleteFieldOptions
 deleteFieldOptions =
   DeleteFieldOptions
-    <$> argument readEntryPath ( mconcat
+    <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
           , help "The path to the entry with the field to delete"
           ])
@@ -192,7 +182,7 @@ deleteFieldOptions =
 findOptions :: Parser FindOptions
 findOptions =
   FindOptions
-    <$> optional (argument readPath $ mconcat
+    <$> optional (argument readQualifiedPath $ mconcat
           [ metavar "PATH"
           , help "If specified, only show entries within this path (use `/` to find everything)"
           ])
@@ -233,11 +223,11 @@ renameOptions =
           , short 'd'
           , help "Don't actually rename anything, just show what would be done"
           ])
-    <*> argument readPath ( mconcat
+    <*> argument readQualifiedPath ( mconcat
           [ metavar "OLDPATH"
           , help "The path to move the old directory or entry from"
           ])
-    <*> argument readPath ( mconcat
+    <*> argument readQualifiedPath ( mconcat
           [ metavar "NEWPATH"
           , help "The path to move the directory or entry to"
           ])
@@ -255,11 +245,11 @@ copyOptions =
           , short 'd'
           , help "Don't actually copy anything, just show what would be done"
           ])
-    <*> argument readPath ( mconcat
+    <*> argument readQualifiedPath ( mconcat
           [ metavar "OLDPATH"
           , help "The path to copy the old directory or entry from"
           ])
-    <*> argument readPath ( mconcat
+    <*> argument readQualifiedPath ( mconcat
           [ metavar "NEWPATH"
           , help "The path to copy the directory or entry to"
           ])
@@ -277,7 +267,7 @@ deleteOptions =
           , short 'd'
           , help "Don't actually delete anything, just show what would be done"
           ])
-    <*> argument readPath ( mconcat
+    <*> argument readQualifiedPath ( mconcat
           [ metavar "PATH"
           , help "The path to the entry or directory to delete"
           ])
@@ -290,7 +280,7 @@ deleteOptions =
 tagOptions :: Parser TagOptions
 tagOptions =
   TagOptions
-    <$> argument readEntryPath ( mconcat
+    <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
           , help "The path to the entry to add or delete a tag from"
           ])
@@ -308,21 +298,19 @@ tagOptions =
 -- Common
 ----------------------------------------------------------------------------
 
-readPath :: ReadM Path
-readPath = do
-  eitherReader \input ->
-    mkPath (T.pack input) & first \err -> unlines
-      [ "Invalid path: '" <> input <> "'."
-      , T.unpack err
-      ]
+readPath' :: Text -> Either String Path
+readPath' input =
+  mkPath input & first \err -> unlines
+    [ "Invalid path: '" <> T.unpack input <> "'."
+    , T.unpack err
+    ]
 
-readEntryPath :: ReadM EntryPath
-readEntryPath = do
-  eitherReader \input ->
-    mkEntryPath (T.pack input) & first \err -> unlines
-      [ "Invalid entry path: '" <> input <> "'."
-      , T.unpack err
-      ]
+readEntryPath' :: Text -> Either String EntryPath
+readEntryPath' input =
+  mkEntryPath input & first \err -> unlines
+    [ "Invalid entry path: '" <> T.unpack input <> "'."
+    , T.unpack err
+    ]
 
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
@@ -331,6 +319,13 @@ readEntryTag = do
       [ "Invalid tag: '" <> input <> "'."
       , T.unpack err
       ]
+
+readBackendName' :: Text -> Either String BackendName
+readBackendName' input =
+  newBackendName input & first \err -> unlines
+    [ "Invalid backend name: '" <> T.unpack input <> "'."
+    , T.unpack err
+    ]
 
 readFieldVisibility :: ReadM FieldVisibility
 readFieldVisibility =
@@ -351,10 +346,58 @@ readFieldKey' input = do
       , T.unpack err
       ]
 
+-- @TODO@ remove copypaste and use backend name smart constructor
+readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
+readQualifiedEntryPath = do
+  eitherReader \input ->
+    case T.splitOn "#" (T.pack input) of
+      [backendName, entryPathStr] -> do
+        entryPath <-
+          mkEntryPath entryPathStr & first \err -> unlines
+            [ "Invalid entry path: '" <> input <> "'."
+            , T.unpack err
+            ]
+        pure $ QualifiedPath (Just backendName) entryPath
+      [entryPathStr] -> do
+        entryPath <-
+          mkEntryPath entryPathStr & first \err -> unlines
+            [ "Invalid entry path: '" <> input <> "'."
+            , T.unpack err
+            ]
+        pure $ QualifiedPath Nothing entryPath
+      _ -> Left $ unlines
+        [ "Invalid qualified entry path format: '" <> input <> "'."
+        , show expectedQualifiedEntryPathFormat
+        ]
+
+-- @TODO@ remove copypaste and use backend name smart constructor
+readQualifiedPath :: ReadM (QualifiedPath Path)
+readQualifiedPath = do
+  eitherReader \input ->
+    case T.splitOn "#" (T.pack input) of
+      [backendName, pathStr] -> do
+        path <-
+          mkPath pathStr & first \err -> unlines
+            [ "Invalid entry path: '" <> input <> "'."
+            , T.unpack err
+            ]
+        pure $ QualifiedPath (Just backendName) path
+      [pathStr] -> do
+        path <-
+          mkPath pathStr & first \err -> unlines
+            [ "Invalid entry path: '" <> input <> "'."
+            , T.unpack err
+            ]
+        pure $ QualifiedPath Nothing path
+      _ -> Left $ unlines
+        [ "Invalid qualified entry path format: '" <> input <> "'."
+        , show expectedQualifiedPathFormat
+        ]
+
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
   eitherReader \input ->
-    P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err ->unlines
+    P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err -> unlines
       [ "Invalid field format: '" <> input <> "'."
       , "Expected format: 'fieldname=fieldcontents'."
       , ""
@@ -422,6 +465,20 @@ readFilter = do
       , "Parser error:"
       , P.errorBundlePretty err
       ]
+
+expectedQualifiedEntryPathFormat :: Pretty.Doc
+expectedQualifiedEntryPathFormat = Pretty.vsep
+  [ "Expected format is: [<backend-name>#]<entry-path>."
+  , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+  , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'."
+  ]
+
+expectedQualifiedPathFormat :: Pretty.Doc
+expectedQualifiedPathFormat = Pretty.vsep
+  [ "Expected format is: [<backend-name>#]<path>."
+  , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+  , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'."
+  ]
 
 expectedFilterFormat :: Pretty.Doc
 expectedFilterFormat = Pretty.vsep
