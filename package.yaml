@@ -14,6 +14,7 @@ copyright:           2022 Serokell
 category:            Command Line Tools
 extra-source-files:
 - README.md
+- config.toml
 
 dependencies:
   - base >= 4.14.3.0 && < 5
@@ -120,8 +121,9 @@ executables:
       - lens
       - optparse-applicative
       - polysemy
-      - servant-client
       - text
+      - tomland
+      - unordered-containers
 
 tests:
   test:

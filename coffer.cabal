@@ -15,6 +15,7 @@ license:        BSD3
 build-type:     Simple
 extra-source-files:
     README.md
+    config.toml
 
 library
   exposed-modules:
@@ -177,8 +178,9 @@ executable coffer
     , lens
     , optparse-applicative
     , polysemy
-    , servant-client
     , text
+    , tomland
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite doctests
