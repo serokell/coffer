@@ -35,6 +35,7 @@ import qualified Data.Set as Set
 import CLI.Types
 import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private))
 import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath, QualifiedPath (QualifiedPath))
+import BackendName (newBackendName, BackendName)
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -312,6 +313,9 @@ readEntryPath' input =
     , T.unpack err
     ]
 
+_readEntryPath :: ReadM EntryPath
+_readEntryPath = str >>= toReader . readEntryPath'
+
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
   eitherReader \input ->
@@ -346,53 +350,39 @@ readFieldKey' input = do
       , T.unpack err
       ]
 
--- @TODO@ remove copypaste and use backend name smart constructor
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
 readQualifiedEntryPath = do
   eitherReader \input ->
     case T.splitOn "#" (T.pack input) of
-      [backendName, entryPathStr] -> do
-        entryPath <-
-          mkEntryPath entryPathStr & first \err -> unlines
-            [ "Invalid entry path: '" <> input <> "'."
-            , T.unpack err
-            ]
+      [backendNameStr, entryPathStr] -> do
+        backendName <- readBackendName' backendNameStr
+        entryPath <- readEntryPath' entryPathStr
         pure $ QualifiedPath (Just backendName) entryPath
       [entryPathStr] -> do
-        entryPath <-
-          mkEntryPath entryPathStr & first \err -> unlines
-            [ "Invalid entry path: '" <> input <> "'."
-            , T.unpack err
-            ]
+        entryPath <- readEntryPath' entryPathStr
         pure $ QualifiedPath Nothing entryPath
-      _ -> Left $ unlines
-        [ "Invalid qualified entry path format: '" <> input <> "'."
-        , show expectedQualifiedEntryPathFormat
-        ]
+      _ ->
+        Left $ unlines
+                [ "Invalid qualified entry path format: '" <> input <> "'."
+                , show expectedQualifiedEntryPathFormat
+                ]
 
--- @TODO@ remove copypaste and use backend name smart constructor
 readQualifiedPath :: ReadM (QualifiedPath Path)
 readQualifiedPath = do
   eitherReader \input ->
     case T.splitOn "#" (T.pack input) of
-      [backendName, pathStr] -> do
-        path <-
-          mkPath pathStr & first \err -> unlines
-            [ "Invalid entry path: '" <> input <> "'."
-            , T.unpack err
-            ]
+      [backendNameStr, pathStr] -> do
+        backendName <- readBackendName' backendNameStr
+        path <- readPath' pathStr
         pure $ QualifiedPath (Just backendName) path
       [pathStr] -> do
-        path <-
-          mkPath pathStr & first \err -> unlines
-            [ "Invalid entry path: '" <> input <> "'."
-            , T.unpack err
-            ]
+        path <- readPath' pathStr
         pure $ QualifiedPath Nothing path
-      _ -> Left $ unlines
-        [ "Invalid qualified entry path format: '" <> input <> "'."
-        , show expectedQualifiedPathFormat
-        ]
+      _ ->
+        Left $ unlines
+                [ "Invalid qualified entry path format: '" <> input <> "'."
+                , show expectedQualifiedPathFormat
+                ]
 
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do

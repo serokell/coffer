@@ -19,11 +19,12 @@ import Polysemy.Error                (Error)
 
 import Polysemy
 import Coffer.Path (EntryPath, Path)
+import BackendName (BackendName)
 
 type Effects r = (Member (Embed IO) r, Member (Error CofferError) r)
 
 class Show a => Backend a where
-  _name :: a -> T.Text
+  _name :: a -> BackendName
   _codec :: Toml.TomlCodec a
   _writeSecret :: Effects r => a -> E.Entry -> Sem r ()
   _readSecret :: Effects r => a -> EntryPath -> Sem r (Maybe E.Entry)

@@ -28,7 +28,7 @@ import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, new
 import qualified Entry as E
 import Coffer.Directory (Directory)
 import qualified Coffer.Directory as Dir
-import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, EntryPath, pathSegments, QualifiedPath (QualifiedPath))
+import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, EntryPath, pathSegments, QualifiedPath (QualifiedPath, qpPath, qpBackendName))
 import qualified Coffer.Path as Path
 import Error (CofferError(..))
 import Coffer.Util (catchAndReturn)
@@ -37,6 +37,7 @@ import Validation (Validation (Success, Failure))
 import Data.Bifunctor (Bifunctor (first))
 import Config (Config (mainBackend, backends))
 import Data.HashMap.Strict ((!?))
+import BackendName (BackendName)
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
@@ -159,7 +160,8 @@ deleteFieldCmd config (DeleteFieldOptions (QualifiedPath backendNameMb path) fie
           pure $ DFRSuccess newEntry
 
 findCmd :: (Member BackendEffect r, Member (Error CofferError) r) => Config -> FindOptions -> Sem r (Maybe Directory)
-findCmd config (FindOptions backendNameMb pathMb textMb sortMb filters filterFields) = do
+findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
+  let backendNameMb = qPathMb >>= qpBackendName
   backend <- getBackend config backendNameMb
   let
     filterByPath :: Entry -> Bool
@@ -188,7 +190,7 @@ findCmd config (FindOptions backendNameMb pathMb textMb sortMb filters filterFie
             FilterFieldByValue substr -> substr `T.isInfixOf` (field ^. value)
             FilterFieldByDate op date -> matchDate op date (field ^. dateModified)
 
-  let path = fromMaybe mempty pathMb
+  let path = maybe mempty qpPath qPathMb
   dir <- getEntryOrDir backend path <&> \case
     Just (Right dir) -> dir
     Just (Left entry) -> Dir.singleton entry
@@ -255,12 +257,13 @@ renameCmd
      , Member (Error RenameResult) r
      )
   => Config -> RenameOptions -> Sem r RenameResult
-renameCmd config (RenameOptions dryRun backendNameMb oldPath newPath force) = do
-  backend <- getBackend config backendNameMb
-  operations <- buildCopyOperations backend backend oldPath newPath force
+renameCmd config (RenameOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force) = do
+  oldBackend <- getBackend config oldBackendNameMb
+  newBackend <- getBackend config newBackendNameMb
+  operations <- buildCopyOperations oldBackend newBackend oldPath newPath force
 
   unless dryRun do
-    runCopyOperations backend operations
+    runCopyOperations newBackend operations
 
   -- we don't want to delete clashed entries if renaming is forced.
   let pathsToDelete =
@@ -270,7 +273,7 @@ renameCmd config (RenameOptions dryRun backendNameMb oldPath newPath force) = do
   -- If directory/entry was successfully copied, then we can delete old directory/entry without delete errors.
   unless dryRun do
     forM_ pathsToDelete \(CopyOperation old _) -> do
-      let qPath = QualifiedPath backendNameMb (Path.entryPathAsPath (old ^. path))
+      let qPath = QualifiedPath oldBackendNameMb (Path.entryPathAsPath (old ^. path))
       void $ catchAndReturn $ deleteCmd config (DeleteOptions dryRun qPath False)
 
   pure $ CPRSuccess $ getOperationPaths <$> operations
@@ -537,10 +540,10 @@ checkCreateEntry backend force entry = catchAndReturn act
 
       pure $ Success entry
 
-getBackend :: forall r. Member (Error CofferError) r => Config -> Maybe T.Text -> Sem r SomeBackend
+getBackend :: forall r. Member (Error CofferError) r => Config -> Maybe BackendName -> Sem r SomeBackend
 getBackend config backendNameMb = do
   let backendName = fromMaybe (mainBackend config) backendNameMb
   let backendsHashMap = backends config
   case backendsHashMap !? backendName of
     Just backend -> pure backend
-    Nothing -> throw BackendNotFound
+    Nothing -> throw $ BackendNotFound backendName

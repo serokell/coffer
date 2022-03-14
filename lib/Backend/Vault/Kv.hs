@@ -28,8 +28,6 @@ import           Network.HTTP.Client          (newManager, defaultManagerSetting
 import           Polysemy.Error               (Error, throw)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
-import           Control.Applicative          (Alternative(empty))
-import           Validation                   (Validation(Success, Failure))
 import           Data.Time                    (UTCTime)
 import           Control.Exception            (catch)
 import           Servant.Client.Core.Response (responseStatusCode)
@@ -40,45 +38,35 @@ import           Control.Lens
 import Coffer.Path (pathSegments, unPathSegment, HasPathSegments, PathSegment, EntryPath, Path)
 import qualified Data.Aeson.Text as A
 import Entry (FieldVisibility)
-import Data.Either.Extra (eitherToMaybe)
+import Data.Either.Extra (eitherToMaybe, maybeToEither)
 import Data.Text (Text)
+import BackendName (BackendName, backendNameCodec)
+import Coffer.Util (didimatch)
 
 data VaultKvBackend =
   VaultKvBackend
-  { vbName :: T.Text
+  { vbName :: BackendName
   , vbAddress :: BaseUrl
   , vbMount :: T.Text
   , vbToken :: I.VaultToken
   }
   deriving stock (Show)
 
-{-# INLINE didimatch #-}
-didimatch
-  :: (b -> Maybe a)  -- ^ Mapper for consumer
-  -> (a -> Maybe b)     -- ^ Mapper for producer
-  -> TomlCodec a  -- ^ Source 'Codec' object
-  -> TomlCodec b  -- ^ Target 'Codec' object
-didimatch matchB matchA codec = Toml.Codec
-    { Toml.codecRead = \t -> case Toml.codecRead codec t of
-        Success a -> maybe empty Success (matchA a)
-        Failure b -> Failure b
-    , Toml.codecWrite = \c -> case matchB c of
-        Nothing -> empty
-        Just d  -> Toml.codecWrite codec d >>= maybe empty pure . matchA
-    }
-
-
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
-                  <$> Toml.text "name" Toml..= vbName
+                  <$> backendNameCodec "name" Toml..= vbName
                   <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
                   <*> Toml.text "mount" Toml..= vbMount
                   <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
   where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
-    baseUrlToText = Just . T.pack . showBaseUrl
-    textToBaseUrl = parseBaseUrl . T.unpack
+
+    baseUrlToText :: BaseUrl -> Either T.Text T.Text
+    baseUrlToText = Right . T.pack . showBaseUrl
+
+    textToBaseUrl :: T.Text -> Either T.Text BaseUrl
+    textToBaseUrl = maybeToEither "Cannot parse base url" . parseBaseUrl . T.unpack
 
 data FieldMetadata = FieldMetadata
   { fmDateModified :: UTCTime

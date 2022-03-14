@@ -32,6 +32,7 @@ import Control.Lens
 import qualified Data.List.NonEmpty as NE
 import Control.Monad ((>=>))
 import qualified Data.List as List
+import BackendName (BackendName)
 
 -- $setup
 -- >>> import Fmt (pretty, build)
@@ -173,7 +174,7 @@ replacePathPrefix (Path oldPrefix) (Path newPrefix) (Path fullpath) =
     <&> Path
 
 data QualifiedPath path = QualifiedPath
-  { qpBackendName :: Maybe Text
+  { qpBackendName :: Maybe BackendName
   , qpPath :: path
   }
   deriving stock (Show)

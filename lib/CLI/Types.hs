@@ -118,8 +118,7 @@ data DeleteFieldOptions = DeleteFieldOptions
   deriving stock Show
 
 data FindOptions = FindOptions
-  { foBackend :: Maybe Text
-  , foPath :: Maybe Path
+  { foQPath :: Maybe (QualifiedPath Path)
   , foText :: Maybe Text
   , foSort :: Maybe (Sort, Direction)
   , foFilters :: [Filter]
@@ -129,9 +128,8 @@ data FindOptions = FindOptions
 
 data RenameOptions = RenameOptions
   { roDryRun :: Bool
-  , roBackend :: Maybe Text
-  , roOldPath :: Path
-  , roNewPath :: Path
+  , roQOldPath :: QualifiedPath Path
+  , roQNewPath :: QualifiedPath Path
   , roForce :: Bool
   }
   deriving stock Show
