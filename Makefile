@@ -23,9 +23,13 @@ haddock-no-deps:
 	$(MAKE_PACKAGE) haddock-no-deps
 clean:
 	$(MAKE_PACKAGE) clean
+
+# Usage:
+#   * make bats
+#   * make bats FILTER="test name"
 bats:
 	git submodule update --init --recursive
-	./tests/golden/helpers/bats/bin/bats ./tests/golden/**
+	./tests/golden/helpers/bats/bin/bats ./tests/golden/** $(if $(FILTER),-f "$(FILTER)",)
 
 
 all:
