@@ -5,11 +5,11 @@
 set -o pipefail
 
 setup () {
-  # delete all existing entries
-  coffer delete -r / || true
-
   # change working directory to the location of the running `bats` suite.
   cd "$( dirname "$BATS_TEST_FILENAME")"
+
+  # delete all existing entries
+  coffer delete -r / || true
 }
 
 # `cleanOutput <cmd>` will run the given command and then scrub dates out of the output.

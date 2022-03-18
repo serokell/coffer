@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+main_backend = "vault-local"
+
+[[backend]]
+type = "vault-kv"
+name = "vault-local"
+address = "localhost:8200"
+mount = "secret"
+token = "root"
