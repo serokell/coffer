@@ -44,6 +44,8 @@ data ViewResult
 data CreateResult
   = CRSuccess Entry
   | CREntryAlreadyExists EntryPath
+  | CRDirectoryAlreadyExists EntryPath
+  | CRParentPathContainsEntry EntryPath
 
 data SetFieldResult
   = SFRSuccess Entry

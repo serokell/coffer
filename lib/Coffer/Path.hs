@@ -14,6 +14,7 @@ module Coffer.Path
   , mkEntryPath
   , entryPathName
   , entryPathParentDir
+  , entryPathParentDirs
   , appendEntryName
   , pathAsEntryPath
   , entryPathAsPath
@@ -34,6 +35,7 @@ import qualified Data.List as List
 -- $setup
 -- >>> import Fmt (pretty, build)
 -- >>> import Control.Lens
+-- >>> import qualified Data.List.NonEmpty as NE
 -- >>> isRight (Right a) = a
 -- >>> unsafeMkPath = isRight . mkPath
 -- >>> unsafeMkEntryPath = isRight . mkEntryPath
@@ -125,6 +127,16 @@ entryPathName = view $ pathSegments . last1 . to unPathSegment
 entryPathParentDir :: Lens' EntryPath Path
 entryPathParentDir = pathSegments . initNE . from pathSegments
 
+-- | Gets all parents paths of given entry path.
+--
+-- >>> NE.toList (entryPathParentDirs (unsafeMkEntryPath "/dir1/dir2/entry")) <&> build
+-- ["/","/dir1","/dir1/dir2"]
+entryPathParentDirs :: EntryPath -> NonEmpty Path
+entryPathParentDirs entryPath =
+  entryPath ^. pathSegments
+    & NE.init
+    & NE.inits
+    <&> Path
 
 -- | Build an `EntryPath` by append the entry's name to its location path.
 --
