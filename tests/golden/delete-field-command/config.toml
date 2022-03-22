@@ -7,6 +7,6 @@ main_backend = "vault-local"
 [[backend]]
 type = "vault-kv"
 name = "vault-local"
-address = "localhost:8200"
+address = "localhost:8209"
 mount = "secret"
 token = "root"
