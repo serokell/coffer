@@ -119,3 +119,16 @@ EOF
     d - [2000-01-01 01:01:01]
 EOF
 }
+
+@test "view multiline fieldcontent" {
+  coffer create /path --field user="$(echo -e "first\n\nsecond")"
+
+  run coffer view /path user
+
+  assert_success
+  assert_output - <<EOF
+first
+
+second
+EOF
+}

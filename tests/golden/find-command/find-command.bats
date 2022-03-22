@@ -333,3 +333,18 @@ EOF
       c - [2000-01-01 01:01:01]
 EOF
 }
+
+@test "find multiline field" {
+  coffer create /path --field user="$(echo -e "first\nsecond")"
+
+  run cleanOutput coffer find
+
+  assert_success
+  assert_output - <<EOF
+/
+  path - [2000-01-01 01:01:01]
+    user: [2000-01-01 01:01:01]
+      first
+      second
+EOF
+}
