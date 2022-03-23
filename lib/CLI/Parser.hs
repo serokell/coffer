@@ -215,7 +215,12 @@ findOptions =
 renameOptions :: Parser RenameOptions
 renameOptions =
   RenameOptions
-    <$> argument readPath ( mconcat
+    <$> switch ( mconcat
+          [ long "dry-run"
+          , short 'd'
+          , help "Don't actually rename anything, just show what would be done"
+          ])
+    <*> argument readPath ( mconcat
           [ metavar "OLDPATH"
           , help "The path to move the old directory or entry from"
           ])
@@ -232,7 +237,12 @@ renameOptions =
 copyOptions :: Parser CopyOptions
 copyOptions =
   CopyOptions
-    <$> argument readPath ( mconcat
+    <$> switch ( mconcat
+          [ long "dry-run"
+          , short 'd'
+          , help "Don't actually copy anything, just show what would be done"
+          ])
+    <*> argument readPath ( mconcat
           [ metavar "OLDPATH"
           , help "The path to copy the old directory or entry from"
           ])
@@ -249,7 +259,12 @@ copyOptions =
 deleteOptions :: Parser DeleteOptions
 deleteOptions =
   DeleteOptions
-    <$> argument readPath ( mconcat
+    <$> switch ( mconcat
+          [ long "dry-run"
+          , short 'd'
+          , help "Don't actually delete anything, just show what would be done"
+          ])
+    <*> argument readPath ( mconcat
           [ metavar "PATH"
           , help "The path to the entry or directory to delete"
           ])
