@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # This script generates cabal.project, cabal.project.freeze and *.cabal
-# files which can be used in order to build morley using cabal
+# files which can be used in order to build the project using cabal
 
 set -e
 
