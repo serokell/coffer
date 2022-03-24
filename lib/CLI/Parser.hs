@@ -33,7 +33,7 @@ import Data.Bifunctor (first)
 import qualified Data.Set as Set
 
 import CLI.Types
-import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private))
+import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private), FieldValue (FieldValue))
 import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath, QualifiedPath (QualifiedPath))
 import BackendName (newBackendName, BackendName)
 
@@ -165,7 +165,7 @@ setFieldOptions =
           [ metavar "FIELDNAME"
           , help "The name of the field to set"
           ])
-    <*> optional (argument str $ mconcat
+    <*> optional (argument readFieldValue $ mconcat
           [ metavar "FIELDCONTENTS"
           , help "The contents to insert into the field. Required when creating a new field, optional otherwise"
           ])
@@ -397,6 +397,9 @@ readQualifiedPath = do
                 , show expectedQualifiedPathFormat
                 ]
 
+readFieldValue :: ReadM FieldValue
+readFieldValue = str <&> FieldValue
+
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
   eitherReader \input ->
@@ -612,8 +615,8 @@ parseFieldNameWhile whileCond = do
   either fail pure $ readFieldKey' fieldName
 
 -- | Parse the rest of the input as a field content.
-parseFieldContentsEof :: MParser Text
-parseFieldContentsEof = T.pack <$> P.manyTill P.anySingle P.eof
+parseFieldContentsEof :: MParser FieldValue
+parseFieldContentsEof = FieldValue . T.pack <$> P.manyTill P.anySingle P.eof
 
 ----------------------------------------------------------------------------
 -- Utils

@@ -24,7 +24,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret, SomeBackend)
-import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path)
+import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path, fieldValue)
 import qualified Entry as E
 import Coffer.Directory (Directory)
 import qualified Coffer.Directory as Dir
@@ -187,7 +187,7 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
         Nothing -> False
         Just field ->
           case filter of
-            FilterFieldByValue substr -> substr `T.isInfixOf` (field ^. value)
+            FilterFieldByValue substr -> substr `T.isInfixOf` (field ^. value . fieldValue)
             FilterFieldByDate op date -> matchDate op date (field ^. dateModified)
 
   let path = maybe mempty qpPath qPathMb
@@ -231,6 +231,7 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
       . each
       . filtered (\field -> field ^. visibility == Private)
       . value
+      . fieldValue
       .~ "[private]"
 
     matchDate :: FilterOp -> FilterDate -> UTCTime -> Bool

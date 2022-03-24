@@ -22,3 +22,6 @@ setup () {
 cleanOutput () {
   $@ | sed -r 's/\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]$/[2000-01-01 01:01:01]/g'
 }
+
+# Reset ANSI control sequences char.
+reset=$(printf '\x1b[0m')

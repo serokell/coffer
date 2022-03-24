@@ -7,6 +7,7 @@ module CLI.PrettyPrint where
 import Control.Lens
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.HashMap.Strict as HashMap
 import Data.Time
 import Data.Maybe (catMaybes)
@@ -17,6 +18,7 @@ import qualified Data.Set as Set
 import Entry
 import Coffer.Directory ( Directory(..) )
 import Coffer.Path (entryPathName)
+import Data.Text.Internal.Builder (toLazyText)
 
 buildDirectory :: Directory -> Builder
 buildDirectory = go ""
@@ -58,10 +60,10 @@ buildTags tags =
 buildFields :: [(FieldKey,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
-  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> T.length firstLine) & maximum
+  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral) & maximum
 
   formattedFields `zip` fields <&> \((firstLine, otherLinesMb), (_, field)) -> do
-    let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified )
+    let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified)
     case otherLinesMb of
       Nothing -> formattedFirstLine
       Just otherLines -> unlinesF [formattedFirstLine, otherLines]
@@ -70,17 +72,18 @@ buildFields fields = do
 -- then the field name and content will be displayed in one single line.
 -- Otherwise, they'll be displayed on separate lines.
 --
--- This function returns a tuple with the first line and an optional builder for the remaining lines.
-buildField :: (FieldKey, Field) -> (Text, Maybe Builder)
+-- This function returns a tuple with the builder for the first line
+-- and an optional builder for the remaining lines.
+buildField :: (FieldKey, Field) -> (Builder, Maybe Builder)
 buildField (fk, field) = do
   let fkText = getFieldKey fk
-  if T.isInfixOf "\n" (field ^. value)
+  if T.isInfixOf "\n" (field ^. value . fieldValue)
     then
-      ( fkText <> ":"
+      ( build fkText <> ":"
       , Just $ indentF 2 $ build $ field ^. value
       )
     else
-      ( fkText <> ": " <> field ^. value
+      ( build fkText <> ": " <> build (field ^. value)
       , Nothing
       )
 

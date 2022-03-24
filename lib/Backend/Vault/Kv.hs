@@ -37,7 +37,7 @@ import           Polysemy
 import           Control.Lens
 import Coffer.Path (pathSegments, unPathSegment, HasPathSegments, PathSegment, EntryPath, Path)
 import qualified Data.Aeson.Text as A
-import Entry (FieldVisibility)
+import Entry (FieldVisibility, FieldValue (FieldValue))
 import Data.Either.Extra (eitherToMaybe, maybeToEither)
 import Data.Text (Text)
 import BackendName (BackendName, backendNameCodec)
@@ -170,7 +170,7 @@ kvWriteSecret backend entry = do
       { I.psCas = Nothing
       , I.psDdata =
               HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
-            . HS.map (^. E.value)
+            . HS.map (^. E.value . E.fieldValue)
             . HS.mapKeys E.getFieldKey
             $ entry ^. E.fields
         }
@@ -195,7 +195,7 @@ kvReadSecret backend path = do
             _key <- eitherToMaybe $ E.newFieldKey key
 
             Just (_key
-                  , E.newField _modTime value
+                  , E.newField _modTime (FieldValue value)
                     & E.visibility .~ _visibility
                   )
 
