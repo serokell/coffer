@@ -126,3 +126,16 @@ EOF
       test: test [2000-01-01 01:01:01]
 EOF
 }
+
+@test "multiline field" {
+  coffer create /path
+
+  run coffer set-field /path multiline "$(echo -e "first\nsecond")"
+
+  assert_success
+  assert_output - <<EOF
+[SUCCESS] Set field 'multiline' (public) at '/path' to:
+first
+second
+EOF
+}
