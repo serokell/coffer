@@ -17,7 +17,6 @@ import Data.Maybe (fromMaybe)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
 import Data.Time.Calendar.Month.Compat (pattern MonthDay)
 import Control.Lens (view)
-import Data.Functor (($>))
 import Polysemy.Error (throw, Error)
 import Control.Monad.Extra (whenM, whenJust)
 import Data.List.NonEmpty (NonEmpty)
@@ -275,17 +274,20 @@ renameCmd
      , Member (Error RenameResult) r
      )
   => RenameOptions -> Sem r RenameResult
-renameCmd (RenameOptions oldPath newPath force) = do
+renameCmd (RenameOptions dryRun oldPath newPath force) = do
   operations <- buildCopyOperations oldPath newPath force
-  runCopyOperations operations
+
+  unless dryRun do
+    runCopyOperations operations
   -- we don't want to delete clashed entries if renaming is forced.
   let pathsToDelete =
         flip filter operations \(CopyOperation old _) ->
           none (\(CopyOperation _ new) -> old ^. path == new ^. path) operations
 
   -- If directory/entry was successfully copied, then we can delete old directory/entry without delete errors.
-  forM_ pathsToDelete \(CopyOperation old _) -> do
-    void $ catchAndReturn $ deleteCmd (DeleteOptions (Path.entryPathAsPath (old ^. path)) False)
+  unless dryRun do
+    forM_ pathsToDelete \(CopyOperation old _) -> do
+      void $ catchAndReturn $ deleteCmd (DeleteOptions False (Path.entryPathAsPath (old ^. path)) False)
 
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
@@ -382,21 +384,26 @@ copyCmd
      , Member (Error CopyResult) r
      )
   => CopyOptions -> Sem r CopyResult
-copyCmd (CopyOptions oldPath newPath force) = do
+copyCmd (CopyOptions dryRun oldPath newPath force) = do
   operations <- buildCopyOperations oldPath newPath force
-  runCopyOperations operations
+  unless dryRun do
+    runCopyOperations operations
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
 deleteCmd
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error DeleteResult) r)
   => DeleteOptions -> Sem r DeleteResult
-deleteCmd (DeleteOptions path recursive) = do
+deleteCmd (DeleteOptions dryRun path recursive) = do
   getEntryOrDirThrow DRPathNotFound path >>= \case
-    Left entry -> deleteSecret (entry ^. E.path) $> DRSuccess [entry ^. E.path]
+    Left entry -> do
+      unless dryRun do
+        deleteSecret (entry ^. E.path)
+      pure $ DRSuccess [entry ^. E.path]
     Right dir
       | recursive -> do
           let entries = Dir.allEntries dir
-          forM_ entries \entry -> deleteSecret (entry ^. E.path)
+          unless dryRun do
+            forM_ entries \entry -> deleteSecret (entry ^. E.path)
           pure $ DRSuccess $ entries ^.. each . E.path
       | otherwise -> pure $ DRDirectoryFound path
 

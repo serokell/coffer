@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Lens
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Options.Applicative ( execParser )
 import Polysemy
 import Polysemy.Error (errorToIOFinal, Error)
@@ -112,9 +112,11 @@ main = do
               Just dir -> pprint $ buildDirectory dir
               Nothing -> printError "No match found."
 
-          SomeCommand cmd@CmdRename{} -> do
+          SomeCommand cmd@(CmdRename opts) -> do
             runCommand cmd >>= \case
-              CPRSuccess copiedPaths ->
+              CPRSuccess copiedPaths -> do
+                when (roDryRun opts) do
+                  pprint "These actions would be done:"
                 forM_ copiedPaths \(from, to) ->
                   printSuccess $ "Renamed '" +| from |+ "' to '" +| to |+ "'."
               CPRPathNotFound path -> pathNotFound path
@@ -132,9 +134,11 @@ main = do
                 let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot rename '" +| from |+ "' to '" +| to |+ "'."
                 printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
 
-          SomeCommand cmd@CmdCopy{} -> do
+          SomeCommand cmd@(CmdCopy opts) -> do
             runCommand cmd >>= \case
-              CPRSuccess copiedPaths ->
+              CPRSuccess copiedPaths -> do
+                when (cpoDryRun opts) do
+                  pprint "These actions would be done:"
                 forM_ copiedPaths \(from, to) ->
                   printSuccess $ "Copied '" +| from |+ "' to '" +| to |+ "'."
               CPRPathNotFound path -> pathNotFound path
@@ -152,14 +156,16 @@ main = do
                 let errorMsgs = NE.toList paths <&> \(from, to) -> "Cannot copy '" +| from |+ "' to '" +| to |+ "'."
                 printError $ unlinesF @_ @Builder $ header : "" : errorMsgs
 
-          SomeCommand cmd@CmdDelete{} -> do
+          SomeCommand cmd@(CmdDelete opts) -> do
             runCommand cmd >>= \case
               DRPathNotFound path -> pathNotFound path
               DRDirectoryFound path -> printError $ unlinesF @_ @Builder
                 [ "The path '" +| path |+ "' is a directory."
                 , "Use '--recursive' or '-r' to recursively delete all entries."
                 ]
-              DRSuccess paths ->
+              DRSuccess paths -> do
+                when (doDryRun opts) do
+                  pprint "These actions would be done:"
                 forM_ paths \path ->
                   printSuccess $ "Deleted '" +| path |+ "'."
 

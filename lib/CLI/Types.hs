@@ -121,21 +121,24 @@ data FindOptions = FindOptions
   deriving stock Show
 
 data RenameOptions = RenameOptions
-  { roOldPath :: Path
+  { roDryRun :: Bool
+  , roOldPath :: Path
   , roNewPath :: Path
   , roForce :: Bool
   }
   deriving stock Show
 
 data CopyOptions = CopyOptions
-  { cpoOldPath :: Path
+  { cpoDryRun :: Bool
+  , cpoOldPath :: Path
   , cpoNewPath :: Path
   , cpoForce :: Bool
   }
   deriving stock Show
 
 data DeleteOptions = DeleteOptions
-  { doPath :: Path
+  { doDryRun :: Bool
+  , doPath :: Path
   , doRecursive :: Bool
   }
   deriving stock Show

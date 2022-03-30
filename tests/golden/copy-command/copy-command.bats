@@ -173,3 +173,26 @@ EOF
 Cannot copy '/a/b' to '/x/b'.
 EOF
 }
+
+@test "copy dry-run" {
+  coffer create /a/b/c
+  coffer create /a/b/d
+
+  run coffer copy /a /x -d
+
+  assert_success
+  assert_output - <<EOF
+These actions would be done:
+[SUCCESS] Copied '/a/b/c' to '/x/b/c'.
+[SUCCESS] Copied '/a/b/d' to '/x/b/d'.
+EOF
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+      d - [2000-01-01 01:01:01]
+EOF
+}

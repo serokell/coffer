@@ -177,3 +177,26 @@ EOF
       b: b [2000-01-01 01:01:01]
 EOF
 }
+
+@test "rename dry-run" {
+  coffer create /a/b/c
+  coffer create /a/b/d
+
+  run coffer rename /a /x -d
+
+  assert_success
+  assert_output - <<EOF
+These actions would be done:
+[SUCCESS] Renamed '/a/b/c' to '/x/b/c'.
+[SUCCESS] Renamed '/a/b/d' to '/x/b/d'.
+EOF
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+      d - [2000-01-01 01:01:01]
+EOF
+}
