@@ -139,3 +139,15 @@ first
 second
 EOF
 }
+
+@test "set field with ANSI control sequences" {
+  coffer create /a/b/c
+
+  run coffer set-field /a/b/c red "$(echo -e "\x1b[41;1mHi I'm red")"
+
+  assert_success
+  assert_output - <<EOF
+[SUCCESS] Set field 'red' (public) at '/a/b/c' to:
+$(printf '\x1b[41;1m')Hi I'm red$reset
+EOF
+}
