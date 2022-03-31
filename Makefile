@@ -28,9 +28,7 @@ clean:
 #   * make bats
 #   * make bats FILTER="test name"
 bats:
-	git submodule update --init --recursive
-	./tests/golden/helpers/bats/bin/bats ./tests/golden/** $(if $(FILTER),-f "$(FILTER)",)
-
+	./scripts/run-bats-tests.sh $(if $(FILTER),"$(FILTER)",)
 
 all:
 	$(MAKEU) PACKAGE=""
