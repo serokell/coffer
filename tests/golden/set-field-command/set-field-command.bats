@@ -86,3 +86,28 @@ EOF
   assert_failure
   assert_output "[ERROR] Entry not found at '/notexist'."
 }
+
+@test "set field on specified backend" {
+  coffer create /a/b
+  coffer create second#/a/b
+
+  run coffer set-field second#/a/b test test
+
+  assert_success
+  assert_output "[SUCCESS] Set field 'test' to 'test' (public) at '/a/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+      test: test [2000-01-01 01:01:01]
+EOF
+}

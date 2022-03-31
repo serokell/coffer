@@ -105,3 +105,17 @@ EOF
         test: kek [2000-01-01 01:01:01]
 EOF
 }
+
+@test "view on specified backend" {
+  coffer create /a/b
+  coffer create second#/c/d
+
+  run cleanOutput coffer view second#/
+
+  assert_success
+  assert_output - <<EOF
+/
+  c/
+    d - [2000-01-01 01:01:01]
+EOF
+}

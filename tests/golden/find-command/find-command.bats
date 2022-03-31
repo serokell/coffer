@@ -295,3 +295,41 @@ EOF
       filtering: zzz [2000-01-01 01:01:01]
 EOF
 }
+
+@test "find an entry on specified backend" {
+  coffer create /a/b/c
+  coffer create /a/d/c
+
+  coffer create second#/a/b/c
+  coffer create second#/a/d/c
+
+  run cleanOutput coffer find second#/a/b
+
+  assert_success
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+EOF
+}
+
+@test "find all entries on specified backend" {
+  coffer create /a/b/c
+  coffer create /a/d/c
+
+  coffer create second#/a/b/c
+  coffer create second#/a/d/c
+
+  run cleanOutput coffer find second#
+
+  assert_success
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+    d/
+      c - [2000-01-01 01:01:01]
+EOF
+}

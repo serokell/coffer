@@ -254,3 +254,26 @@ EOF
   Use '--force' or '-f' to overwrite existing entries.
 EOF
 }
+
+@test "copy from one backend to the other" {
+  coffer create /a/b
+
+  run coffer copy /a second#/c
+
+  assert_success
+  assert_output "[SUCCESS] Copied '/a/b' to '/c/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  c/
+    b - [2000-01-01 01:01:01]
+EOF
+}

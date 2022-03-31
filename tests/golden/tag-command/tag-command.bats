@@ -77,3 +77,27 @@ EOF
   assert_failure
   assert_output "[ERROR] Entry not found at '/notexist'."
 }
+
+@test "tag on specified backend" {
+  coffer create /a/b
+  coffer create second#/a/b
+
+  run coffer tag second#/a/b tag
+
+  assert_success
+  assert_output "[SUCCESS] Added tag 'tag' to 'second#/a/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  a/
+    b - [tag] [2000-01-01 01:01:01]
+EOF
+}
