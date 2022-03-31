@@ -51,11 +51,14 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be renamed because an entry already exists at the destination.
-Use '--force' or '-f' to overwrite existing entries.
+[ERROR] The following entries cannot be renamed:
 
-Cannot rename '/a/b/c' to '/d/c'.
-Cannot rename '/a/b/d' to '/d/d'.
+'/a/b/c' to '/d/c':
+  An entry already exists at '/d/c'.
+  Use '--force' or '-f' to overwrite existing entries.
+'/a/b/d' to '/d/d':
+  An entry already exists at '/d/d'.
+  Use '--force' or '-f' to overwrite existing entries.
 EOF
 }
 
@@ -96,9 +99,10 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be renamed because a directory already exists at the destination.
+[ERROR] The following entries cannot be renamed:
 
-Cannot rename '/d' to '/a/b'.
+'/d' to '/a/b':
+  '/a/b' is a directory.
 EOF
 }
 
@@ -152,11 +156,14 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be renamed because an entry already exists at the destination.
-Use '--force' or '-f' to overwrite existing entries.
+[ERROR] The following entries cannot be renamed:
 
-Cannot rename '/dir/a' to '/dir/a'.
-Cannot rename '/dir/b' to '/dir/b'.
+'/dir/a' to '/dir/a':
+  An entry already exists at '/dir/a'.
+  Use '--force' or '-f' to overwrite existing entries.
+'/dir/b' to '/dir/b':
+  An entry already exists at '/dir/b'.
+  Use '--force' or '-f' to overwrite existing entries.
 EOF
 
   run coffer rename /dir /dir -f
@@ -198,5 +205,25 @@ EOF
     b/
       c - [2000-01-01 01:01:01]
       d - [2000-01-01 01:01:01]
+EOF
+}
+
+@test "rename multierrors" {
+  coffer create /a/b
+  coffer create /x/b/c
+  coffer create /a/d
+  coffer create /x/d
+
+  run coffer rename /a /x
+
+  assert_failure
+  assert_output - <<EOF
+[ERROR] The following entries cannot be renamed:
+
+'/a/b' to '/x/b':
+  '/x/b' is a directory.
+'/a/d' to '/x/d':
+  An entry already exists at '/x/d'.
+  Use '--force' or '-f' to overwrite existing entries.
 EOF
 }

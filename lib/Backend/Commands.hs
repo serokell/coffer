@@ -18,8 +18,7 @@ import Data.Time.Calendar.Compat (pattern YearMonthDay)
 import Data.Time.Calendar.Month.Compat (pattern MonthDay)
 import Control.Lens (view)
 import Polysemy.Error (throw, Error)
-import Control.Monad.Extra (whenM, whenJust)
-import Data.List.NonEmpty (NonEmpty)
+import Control.Monad.Extra (whenM)
 import qualified Data.List.NonEmpty as NE
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -34,6 +33,8 @@ import qualified Coffer.Path as Path
 import Error (CofferError(..))
 import Coffer.Util (catchAndReturn)
 import Data.Either (rights)
+import Validation (Validation (Success, Failure))
+import Data.Bifunctor (Bifunctor (first))
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
@@ -91,39 +92,11 @@ createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
       & E.fields .~ HashMap.fromList allFields
       & E.tags .~ tags
 
-  whenM (pathIsDirectory entryPath) do
-    throw $ CRDirectoryAlreadyExists entryPath
-
-  checkForEntriesInEntryPath entryPath
-
-  when (not force) do
-    whenM (pathIsEntry entryPath) do
-      throw $ CREntryAlreadyExists entryPath
-
-  void $ writeSecret entry
-  pure $ CRSuccess entry
-
-  where
-    -- | When attempting to create an entry at, e.g., @/a/b/c@, the directories
-    -- @/a@ and @/a/b@ will be implicitly created.
-    --
-    -- This function checks whether those paths are already
-    -- occupied by existing entries and, if so, fails.
-    --
-    -- Note: the root path @/@ cannot possibly be occupied by an entry,
-    -- therefore we skip the check for that path.
-    checkForEntriesInEntryPath :: EntryPath -> Sem r ()
-    checkForEntriesInEntryPath entryPath = do
-      let parentDirsExceptRoot = entryPath
-            & Path.entryPathParentDirs
-            & NE.toList
-            -- Ignore paths that cannot possibly point to an entry
-            <&> Path.pathAsEntryPath
-            & rights
-
-      filterM pathIsEntry parentDirsExceptRoot >>= \case
-        (clashed : _) -> throw $ CRParentPathContainsEntry clashed
-        [] -> pure ()
+  checkCreateEntry force entry >>= \case
+    Failure error -> throw $ CRCreateError error
+    Success entry -> do
+      void $ writeSecret entry
+      pure $ CRSuccess entry
 
 setFieldCmd
   :: forall r
@@ -318,20 +291,9 @@ buildCopyOperations oldPath newPath force = do
       Left entry -> copyEntry entry
       Right dir -> copyDir dir
 
-  -- Checks that the paths we're trying to copy entries to aren't already occupied
-  -- by an existing directory.
-  checkCopyOperations operations
-    do \(CopyOperation _ new) -> pathIsDirectory (new ^. E.path)
-    do CPRDestinationIsDirectory . fmap getOperationPaths
-
-  when (not force) do
-    -- Checks that the paths we're trying to copy entries to aren't already occupied
-    -- by an existing entry.
-    checkCopyOperations operations
-      do \(CopyOperation _ new) -> pathIsEntry (new ^. E.path)
-      do CPREntryAlreadyExists . fmap getOperationPaths
-
-  pure operations
+  sequenceA <$> forM operations validateCopyOperation >>= \case
+    Failure createErrors -> throw $ CPRCreateErrors createErrors
+    Success _ -> pure operations
 
   where
     copyEntry :: Entry -> Sem r [CopyOperation]
@@ -361,16 +323,10 @@ buildCopyOperations oldPath newPath force = do
     setModifiedDate nowUtc (CopyOperation old new) =
       CopyOperation old (new & dateModified .~ nowUtc)
 
-    -- | Performs a check on all `CopyOperation`s and throws an error if any of checks fail.
-    checkCopyOperations
-      :: [CopyOperation]
-      -> (CopyOperation -> Sem r Bool)
-      -> (NonEmpty CopyOperation -> CopyResult)
-      -> Sem r ()
-    checkCopyOperations operations pred mkErr = do
-      invalidOperations <- filterM pred operations
-      whenJust (NE.nonEmpty invalidOperations) \invalidOperationsNE ->
-        throw $ mkErr invalidOperationsNE
+    -- | Performs a check on `CopyOperation` and returns @Failure@ if any of checks fail.
+    validateCopyOperation :: CopyOperation -> Sem r (Validation [(EntryPath, CreateError)] Entry)
+    validateCopyOperation (CopyOperation old new) =
+      checkCreateEntry force new <&> first \err -> [(old ^. path, err)]
 
 runCopyOperations :: (Member BackendEffect r) => [CopyOperation] -> Sem r ()
 runCopyOperations operations = do
@@ -521,3 +477,45 @@ getEntryOrDir path =
                       \ entry or directory name."
                     , "Got: '" <> secret <> "'."
                     ]
+
+-- | This function gets all entries, that are exist in given entry path.
+--
+-- Note: the root path @/@ cannot possibly be occupied by an entry,
+-- therefore we skip the check for that path.
+getEntriesInEntryPath :: forall r. Member BackendEffect r => EntryPath -> Sem r [EntryPath]
+getEntriesInEntryPath entryPath = do
+  let parentDirsExceptRoot = entryPath
+        & Path.entryPathParentDirs
+        & NE.toList
+        -- Ignore paths that cannot possibly point to an entry
+        <&> Path.pathAsEntryPath
+        & rights
+
+  filterM pathIsEntry parentDirsExceptRoot
+
+checkCreateEntry
+  :: forall r
+   . (Member BackendEffect r)
+  => Bool -> Entry -> Sem r (Validation CreateError Entry)
+checkCreateEntry force entry = catchAndReturn act
+  where
+    act :: Sem (Error (Validation CreateError Entry) ': r) (Validation CreateError Entry)
+    act = do
+      let entryPath = entry ^. path
+      whenM (pathIsDirectory entryPath) do
+        throw $ Failure @_ @Entry (CEDestinationIsDirectory entry)
+
+      -- When attempting to create an entry at, e.g., @/a/b/c@, the directories
+      -- @/a@ and @/a/b@ will be implicitly created.
+      --
+      -- Checks whether those paths are already
+      -- occupied by existing entries and, if so, fails.
+      getEntriesInEntryPath entryPath >>= \case
+        (clashed : _) -> throw $ Failure @_ @Entry (CEParentDirectoryIsEntry (entry, clashed))
+        [] -> pure ()
+
+      when (not force) do
+        whenM (pathIsEntry entryPath) do
+          throw $ Failure @_ @Entry (CEEntryAlreadyExists entry)
+
+      pure $ Success entry
