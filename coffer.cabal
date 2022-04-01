@@ -178,6 +178,7 @@ executable coffer
       base >=4.14.3.0 && <5
     , coffer
     , fmt
+    , http-client
     , lens
     , optparse-applicative
     , polysemy

@@ -20,8 +20,10 @@ import Polysemy.Error                (Error)
 import Polysemy
 import Coffer.Path (EntryPath, Path)
 import BackendName (BackendName)
+import Network.HTTP.Client (Manager)
+import Polysemy.State (State)
 
-type Effects r = (Member (Embed IO) r, Member (Error CofferError) r)
+type Effects r = (Member (Embed IO) r, Member (State (Maybe Manager)) r, Member (Error CofferError) r)
 
 class Show a => Backend a where
   _name :: a -> BackendName

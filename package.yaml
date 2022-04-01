@@ -119,6 +119,7 @@ executables:
     dependencies:
       - coffer
       - fmt
+      - http-client
       - lens
       - optparse-applicative
       - polysemy

@@ -29,13 +29,16 @@ import Config (configCodec, Config (..))
 import Entry (path, Entry)
 import System.Environment (lookupEnv)
 import Data.Maybe (fromMaybe)
+import Polysemy.State (State, evalState)
+import Network.HTTP.Client (Manager)
 
 runBackendIO
-  :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a
+  :: Sem '[BackendEffect, Error CofferError, State (Maybe Manager), Embed IO, Final IO ] a
   -> IO a
 runBackendIO action =
   runBackend action
     & errorToIOFinal @CofferError
+    & evalState Nothing
     & embedToFinal @IO
     & runFinal
     >>= \case
