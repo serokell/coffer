@@ -90,9 +90,9 @@ main = do
             let field = entry ^?! E.fields . ix fieldName
             printSuccess $
               "Set field '" +| fieldName |+
-              "' to '" +| (field ^. E.value) |+
               "' (" +| (field ^. E.visibility) |+
-              ") at '" +| entry ^. E.path |+ "'."
+              ") at '" +| entry ^. E.path |+
+              "' to:\n" +| (field ^. E.value) |+ ""
 
       SomeCommand cmd@(CmdDeleteField opts) -> do
         runCommand config cmd >>= \case

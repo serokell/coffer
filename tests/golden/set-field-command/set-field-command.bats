@@ -14,7 +14,10 @@ load '../helpers'
   run coffer set-field /a/b test aba -V public
 
   assert_success
-  assert_output "[SUCCESS] Set field 'test' to 'aba' (public) at '/a/b'."
+  assert_output - <<EOF
+[SUCCESS] Set field 'test' (public) at '/a/b' to:
+aba
+EOF
 
   run cleanOutput coffer find
   assert_output - <<EOF
@@ -27,7 +30,10 @@ EOF
   run coffer set-field /a/b test -V private
 
   assert_success
-  assert_output "[SUCCESS] Set field 'test' to 'aba' (private) at '/a/b'."
+  assert_output - <<EOF
+[SUCCESS] Set field 'test' (private) at '/a/b' to:
+aba
+EOF
 
   run cleanOutput coffer find
   assert_output - <<EOF
@@ -65,12 +71,18 @@ EOF
   run coffer set-field a kek a1
 
   assert_success
-  assert_output "[SUCCESS] Set field 'kek' to 'a1' (public) at '/a'."
+  assert_output - <<EOF
+[SUCCESS] Set field 'kek' (public) at '/a' to:
+a1
+EOF
 
   run coffer set-field a kek a2
 
   assert_success
-  assert_output "[SUCCESS] Set field 'kek' to 'a2' (public) at '/a'."
+  assert_output - <<EOF
+[SUCCESS] Set field 'kek' (public) at '/a' to:
+a2
+EOF
 
   run cleanOutput coffer view /
   assert_output - <<EOF
@@ -94,7 +106,10 @@ EOF
   run coffer set-field second#/a/b test test
 
   assert_success
-  assert_output "[SUCCESS] Set field 'test' to 'test' (public) at '/a/b'."
+  assert_output - <<EOF
+[SUCCESS] Set field 'test' (public) at '/a/b' to:
+test
+EOF
 
   run cleanOutput coffer view /
   assert_output - <<EOF
@@ -109,5 +124,18 @@ EOF
   a/
     b - [2000-01-01 01:01:01]
       test: test [2000-01-01 01:01:01]
+EOF
+}
+
+@test "multiline field" {
+  coffer create /path
+
+  run coffer set-field /path multiline "$(echo -e "first\nsecond")"
+
+  assert_success
+  assert_output - <<EOF
+[SUCCESS] Set field 'multiline' (public) at '/path' to:
+first
+second
 EOF
 }
