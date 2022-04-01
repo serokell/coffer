@@ -27,6 +27,8 @@ import qualified Entry as E
 import qualified Coffer.Directory as Dir
 import Config (configCodec, Config (..))
 import Entry (path, Entry)
+import System.Environment (lookupEnv)
+import Data.Maybe (fromMaybe)
 
 runBackendIO
   :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a
@@ -52,11 +54,19 @@ readConfig configPath = do
       exitFailure
     Right config -> pure config
 
+getConfigPath :: Options -> IO FilePath
+getConfigPath options = do
+  case oConfigPathMb options of
+    Just configPath -> pure configPath
+    Nothing -> do
+      envConfigPathMb <- lookupEnv "COFFER_CONFIG"
+      pure $ fromMaybe "config.toml" envConfigPathMb
+
 main :: IO ()
 main = do
   options <- execParser parserInfo
   let someCommand = oSomeCommand options
-  let configPath = oConfigPath options
+  configPath <- getConfigPath options
   config <- readConfig configPath
   runBackendIO do
     case someCommand of

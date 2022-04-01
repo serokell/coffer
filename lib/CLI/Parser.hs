@@ -51,15 +51,17 @@ parser = Options
   <$> configPathParser
   <*> commandParser
   where
-    configPathParser :: Parser FilePath
-    configPathParser =
+    configPathParser :: Parser (Maybe FilePath)
+    configPathParser = optional $
       option str $ mconcat
         [ long "config"
         , short 'c'
         , metavar "CONFIG"
-        , value "./config.toml"
-        , showDefault
-        , help "Specify config file path"
+        , help $ unlines
+            [ "Specify config file path."
+            , "When this option is not set, the 'COFFER_CONFIG' environment variable will be used."
+            , "When neither is set, it will default to 'config.toml'."
+            ]
         ]
 
 commandParser :: Parser SomeCommand
