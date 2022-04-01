@@ -47,7 +47,20 @@ parserInfo =
     <> header "TODO: coffer description goes here"
 
 parser :: Parser Options
-parser = Options <$> commandParser
+parser = Options
+  <$> configPathParser
+  <*> commandParser
+  where
+    configPathParser :: Parser FilePath
+    configPathParser =
+      option str $ mconcat
+        [ long "config"
+        , short 'c'
+        , metavar "CONFIG"
+        , value "./config.toml"
+        , showDefault
+        , help "Specify config file path"
+        ]
 
 commandParser :: Parser SomeCommand
 commandParser =
