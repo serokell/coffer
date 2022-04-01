@@ -186,3 +186,24 @@ EOF
 Attempted to create the directory '/a/b' but an entry exists at that path.
 EOF
 }
+
+@test "create entry on specified backend" {
+  coffer create /first
+
+  run coffer create second#/second
+
+  assert_success
+  assert_output "[SUCCESS] Entry created at 'second#/second'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  first - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  second - [2000-01-01 01:01:01]
+EOF
+}

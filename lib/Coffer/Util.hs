@@ -4,10 +4,15 @@
 
 module Coffer.Util
   ( catchAndReturn
+  , didimatch
   ) where
 
 import Polysemy ( Sem )
 import Polysemy.Error ( runError, Error )
+import Toml (TomlCodec)
+import qualified Toml
+import Validation (Validation(Success, Failure))
+import Data.Text (Text)
 
 ----------------------------------------------------------------------------
 -- Polysemy helpers
@@ -18,3 +23,26 @@ import Polysemy.Error ( runError, Error )
 catchAndReturn :: forall e r. Sem (Error e ': r) e -> Sem r e
 catchAndReturn action =
   either id id <$> runError @e action
+
+----------------------------------------------------------------------------
+-- Tomland helpers
+----------------------------------------------------------------------------
+
+{-# INLINE didimatch #-}
+didimatch
+  :: (b -> Either Text a)  -- ^ Mapper for consumer
+  -> (a -> Either Text b)  -- ^ Mapper for producer
+  -> TomlCodec a  -- ^ Source 'Codec' object
+  -> TomlCodec b  -- ^ Target 'Codec' object
+didimatch matchB matchA codec = Toml.Codec
+    { Toml.codecRead = \t -> case Toml.codecRead codec t of
+        Success a ->
+          case matchA a of
+            Left err -> Failure [Toml.ParseError $ Toml.TomlParseError err]
+            Right b -> Success b
+        Failure b -> Failure b
+    , Toml.codecWrite = \b -> do
+        a <- Toml.eitherToTomlState $ matchB b
+        a' <- Toml.codecWrite codec a
+        Toml.eitherToTomlState $ matchA a'
+    }

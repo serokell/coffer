@@ -84,3 +84,31 @@ EOF
       d - [2000-01-01 01:01:01]
 EOF
 }
+
+@test "delete an entry on specified backend" {
+  coffer create /a/b
+  coffer create /a/c
+
+  coffer create second#/a/b
+  coffer create second#/a/c
+
+  run coffer delete second#/a/b
+
+  assert_success
+  assert_output "[SUCCESS] Deleted '/a/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+    c - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  a/
+    c - [2000-01-01 01:01:01]
+EOF
+}

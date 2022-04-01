@@ -9,7 +9,7 @@ setup () {
   cd "$( dirname "$BATS_TEST_FILENAME")"
 
   # delete all existing entries
-  coffer delete -r / || true
+  (coffer delete -r / && coffer delete -r second#/) || true
 }
 
 # `cleanOutput <cmd>` will run the given command and then scrub dates out of the output.

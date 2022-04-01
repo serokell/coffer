@@ -48,3 +48,28 @@ EOF
   assert_failure
   assert_output "[ERROR] Entry not found at '/a/b'."
 }
+
+@test "delete field on specified backend" {
+  coffer create /a/b --field test=test1
+  coffer create second#/a/b --field test=test2
+
+  run coffer delete-field second#/a/b test
+
+  assert_success
+  assert_output "[SUCCESS] Deleted field 'test' from 'second#/a/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+      test: test1 [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+}

@@ -13,11 +13,11 @@ import System.Exit (die, exitFailure)
 import Fmt
 import qualified Data.Text.IO as TIO
 import qualified Toml
-import qualified Data.HashMap.Strict as HS
 
 import CLI.Parser
 import CLI.Types
 import CLI.PrettyPrint
+import Backend.Interpreter
 import Error
 import Backend.Commands as Commands
 import Backend
@@ -27,12 +27,11 @@ import qualified Coffer.Directory as Dir
 import Config (configCodec, Config (..))
 import Entry (path, Entry)
 
-runBackend
-  :: SomeBackend
-  -> Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a
+runBackendIO
+  :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a
   -> IO a
-runBackend (SomeBackend backend) action =
-  _runEffect backend action
+runBackendIO action =
+  runBackend action
     & errorToIOFinal @CofferError
     & embedToFinal @IO
     & runFinal
@@ -55,112 +54,109 @@ readConfig = do
 main :: IO ()
 main = do
   config <- readConfig
-  let mainBackendName = mainBackend config
-      mBackend = HS.lookup mainBackendName (backends config)
-  case mBackend of
-    Nothing -> TIO.putStrLn ("Can't find backend '" <> mainBackendName <> "' in 'config.toml'") >> exitFailure
-    Just packedBackend -> do
-      runBackend packedBackend do
-        embed (execParser parserInfo) >>= \case
-          SomeCommand cmd@CmdView{} -> do
-            runCommand cmd >>= \case
-              VRDirectory dir -> pprint $ buildDirectory dir
-              VREntry entry -> pprint $ buildDirectory $ Dir.singleton entry
-              VRField _ field -> pprint $ build $ field ^. E.value
-              VRPathNotFound path -> pathNotFound path
-              VRDirectoryNoFieldMatch path fieldName -> printError $
-                "There are no entries at path '" +| path |+ "' with the field '" +| fieldName |+ "'."
-              VREntryNoFieldMatch path fieldName -> printError $
-                "The entry at '" +| path |+ "' does not have a field '" +| fieldName |+ "'."
+  options <- execParser parserInfo
+  let someCommand = oSomeCommand options
+  runBackendIO do
+    case someCommand of
+      SomeCommand cmd@CmdView{} -> do
+        runCommand config cmd >>= \case
+          VRDirectory dir -> pprint $ buildDirectory dir
+          VREntry entry -> pprint $ buildDirectory $ Dir.singleton entry
+          VRField _ field -> pprint $ build $ field ^. E.value
+          VRPathNotFound path -> pathNotFound path
+          VRDirectoryNoFieldMatch path fieldName -> printError $
+            "There are no entries at path '" +| path |+ "' with the field '" +| fieldName |+ "'."
+          VREntryNoFieldMatch path fieldName -> printError $
+            "The entry at '" +| path |+ "' does not have a field '" +| fieldName |+ "'."
 
-          SomeCommand cmd@(CmdCreate opts) -> do
-            runCommand cmd >>= \case
-              CRSuccess _ -> printSuccess $ "Entry created at '"  +| coPath opts |+ "'."
-              CRCreateError error -> do
-                let errorMsg = createErrorToBuilder error
-                printError $ unlinesF @_ @Builder $ "The entry cannot be created:" : "" : [errorMsg]
+      SomeCommand cmd@(CmdCreate opts) -> do
+        runCommand config cmd >>= \case
+          CRSuccess _ -> printSuccess $ "Entry created at '"  +| coQPath opts |+ "'."
+          CRCreateError error -> do
+            let errorMsg = createErrorToBuilder error
+            printError $ unlinesF @_ @Builder $ "The entry cannot be created:" : "" : [errorMsg]
 
-          SomeCommand cmd@(CmdSetField opts) -> do
-            let fieldName = sfoFieldName opts
-            runCommand cmd >>= \case
-              SFREntryNotFound path -> entryNotFound path
-              SFRMissingFieldContents path -> printError $ unlinesF @_ @Builder
-                [ "The entry at '" +| path |+ "' does not yet have a field '" +| fieldName |+ "'."
-                , "In order to create a new field, please include the 'FIELDCONTENTS' argument."
-                ]
-              SFRSuccess entry -> do
-                let field = entry ^?! E.fields . ix fieldName
-                printSuccess $
-                  "Set field '" +| fieldName |+
-                  "' to '" +| (field ^. E.value) |+
-                  "' (" +| (field ^. E.visibility) |+
-                  ") at '" +| entry ^. E.path |+ "'."
+      SomeCommand cmd@(CmdSetField opts) -> do
+        let fieldName = sfoFieldName opts
+        runCommand config cmd >>= \case
+          SFREntryNotFound path -> entryNotFound path
+          SFRMissingFieldContents path -> printError $ unlinesF @_ @Builder
+            [ "The entry at '" +| path |+ "' does not yet have a field '" +| fieldName |+ "'."
+            , "In order to create a new field, please include the 'FIELDCONTENTS' argument."
+            ]
+          SFRSuccess entry -> do
+            let field = entry ^?! E.fields . ix fieldName
+            printSuccess $
+              "Set field '" +| fieldName |+
+              "' to '" +| (field ^. E.value) |+
+              "' (" +| (field ^. E.visibility) |+
+              ") at '" +| entry ^. E.path |+ "'."
 
-          SomeCommand cmd@(CmdDeleteField opts) -> do
-            runCommand cmd >>= \case
-              DFREntryNotFound path -> entryNotFound path
-              DFRFieldNotFound fieldName -> printError $
-                "Entry does not have a field with name '" +| fieldName |+ "'."
-              DFRSuccess _ -> printSuccess $
-                "Deleted field '" +| dfoFieldName opts |+ "' from '" +| dfoPath opts |+ "'."
+      SomeCommand cmd@(CmdDeleteField opts) -> do
+        runCommand config cmd >>= \case
+          DFREntryNotFound path -> entryNotFound path
+          DFRFieldNotFound fieldName -> printError $
+            "Entry does not have a field with name '" +| fieldName |+ "'."
+          DFRSuccess _ -> printSuccess $
+            "Deleted field '" +| dfoFieldName opts |+ "' from '" +| dfoQPath opts |+ "'."
 
-          SomeCommand cmd@CmdFind{} -> do
-            runCommand cmd >>= \case
-              Just dir -> pprint $ buildDirectory dir
-              Nothing -> printError "No match found."
+      SomeCommand cmd@CmdFind{} -> do
+        runCommand config cmd >>= \case
+          Just dir -> pprint $ buildDirectory dir
+          Nothing -> printError "No match found."
 
-          SomeCommand cmd@(CmdRename opts) -> do
-            runCommand cmd >>= \case
-              CPRSuccess copiedPaths -> do
-                when (roDryRun opts) do
-                  pprint "These actions would be done:"
-                forM_ copiedPaths \(from, to) ->
-                  printSuccess $ "Renamed '" +| from |+ "' to '" +| to |+ "'."
-              CPRPathNotFound path -> pathNotFound path
-              CPRMissingEntryName -> printError
-                "The destination path is not a valid entry path. Please specify the new name of the entry."
-              CPRCreateErrors errors -> do
-                errorMsgs <- buildErrorMessages errors
-                printError $ unlinesF @_ @Builder $ "The following entries cannot be renamed:" : "" : errorMsgs
+      SomeCommand cmd@(CmdRename opts) -> do
+        runCommand config cmd >>= \case
+          CPRSuccess copiedPaths -> do
+            when (roDryRun opts) do
+              pprint "These actions would be done:"
+            forM_ copiedPaths \(from, to) ->
+              printSuccess $ "Renamed '" +| from |+ "' to '" +| to |+ "'."
+          CPRPathNotFound path -> pathNotFound path
+          CPRMissingEntryName -> printError
+            "The destination path is not a valid entry path. Please specify the new name of the entry."
+          CPRCreateErrors errors -> do
+            errorMsgs <- buildErrorMessages errors
+            printError $ unlinesF @_ @Builder $ "The following entries cannot be renamed:" : "" : errorMsgs
 
-          SomeCommand cmd@(CmdCopy opts) -> do
-            runCommand cmd >>= \case
-              CPRSuccess copiedPaths -> do
-                when (cpoDryRun opts) do
-                  pprint "These actions would be done:"
-                forM_ copiedPaths \(from, to) ->
-                  printSuccess $ "Copied '" +| from |+ "' to '" +| to |+ "'."
-              CPRPathNotFound path -> pathNotFound path
-              CPRMissingEntryName -> printError
-                "The destination path is not a valid entry path. Please specify the new name of the entry."
-              CPRCreateErrors errors -> do
-                errorMsgs <- buildErrorMessages errors
-                printError $ unlinesF @_ @Builder $ "The following entries cannot be copied:" : "" : errorMsgs
+      SomeCommand cmd@(CmdCopy opts) -> do
+        runCommand config cmd >>= \case
+          CPRSuccess copiedPaths -> do
+            when (cpoDryRun opts) do
+              pprint "These actions would be done:"
+            forM_ copiedPaths \(from, to) ->
+              printSuccess $ "Copied '" +| from |+ "' to '" +| to |+ "'."
+          CPRPathNotFound path -> pathNotFound path
+          CPRMissingEntryName -> printError
+            "The destination path is not a valid entry path. Please specify the new name of the entry."
+          CPRCreateErrors errors -> do
+            errorMsgs <- buildErrorMessages errors
+            printError $ unlinesF @_ @Builder $ "The following entries cannot be copied:" : "" : errorMsgs
 
-          SomeCommand cmd@(CmdDelete opts) -> do
-            runCommand cmd >>= \case
-              DRPathNotFound path -> pathNotFound path
-              DRDirectoryFound path -> printError $ unlinesF @_ @Builder
-                [ "The path '" +| path |+ "' is a directory."
-                , "Use '--recursive' or '-r' to recursively delete all entries."
-                ]
-              DRSuccess paths -> do
-                when (doDryRun opts) do
-                  pprint "These actions would be done:"
-                forM_ paths \path ->
-                  printSuccess $ "Deleted '" +| path |+ "'."
+      SomeCommand cmd@(CmdDelete opts) -> do
+        runCommand config cmd >>= \case
+          DRPathNotFound path -> pathNotFound path
+          DRDirectoryFound path -> printError $ unlinesF @_ @Builder
+            [ "The path '" +| path |+ "' is a directory."
+            , "Use '--recursive' or '-r' to recursively delete all entries."
+            ]
+          DRSuccess paths -> do
+            when (doDryRun opts) do
+              pprint "These actions would be done:"
+            forM_ paths \path ->
+              printSuccess $ "Deleted '" +| path |+ "'."
 
-          SomeCommand cmd@(CmdTag opts) -> do
-            runCommand cmd >>= \case
-              TREntryNotFound path -> entryNotFound path
-              TRSuccess _ ->
-                if toDelete opts
-                  then printSuccess $ "Removed tag '" +| toTagName opts |+ "' from '" +| toPath opts |+ "'."
-                  else printSuccess $ "Added tag '" +| toTagName opts |+ "' to '" +| toPath opts |+ "'."
-              TRTagNotFound tag -> printError $
-                "Entry does not have the tag '" +| tag |+ "'."
-              TRDuplicateTag tag -> printError $
-                "Entry already has the tag '" +| tag |+ "'."
+      SomeCommand cmd@(CmdTag opts) -> do
+        runCommand config cmd >>= \case
+          TREntryNotFound path -> entryNotFound path
+          TRSuccess _ ->
+            if toDelete opts
+              then printSuccess $ "Removed tag '" +| toTagName opts |+ "' from '" +| toQPath opts |+ "'."
+              else printSuccess $ "Added tag '" +| toTagName opts |+ "' to '" +| toQPath opts |+ "'."
+          TRTagNotFound tag -> printError $
+            "Entry does not have the tag '" +| tag |+ "'."
+          TRDuplicateTag tag -> printError $
+            "Entry already has the tag '" +| tag |+ "'."
     where
       -- | Pretty-print a message.
       pprint :: Member (Embed IO) r => Builder -> Sem r ()

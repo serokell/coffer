@@ -23,38 +23,42 @@ import qualified Data.List.NonEmpty as NE
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret)
+import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret, SomeBackend)
 import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path)
 import qualified Entry as E
 import Coffer.Directory (Directory)
 import qualified Coffer.Directory as Dir
-import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, EntryPath, pathSegments)
+import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, EntryPath, pathSegments, QualifiedPath (QualifiedPath, qpPath, qpBackendName))
 import qualified Coffer.Path as Path
 import Error (CofferError(..))
 import Coffer.Util (catchAndReturn)
 import Data.Either (rights)
 import Validation (Validation (Success, Failure))
 import Data.Bifunctor (Bifunctor (first))
+import Config (Config (mainBackend, backends))
+import Data.HashMap.Strict ((!?))
+import BackendName (BackendName)
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
-  => Command res -> Sem r res
-runCommand = \case
-  CmdView opts -> catchAndReturn $ viewCmd opts
-  CmdCreate opts -> catchAndReturn $ createCmd opts
-  CmdSetField opts -> catchAndReturn $ setFieldCmd opts
-  CmdDeleteField opts -> deleteFieldCmd opts
-  CmdFind opts -> findCmd opts
-  CmdRename opts -> catchAndReturn $ renameCmd opts
-  CmdCopy opts -> catchAndReturn $ copyCmd opts
-  CmdDelete opts -> catchAndReturn $ deleteCmd opts
-  CmdTag opts -> catchAndReturn $ tagCmd opts
+  => Config -> Command res -> Sem r res
+runCommand config = \case
+  CmdView opts -> catchAndReturn $ viewCmd config opts
+  CmdCreate opts -> catchAndReturn $ createCmd config opts
+  CmdSetField opts -> catchAndReturn $ setFieldCmd config opts
+  CmdDeleteField opts -> deleteFieldCmd config opts
+  CmdFind opts -> findCmd config opts
+  CmdRename opts -> catchAndReturn $ renameCmd config opts
+  CmdCopy opts -> catchAndReturn $ copyCmd config opts
+  CmdDelete opts -> catchAndReturn $ deleteCmd config opts
+  CmdTag opts -> catchAndReturn $ tagCmd config opts
 
 viewCmd
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error ViewResult) r)
-  => ViewOptions -> Sem r ViewResult
-viewCmd (ViewOptions path fieldNameMb) = do
-  getEntryOrDirThrow VRPathNotFound path >>= \case
+  => Config -> ViewOptions -> Sem r ViewResult
+viewCmd config (ViewOptions (QualifiedPath backendNameMb path) fieldNameMb) = do
+  backend <- getBackend config backendNameMb
+  getEntryOrDirThrow backend VRPathNotFound path >>= \case
     Right dir -> do
       case fieldNameMb of
         Nothing -> pure $ VRDirectory dir
@@ -78,9 +82,11 @@ viewCmd (ViewOptions path fieldNameMb) = do
             Nothing -> pure $ VREntryNoFieldMatch (entry ^. E.path) fieldName
 
 createCmd
-  :: forall r. (Member BackendEffect r, Member (Embed IO) r, Member (Error CreateResult) r)
-  => CreateOptions -> Sem r CreateResult
-createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
+  :: forall r
+   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error CreateResult) r)
+  => Config -> CreateOptions -> Sem r CreateResult
+createCmd config (CreateOptions (QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields) = do
+  backend <- getBackend config backendNameMb
   nowUtc <- embed getCurrentTime
   let
     mkField :: FieldVisibility -> FieldInfo -> (FieldKey, Field)
@@ -92,23 +98,24 @@ createCmd (CreateOptions entryPath _edit force tags fields privateFields) = do
       & E.fields .~ HashMap.fromList allFields
       & E.tags .~ tags
 
-  checkCreateEntry force entry >>= \case
+  checkCreateEntry backend force entry >>= \case
     Failure error -> throw $ CRCreateError error
     Success entry -> do
-      void $ writeSecret entry
+      void $ writeSecret backend entry
       pure $ CRSuccess entry
 
 setFieldCmd
   :: forall r
-   . (Member BackendEffect r, Member (Embed IO) r, Member (Error SetFieldResult) r)
-  => SetFieldOptions -> Sem r SetFieldResult
-setFieldCmd (SetFieldOptions entryPath fieldName fieldContentsMb visibilityMb) = do
-  readSecret entryPath >>= \case
+   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error SetFieldResult) r)
+  => Config -> SetFieldOptions -> Sem r SetFieldResult
+setFieldCmd config (SetFieldOptions (QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb) = do
+  backend <- getBackend config backendNameMb
+  readSecret backend entryPath >>= \case
     Nothing -> pure $ SFREntryNotFound entryPath
     Just entry -> do
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateOrInsert nowUtc entry
-      void $ writeSecret updatedEntry
+      void $ writeSecret backend updatedEntry
       pure $ SFRSuccess updatedEntry
   where
     updateOrInsert :: UTCTime -> Entry -> Sem r Entry
@@ -135,10 +142,11 @@ setFieldCmd (SetFieldOptions entryPath fieldName fieldContentsMb visibilityMb) =
           Nothing -> throw $ SFRMissingFieldContents entryPath
 
 deleteFieldCmd
-  :: (Member BackendEffect r, Member (Embed IO) r)
-  => DeleteFieldOptions -> Sem r DeleteFieldResult
-deleteFieldCmd (DeleteFieldOptions path fieldName) = do
-  readSecret path >>= \case
+  :: (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r)
+  => Config -> DeleteFieldOptions -> Sem r DeleteFieldResult
+deleteFieldCmd config (DeleteFieldOptions (QualifiedPath backendNameMb path) fieldName) = do
+  backend <- getBackend config backendNameMb
+  readSecret backend path >>= \case
     Nothing -> pure $ DFREntryNotFound path
     Just entry -> do
       case entry ^. fields . at fieldName of
@@ -148,11 +156,13 @@ deleteFieldCmd (DeleteFieldOptions path fieldName) = do
           let newEntry = entry
                 & fields . at fieldName .~ Nothing
                 & dateModified .~ nowUtc
-          void $ writeSecret newEntry
+          void $ writeSecret backend newEntry
           pure $ DFRSuccess newEntry
 
-findCmd :: (Member BackendEffect r, Member (Error CofferError) r) => FindOptions -> Sem r (Maybe Directory)
-findCmd (FindOptions pathMb textMb sortMb filters filterFields) = do
+findCmd :: (Member BackendEffect r, Member (Error CofferError) r) => Config -> FindOptions -> Sem r (Maybe Directory)
+findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
+  let backendNameMb = qPathMb >>= qpBackendName
+  backend <- getBackend config backendNameMb
   let
     filterByPath :: Entry -> Bool
     filterByPath e =
@@ -180,8 +190,8 @@ findCmd (FindOptions pathMb textMb sortMb filters filterFields) = do
             FilterFieldByValue substr -> substr `T.isInfixOf` (field ^. value)
             FilterFieldByDate op date -> matchDate op date (field ^. dateModified)
 
-  let path = fromMaybe mempty pathMb
-  dir <- getEntryOrDir path <&> \case
+  let path = maybe mempty qpPath qPathMb
+  dir <- getEntryOrDir backend path <&> \case
     Just (Right dir) -> dir
     Just (Left entry) -> Dir.singleton entry
     Nothing -> Dir.emptyDir
@@ -246,12 +256,15 @@ renameCmd
      , Member (Error CofferError) r
      , Member (Error RenameResult) r
      )
-  => RenameOptions -> Sem r RenameResult
-renameCmd (RenameOptions dryRun oldPath newPath force) = do
-  operations <- buildCopyOperations oldPath newPath force
+  => Config -> RenameOptions -> Sem r RenameResult
+renameCmd config (RenameOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force) = do
+  oldBackend <- getBackend config oldBackendNameMb
+  newBackend <- getBackend config newBackendNameMb
+  operations <- buildCopyOperations oldBackend newBackend oldPath newPath force
 
   unless dryRun do
-    runCopyOperations operations
+    runCopyOperations newBackend operations
+
   -- we don't want to delete clashed entries if renaming is forced.
   let pathsToDelete =
         flip filter operations \(CopyOperation old _) ->
@@ -260,7 +273,8 @@ renameCmd (RenameOptions dryRun oldPath newPath force) = do
   -- If directory/entry was successfully copied, then we can delete old directory/entry without delete errors.
   unless dryRun do
     forM_ pathsToDelete \(CopyOperation old _) -> do
-      void $ catchAndReturn $ deleteCmd (DeleteOptions False (Path.entryPathAsPath (old ^. path)) False)
+      let qPath = QualifiedPath oldBackendNameMb (Path.entryPathAsPath (old ^. path))
+      void $ catchAndReturn $ deleteCmd config (DeleteOptions dryRun qPath False)
 
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
@@ -280,9 +294,9 @@ buildCopyOperations
      , Member (Error CofferError) r
      , Member (Error CopyResult) r
      )
-  => Path -> Path -> Bool -> Sem r [CopyOperation]
-buildCopyOperations oldPath newPath force = do
-  entryOrDir <- getEntryOrDirThrow CPRPathNotFound oldPath
+  => SomeBackend -> SomeBackend -> Path -> Path -> Bool -> Sem r [CopyOperation]
+buildCopyOperations oldBackend newBackend oldPath newPath force = do
+  entryOrDir <- getEntryOrDirThrow oldBackend CPRPathNotFound oldPath
 
   -- Build a list of operations to perform.
   nowUtc <- embed getCurrentTime
@@ -291,7 +305,7 @@ buildCopyOperations oldPath newPath force = do
       Left entry -> copyEntry entry
       Right dir -> copyDir dir
 
-  sequenceA <$> forM operations validateCopyOperation >>= \case
+  sequenceA <$> forM operations (validateCopyOperation newBackend) >>= \case
     Failure createErrors -> throw $ CPRCreateErrors createErrors
     Success _ -> pure operations
 
@@ -324,14 +338,14 @@ buildCopyOperations oldPath newPath force = do
       CopyOperation old (new & dateModified .~ nowUtc)
 
     -- | Performs a check on `CopyOperation` and returns @Failure@ if any of checks fail.
-    validateCopyOperation :: CopyOperation -> Sem r (Validation [(EntryPath, CreateError)] Entry)
-    validateCopyOperation (CopyOperation old new) =
-      checkCreateEntry force new <&> first \err -> [(old ^. path, err)]
+    validateCopyOperation :: SomeBackend -> CopyOperation -> Sem r (Validation [(EntryPath, CreateError)] Entry)
+    validateCopyOperation backend (CopyOperation old new) =
+      checkCreateEntry backend force new <&> first \err -> [(old ^. path, err)]
 
-runCopyOperations :: (Member BackendEffect r) => [CopyOperation] -> Sem r ()
-runCopyOperations operations = do
+runCopyOperations :: (Member BackendEffect r) => SomeBackend -> [CopyOperation] -> Sem r ()
+runCopyOperations backend operations = do
   let newEntries = coNew <$> operations
-  forM_ newEntries writeSecret
+  forM_ newEntries (writeSecret backend)
 
 copyCmd
   :: ( Member BackendEffect r
@@ -339,41 +353,47 @@ copyCmd
      , Member (Error CofferError) r
      , Member (Error CopyResult) r
      )
-  => CopyOptions -> Sem r CopyResult
-copyCmd (CopyOptions dryRun oldPath newPath force) = do
-  operations <- buildCopyOperations oldPath newPath force
+  => Config -> CopyOptions -> Sem r CopyResult
+copyCmd config (CopyOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force) = do
+  oldBackend <- getBackend config oldBackendNameMb
+  newBackend <- getBackend config newBackendNameMb
+  operations <- buildCopyOperations oldBackend newBackend oldPath newPath force
+
   unless dryRun do
-    runCopyOperations operations
+    runCopyOperations newBackend operations
+
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
 deleteCmd
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error DeleteResult) r)
-  => DeleteOptions -> Sem r DeleteResult
-deleteCmd (DeleteOptions dryRun path recursive) = do
-  getEntryOrDirThrow DRPathNotFound path >>= \case
+  => Config -> DeleteOptions -> Sem r DeleteResult
+deleteCmd config (DeleteOptions dryRun (QualifiedPath backendNameMb path) recursive) = do
+  backend <- getBackend config backendNameMb
+  getEntryOrDirThrow backend DRPathNotFound path >>= \case
     Left entry -> do
       unless dryRun do
-        deleteSecret (entry ^. E.path)
+        deleteSecret backend (entry ^. E.path)
       pure $ DRSuccess [entry ^. E.path]
     Right dir
       | recursive -> do
           let entries = Dir.allEntries dir
           unless dryRun do
-            forM_ entries \entry -> deleteSecret (entry ^. E.path)
+            forM_ entries \entry -> deleteSecret backend (entry ^. E.path)
           pure $ DRSuccess $ entries ^.. each . E.path
       | otherwise -> pure $ DRDirectoryFound path
 
 tagCmd
   :: forall r
-   . (Member BackendEffect r, Member (Embed IO) r, Member (Error TagResult) r)
-  => TagOptions -> Sem r TagResult
-tagCmd (TagOptions entryPath tag delete) = do
-  readSecret entryPath >>= \case
+   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error TagResult) r)
+  => Config -> TagOptions -> Sem r TagResult
+tagCmd config (TagOptions (QualifiedPath backendNameMb entryPath) tag delete) = do
+  backend <- getBackend config backendNameMb
+  readSecret backend entryPath >>= \case
     Nothing -> pure $ TREntryNotFound entryPath
     Just entry -> do
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateEntry nowUtc entry
-      void $ writeSecret updatedEntry
+      void $ writeSecret backend updatedEntry
       pure $ TRSuccess updatedEntry
   where
     updateEntry :: UTCTime -> Entry -> Sem r Entry
@@ -398,17 +418,17 @@ tagCmd (TagOptions entryPath tag delete) = do
 ----------------------------------------------------------------------------
 
 -- | Checks if the path points to an existing directory.
-pathIsDirectory :: forall r. Member BackendEffect r => EntryPath -> Sem r Bool
-pathIsDirectory entryPath =
-  listSecrets (Path.entryPathAsPath entryPath) >>= \case
+pathIsDirectory :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r Bool
+pathIsDirectory backend entryPath =
+  listSecrets backend (Path.entryPathAsPath entryPath) >>= \case
     Nothing -> pure False
     Just [] -> pure False
     Just _ -> pure True
 
 -- | Checks if the path points to an existing entry.
-pathIsEntry :: forall r. Member BackendEffect r => EntryPath -> Sem r Bool
-pathIsEntry entryPath =
-  readSecret entryPath <&> \case
+pathIsEntry :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r Bool
+pathIsEntry backend entryPath =
+  readSecret backend entryPath <&> \case
     Nothing -> False
     Just _ -> True
 
@@ -416,9 +436,9 @@ pathIsEntry entryPath =
 -- If the path doesn't exist at all, throws an error.
 getEntryOrDirThrow
   :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error e) r)
-  => (Path -> e) -> Path -> Sem r (Either Entry Directory)
-getEntryOrDirThrow mkError path = do
-  getEntryOrDir path >>= \case
+  => SomeBackend -> (Path -> e) -> Path -> Sem r (Either Entry Directory)
+getEntryOrDirThrow backend mkError path = do
+  getEntryOrDir backend path >>= \case
     Nothing -> throw (mkError path)
     Just entryOrDir -> pure entryOrDir
 
@@ -427,8 +447,8 @@ getEntryOrDirThrow mkError path = do
 getEntryOrDir
   :: forall r
    . (Member BackendEffect r, Member (Error CofferError) r)
-  => Path -> Sem r (Maybe (Either Entry Directory))
-getEntryOrDir path =
+  => SomeBackend -> Path -> Sem r (Maybe (Either Entry Directory))
+getEntryOrDir backend path =
   tryGetEntry path >>= \case
     Just entry -> pure $ Just $ Left entry
     Nothing -> fmap Right <$> tryGetDir path
@@ -438,7 +458,7 @@ getEntryOrDir path =
     tryGetEntry path =
       case Path.pathAsEntryPath path of
         Left _ -> pure Nothing
-        Right entryPath -> readSecret entryPath
+        Right entryPath -> readSecret backend entryPath
 
     -- | Checks if the given path points to a directory.
     -- If so, returns all entries under the given directory and subdirectories.
@@ -452,7 +472,7 @@ getEntryOrDir path =
       where
         go :: Path -> StateT Directory (Sem r) ()
         go rootPath = do
-          secrets <- lift $ fromMaybe [] <$> listSecrets rootPath
+          secrets <- lift $ fromMaybe [] <$> listSecrets backend rootPath
           -- TODO: run in parallel
           forM_ secrets \secret -> do
             -- We need to find out whether `secret` is a directory name or an entry name.
@@ -465,7 +485,7 @@ getEntryOrDir path =
             -- Otherwise, it's a directory name (and `mkPath` should succeed).
             case (mkPathSegment secret, mkPath secret) of
               (Right entryName, _) -> do
-                entry <- lift $ readSecret (Path.appendEntryName rootPath entryName)
+                entry <- lift $ readSecret backend (Path.appendEntryName rootPath entryName)
                 case entry of
                   Just entry -> modify' (Dir.insertEntry entry)
                   Nothing -> pure ()
@@ -482,8 +502,8 @@ getEntryOrDir path =
 --
 -- Note: the root path @/@ cannot possibly be occupied by an entry,
 -- therefore we skip the check for that path.
-getEntriesInEntryPath :: forall r. Member BackendEffect r => EntryPath -> Sem r [EntryPath]
-getEntriesInEntryPath entryPath = do
+getEntriesInEntryPath :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r [EntryPath]
+getEntriesInEntryPath backend entryPath = do
   let parentDirsExceptRoot = entryPath
         & Path.entryPathParentDirs
         & NE.toList
@@ -491,18 +511,18 @@ getEntriesInEntryPath entryPath = do
         <&> Path.pathAsEntryPath
         & rights
 
-  filterM pathIsEntry parentDirsExceptRoot
+  filterM (pathIsEntry backend) parentDirsExceptRoot
 
 checkCreateEntry
   :: forall r
    . (Member BackendEffect r)
-  => Bool -> Entry -> Sem r (Validation CreateError Entry)
-checkCreateEntry force entry = catchAndReturn act
+  => SomeBackend -> Bool -> Entry -> Sem r (Validation CreateError Entry)
+checkCreateEntry backend force entry = catchAndReturn act
   where
     act :: Sem (Error (Validation CreateError Entry) ': r) (Validation CreateError Entry)
     act = do
       let entryPath = entry ^. path
-      whenM (pathIsDirectory entryPath) do
+      whenM (pathIsDirectory backend entryPath) do
         throw $ Failure @_ @Entry (CEDestinationIsDirectory entry)
 
       -- When attempting to create an entry at, e.g., @/a/b/c@, the directories
@@ -510,12 +530,20 @@ checkCreateEntry force entry = catchAndReturn act
       --
       -- Checks whether those paths are already
       -- occupied by existing entries and, if so, fails.
-      getEntriesInEntryPath entryPath >>= \case
+      getEntriesInEntryPath backend entryPath >>= \case
         (clashed : _) -> throw $ Failure @_ @Entry (CEParentDirectoryIsEntry (entry, clashed))
         [] -> pure ()
 
       when (not force) do
-        whenM (pathIsEntry entryPath) do
+        whenM (pathIsEntry backend entryPath) do
           throw $ Failure @_ @Entry (CEEntryAlreadyExists entry)
 
       pure $ Success entry
+
+getBackend :: forall r. Member (Error CofferError) r => Config -> Maybe BackendName -> Sem r SomeBackend
+getBackend config backendNameMb = do
+  let backendName = fromMaybe (mainBackend config) backendNameMb
+  let backendsHashMap = backends config
+  case backendsHashMap !? backendName of
+    Just backend -> pure backend
+    Nothing -> throw $ BackendNotFound backendName
