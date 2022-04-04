@@ -28,6 +28,7 @@ clean:
 #   * make bats
 #   * make bats FILTER="test name"
 bats:
+	git submodule update --init --recursive
 	./scripts/run-bats-tests.sh $(if $(FILTER),"$(FILTER)",)
 
 all:

@@ -22,6 +22,14 @@ steps:
       - nix-build ci.nix -A tests
       - ./result/bin/test
 
+  - label: golden tests
+    depends_on: build
+    commands:
+      - export PATH=$(nix-build ci.nix -A project.coffer.components.exes.coffer --no-out-link)/bin:$PATH
+      - nix run
+          -f ci.nix pkgs.vault pkgs.bats
+          -c ./scripts/run-bats-tests.sh
+
   - label: haddock
     depends_on: build
     command: nix-build ci.nix -A haddock
