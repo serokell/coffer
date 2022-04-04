@@ -99,7 +99,6 @@ library
     , fmt
     , hashable
     , http-client
-    , http-client-tls
     , http-types
     , lens
     , lens-aeson
