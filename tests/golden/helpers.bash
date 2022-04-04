@@ -8,6 +8,8 @@ setup () {
   # change working directory to the location of the running `bats` suite.
   cd "$( dirname "$BATS_TEST_FILENAME")"
 
+  export COFFER_CONFIG="../default-config.toml"
+
   # delete all existing entries
   (coffer delete -r / && coffer delete -r second#/) || true
 }

@@ -13,7 +13,7 @@ import Coffer.Path (Path, EntryPath, QualifiedPath)
 import Data.Set (Set)
 
 data Options = Options
-  { oConfigPath :: FilePath
+  { oConfigPathMb :: Maybe FilePath
   , oSomeCommand :: SomeCommand
   }
   deriving stock Show
