@@ -29,13 +29,13 @@ import Config (configCodec, Config (..))
 import Entry (path, Entry)
 import System.Environment (lookupEnv)
 import Data.Maybe (fromMaybe)
-import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
+import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Polysemy.Reader (Reader, runReader)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 runBackendIO
-  :: (Manager, Manager)
-  -> Sem '[BackendEffect, Error CofferError, Reader (Manager, Manager), Embed IO, Final IO ] a
+  :: ConnectionManagers
+  -> Sem '[BackendEffect, Error CofferError, Reader ConnectionManagers, Embed IO, Final IO ] a
   -> IO a
 runBackendIO managers action =
   runBackend action
@@ -75,7 +75,7 @@ main = do
   config <- readConfig configPath
   defaultManager <- newManager defaultManagerSettings
   tlsManager <- newManager tlsManagerSettings
-  runBackendIO (defaultManager, tlsManager) do
+  runBackendIO (ConnectionManagers defaultManager tlsManager) do
     case someCommand of
       SomeCommand cmd@CmdView{} -> do
         runCommand config cmd >>= \case

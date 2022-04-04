@@ -11,7 +11,7 @@ import qualified Entry                        as E
 import qualified Backend.Vault.Kv.Internal    as I
 
 import           Error                        (CofferError (..))
-import           Backend                      (Backend (..), Effects)
+import           Backend                      (Backend (..), Effects, ConnectionManagers (cmDefaultManager, cmTlsManager))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
@@ -88,12 +88,12 @@ makeLensesWith abbreviatedFields ''CofferSpecials
 
 getEnv :: Effects r => VaultKvBackend -> Sem r ClientEnv
 getEnv backend = do
-  (defaultManager, tlsManager) <- ask
+  connectionManagers <- ask
   case url of
     (BaseUrl Http _ _ _) -> do
-      pure $ mkClientEnv defaultManager url
+      pure $ mkClientEnv (cmDefaultManager connectionManagers) url
     (BaseUrl Https _ _ _) -> do
-      pure $ mkClientEnv tlsManager url
+      pure $ mkClientEnv (cmTlsManager connectionManagers) url
   where
     url = vbAddress backend
 

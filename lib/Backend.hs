@@ -5,6 +5,7 @@
 module Backend
   ( BackendEffect (..), readSecret, writeSecret, listSecrets, deleteSecret
   , Backend (..)
+  , ConnectionManagers (..)
   , SomeBackend (..)
   , Effects
   )
@@ -23,7 +24,12 @@ import BackendName (BackendName)
 import Network.HTTP.Client (Manager)
 import Polysemy.Reader (Reader)
 
-type Effects r = (Member (Embed IO) r, Member (Reader (Manager, Manager)) r, Member (Error CofferError) r)
+data ConnectionManagers = ConnectionManagers
+  { cmDefaultManager :: Manager
+  , cmTlsManager     :: Manager
+  }
+
+type Effects r = (Member (Embed IO) r, Member (Reader ConnectionManagers) r, Member (Error CofferError) r)
 
 class Show a => Backend a where
   _name :: a -> BackendName
