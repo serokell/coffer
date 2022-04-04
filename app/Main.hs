@@ -29,16 +29,18 @@ import Config (configCodec, Config (..))
 import Entry (path, Entry)
 import System.Environment (lookupEnv)
 import Data.Maybe (fromMaybe)
-import Polysemy.State (State, evalState)
-import Network.HTTP.Client (Manager)
+import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
+import Polysemy.Reader (Reader, runReader)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 runBackendIO
-  :: Sem '[BackendEffect, Error CofferError, State (Maybe Manager), Embed IO, Final IO ] a
+  :: (Manager, Manager)
+  -> Sem '[BackendEffect, Error CofferError, Reader (Manager, Manager), Embed IO, Final IO ] a
   -> IO a
-runBackendIO action =
+runBackendIO managers action =
   runBackend action
     & errorToIOFinal @CofferError
-    & evalState Nothing
+    & runReader managers
     & embedToFinal @IO
     & runFinal
     >>= \case
@@ -71,7 +73,9 @@ main = do
   let someCommand = oSomeCommand options
   configPath <- getConfigPath options
   config <- readConfig configPath
-  runBackendIO do
+  defaultManager <- newManager defaultManagerSettings
+  tlsManager <- newManager tlsManagerSettings
+  runBackendIO (defaultManager, tlsManager) do
     case someCommand of
       SomeCommand cmd@CmdView{} -> do
         runCommand config cmd >>= \case

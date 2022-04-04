@@ -179,6 +179,7 @@ executable coffer
     , coffer
     , fmt
     , http-client
+    , http-client-tls
     , lens
     , optparse-applicative
     , polysemy

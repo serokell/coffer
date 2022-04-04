@@ -21,9 +21,9 @@ import Polysemy
 import Coffer.Path (EntryPath, Path)
 import BackendName (BackendName)
 import Network.HTTP.Client (Manager)
-import Polysemy.State (State)
+import Polysemy.Reader (Reader)
 
-type Effects r = (Member (Embed IO) r, Member (State (Maybe Manager)) r, Member (Error CofferError) r)
+type Effects r = (Member (Embed IO) r, Member (Reader (Manager, Manager)) r, Member (Error CofferError) r)
 
 class Show a => Backend a where
   _name :: a -> BackendName

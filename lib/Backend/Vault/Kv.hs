@@ -23,8 +23,6 @@ import qualified Toml
 
 import           Control.Monad                (void)
 import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, ClientError (..), parseBaseUrl, showBaseUrl, ClientEnv)
-import           Network.HTTP.Client.TLS      (tlsManagerSettings)
-import           Network.HTTP.Client          (newManager, defaultManagerSettings, Manager, ManagerSettings)
 import           Polysemy.Error               (Error, throw)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
@@ -42,7 +40,7 @@ import Data.Either.Extra (eitherToMaybe, maybeToEither)
 import Data.Text (Text)
 import BackendName (BackendName, backendNameCodec)
 import Coffer.Util (didimatch)
-import Polysemy.State (get, put)
+import Polysemy.Reader (ask)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -88,25 +86,14 @@ data CofferSpecials =
   deriving anyclass (A.ToJSON, A.FromJSON)
 makeLensesWith abbreviatedFields ''CofferSpecials
 
-getManager :: Effects r => ManagerSettings -> Sem r Manager
-getManager settings = do
-  managerMb <- get @(Maybe Manager)
-  case managerMb of
-    Nothing -> do
-      manager <- embed $ newManager settings
-      put (Just manager)
-      pure manager
-    Just manager -> pure manager
-
 getEnv :: Effects r => VaultKvBackend -> Sem r ClientEnv
-getEnv backend =
+getEnv backend = do
+  (defaultManager, tlsManager) <- ask
   case url of
     (BaseUrl Http _ _ _) -> do
-      manager <- getManager defaultManagerSettings
-      pure $ mkClientEnv manager url
+      pure $ mkClientEnv defaultManager url
     (BaseUrl Https _ _ _) -> do
-      manager <- getManager tlsManagerSettings
-      pure $ mkClientEnv manager url
+      pure $ mkClientEnv tlsManager url
   where
     url = vbAddress backend
 
