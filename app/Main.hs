@@ -11,14 +11,13 @@ import CLI.Parser
 import CLI.PrettyPrint
 import CLI.Types
 import Coffer.Directory qualified as Dir
-import Coffer.Path (EntryPath, Path)
+import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
 import Config (Config(..), configCodec)
 import Control.Lens
 import Control.Monad (forM, forM_, when)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Data.Text.IO qualified as TIO
-import Entry (Entry, path)
 import Entry qualified as E
 import Error
 import Fmt
@@ -95,12 +94,14 @@ main = do
             [ "The entry at '" +| path |+ "' does not yet have a field '" +| fieldName |+ "'."
             , "In order to create a new field, please include the 'FIELDCONTENTS' argument."
             ]
-          SFRSuccess entry -> do
+          SFRSuccess qEntry -> do
+            let entry = qpPath qEntry
+            let qPath = view E.path <$> qEntry
             let field = entry ^?! E.fields . ix fieldName
             printSuccess $
               "Set field '" +| fieldName |+
               "' (" +| (field ^. E.visibility) |+
-              ") at '" +| entry ^. E.path |+
+              ") at '" +| qPath |+
               "' to:\n" +| (field ^. E.value) |+ ""
 
       SomeCommand cmd@(CmdDeleteField opts) -> do
@@ -181,32 +182,32 @@ main = do
       printError :: Member (Embed IO) r => Builder -> Sem r ()
       printError msg = embed $ die $ "[ERROR] " <> fmt msg
 
-      entryNotFound :: Member (Embed IO) r => EntryPath -> Sem r ()
+      entryNotFound :: Member (Embed IO) r => QualifiedPath EntryPath -> Sem r ()
       entryNotFound path = printError $ "Entry not found at '" +| path |+ "'."
 
-      pathNotFound :: Member (Embed IO) r => Path -> Sem r ()
+      pathNotFound :: Member (Embed IO) r => QualifiedPath Path -> Sem r ()
       pathNotFound path = printError $ "Entry or directory not found at '" +| path |+ "'."
 
       createErrorToBuilder :: CreateError -> Builder
       createErrorToBuilder = \case
-        CEEntryAlreadyExists entryTo -> unlinesF @_ @Builder
-          [ "An entry already exists at '" +| entryTo ^. path |+ "'."
+        CEEntryAlreadyExists entryPath -> unlinesF @_ @Builder
+          [ "An entry already exists at '" +| entryPath |+ "'."
           , "Use '--force' or '-f' to overwrite existing entries."
           ]
-        CEDestinationIsDirectory entryTo -> "'" +| entryTo ^. path |+ "' is a directory."
+        CEDestinationIsDirectory entryPath -> "'" +| entryPath |+ "' is a directory."
         CEParentDirectoryIsEntry (_, clashed) ->
           "Attempted to create the directory '" +| clashed |+ "' but an entry exists at that path."
 
-      getEntryFromCreateError :: CreateError -> Entry
+      getEntryFromCreateError :: CreateError -> QualifiedPath EntryPath
       getEntryFromCreateError = \case
-        CEParentDirectoryIsEntry (entryTo, _) -> entryTo
-        CEDestinationIsDirectory entryTo -> entryTo
-        CEEntryAlreadyExists entryTo -> entryTo
+        CEParentDirectoryIsEntry (entryPath, _) -> entryPath
+        CEDestinationIsDirectory entryPath -> entryPath
+        CEEntryAlreadyExists entryPath -> entryPath
 
-      buildErrorMessages :: [(EntryPath, CreateError)] -> Sem r [Builder]
+      buildErrorMessages :: [(QualifiedPath EntryPath, CreateError)] -> Sem r [Builder]
       buildErrorMessages errors = do
         forM errors \(from, err) -> do
-          let entryTo = getEntryFromCreateError err
-          let header = "'" +| from |+ "' to '" +| entryTo ^. path |+ "':"
+          let entryPath = getEntryFromCreateError err
+          let header = "'" +| from |+ "' to '" +| entryPath |+ "':"
           let errorMsg = createErrorToBuilder err
           pure $ unlinesF @_ @Builder $ header : [indentF 2 errorMsg]

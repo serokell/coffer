@@ -107,7 +107,7 @@ EOF
 
   assert_success
   assert_output - <<EOF
-[SUCCESS] Set field 'test' (public) at '/a/b' to:
+[SUCCESS] Set field 'test' (public) at 'second#/a/b' to:
 test
 EOF
 

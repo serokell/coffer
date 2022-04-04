@@ -261,7 +261,7 @@ EOF
   run coffer copy /a second#/c
 
   assert_success
-  assert_output "[SUCCESS] Copied '/a/b' to '/c/b'."
+  assert_output "[SUCCESS] Copied '/a/b' to 'second#/c/b'."
 
   run cleanOutput coffer view /
   assert_output - <<EOF

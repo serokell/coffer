@@ -95,7 +95,7 @@ EOF
   run coffer delete second#/a/b
 
   assert_success
-  assert_output "[SUCCESS] Deleted '/a/b'."
+  assert_output "[SUCCESS] Deleted 'second#/a/b'."
 
   run cleanOutput coffer view /
   assert_output - <<EOF

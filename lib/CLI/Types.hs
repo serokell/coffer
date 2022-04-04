@@ -44,45 +44,45 @@ data ViewResult
   = VRDirectory Directory
   | VREntry Entry
   | VRField FieldKey Field
-  | VRPathNotFound Path
-  | VRDirectoryNoFieldMatch Path FieldKey
-  | VREntryNoFieldMatch EntryPath FieldKey
+  | VRPathNotFound (QualifiedPath Path)
+  | VRDirectoryNoFieldMatch (QualifiedPath Path) FieldKey
+  | VREntryNoFieldMatch (QualifiedPath EntryPath) FieldKey
 
 data CreateError
-  = CEParentDirectoryIsEntry (Entry, EntryPath)
-  | CEDestinationIsDirectory Entry
-  | CEEntryAlreadyExists Entry
+  = CEParentDirectoryIsEntry (QualifiedPath EntryPath, QualifiedPath EntryPath)
+  | CEDestinationIsDirectory (QualifiedPath EntryPath)
+  | CEEntryAlreadyExists (QualifiedPath EntryPath)
 
 data CreateResult
   = CRSuccess Entry
   | CRCreateError CreateError
 
 data SetFieldResult
-  = SFRSuccess Entry
-  | SFREntryNotFound EntryPath
-  | SFRMissingFieldContents EntryPath
+  = SFRSuccess (QualifiedPath Entry)
+  | SFREntryNotFound (QualifiedPath EntryPath)
+  | SFRMissingFieldContents (QualifiedPath EntryPath)
 
 data DeleteFieldResult
   = DFRSuccess Entry
-  | DFREntryNotFound EntryPath
+  | DFREntryNotFound (QualifiedPath EntryPath)
   | DFRFieldNotFound FieldKey
 
 type RenameResult = CopyResult
 
 data CopyResult
-  = CPRSuccess [(EntryPath, EntryPath)]
-  | CPRPathNotFound Path
+  = CPRSuccess [(QualifiedPath EntryPath, QualifiedPath EntryPath)]
+  | CPRPathNotFound (QualifiedPath Path)
   | CPRMissingEntryName
-  | CPRCreateErrors [(EntryPath, CreateError)]
+  | CPRCreateErrors [(QualifiedPath EntryPath, CreateError)]
 
 data DeleteResult
-  = DRSuccess [EntryPath]
-  | DRPathNotFound Path
-  | DRDirectoryFound Path
+  = DRSuccess [QualifiedPath EntryPath]
+  | DRPathNotFound (QualifiedPath Path)
+  | DRDirectoryFound (QualifiedPath Path)
 
 data TagResult
   = TRSuccess Entry
-  | TREntryNotFound EntryPath
+  | TREntryNotFound (QualifiedPath EntryPath)
   | TRTagNotFound EntryTag
   | TRDuplicateTag EntryTag
 

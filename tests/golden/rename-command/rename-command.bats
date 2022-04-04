@@ -235,7 +235,7 @@ EOF
   run coffer rename /a second#/c
 
   assert_success
-  assert_output "[SUCCESS] Renamed '/a/b' to '/c/b'."
+  assert_output "[SUCCESS] Renamed '/a/b' to 'second#/c/b'."
 
   run cleanOutput coffer view /
   assert_output - <<EOF
