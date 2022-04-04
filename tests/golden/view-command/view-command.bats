@@ -132,3 +132,30 @@ first
 second
 EOF
 }
+
+@test "view entry with ANSI control sequences" {
+  coffer create /a/b/c --field x="$(echo -e "\x1b[41;1mHi i'm red")"
+  coffer create /a/b/d --field x=y
+
+  run cleanOutput coffer view /
+
+  assert_success
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+        x: $(printf '\x1b[41;1m')Hi i'm red$reset [2000-01-01 01:01:01]
+      d - [2000-01-01 01:01:01]
+        x: y [2000-01-01 01:01:01]
+EOF
+}
+
+@test "view field with ANSI control sequences" {
+  coffer create /a/b/c --field x="$(echo -e "\x1b[41;1mHi i'm red")"
+
+  run coffer view /a/b/c x
+
+  assert_success
+  assert_output "$(printf '\x1b[41;1m')Hi i'm red$reset"
+}

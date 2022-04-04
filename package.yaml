@@ -87,6 +87,7 @@ library:
   source-dirs:      lib
   dependencies:
     - aeson
+    - ansi-terminal
     - containers
     - extra
     - extra

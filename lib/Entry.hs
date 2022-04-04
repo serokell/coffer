@@ -11,6 +11,8 @@ module Entry
   , newFieldKey, newEntryTag, getEntryTag
   , visibility, value, tags, EntryTag
   , FieldVisibility(..)
+  , FieldValue (..)
+  , fieldValue
   )
 where
 
@@ -24,6 +26,8 @@ import qualified Data.Aeson as A
 import Data.Hashable (Hashable)
 import Data.Time (UTCTime)
 import Coffer.Path (EntryPath)
+import System.Console.ANSI (setSGRCode, SGR (Reset))
+import System.Console.ANSI.Codes (csi)
 
 newtype FieldKey = UnsafeFieldKey T.Text
   deriving stock (Show, Eq)
@@ -76,16 +80,31 @@ instance A.FromJSON FieldVisibility where
     "private" -> pure Private
     other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
 
+newtype FieldValue = FieldValue { unFieldValue :: T.Text }
+  deriving stock (Show, Eq, Ord)
+makeLensesFor [("unFieldValue", "fieldValue")] ''FieldValue
+
+-- | User can use ANSI control sequences in field values.
+-- If some ANSI control sequence contain in field value then we append @reset@ ANSI control sequence.
+-- Otherwise, we just return wrapped text.
+-- You can see explanation here (https://github.com/serokell/coffer/issues/48)
+instance Buildable FieldValue where
+  build (FieldValue t) =
+    if T.pack (csi [] "") `T.isInfixOf` t then
+      build t <> build (setSGRCode [Reset])
+    else
+      build t
+
 data Field =
   Field
   { fDateModified :: UTCTime
   , fVisibility :: FieldVisibility
-  , fValue :: T.Text
+  , fValue :: FieldValue
   }
   deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Field
 
-newField :: UTCTime -> T.Text -> Field
+newField :: UTCTime -> FieldValue -> Field
 newField time value =
   Field
   { fDateModified = time

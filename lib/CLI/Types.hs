@@ -7,7 +7,7 @@ module CLI.Types where
 import Data.Text (Text)
 import Data.Time.Compat (Day, UTCTime , Year)
 import Data.Time.Calendar.Month.Compat (Month)
-import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag)
+import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag, FieldValue)
 import Coffer.Directory (Directory)
 import Coffer.Path (Path, EntryPath, QualifiedPath)
 import Data.Set (Set)
@@ -109,7 +109,7 @@ data CreateOptions = CreateOptions
 data SetFieldOptions = SetFieldOptions
   { sfoQPath :: QualifiedPath EntryPath
   , sfoFieldName :: FieldKey
-  , sfoFieldContents :: Maybe Text
+  , sfoFieldContents :: Maybe FieldValue
   , sfoVisibility :: Maybe FieldVisibility
   }
   deriving stock Show
@@ -165,7 +165,7 @@ data TagOptions = TagOptions
 
 data FieldInfo = FieldInfo
   { fiName :: FieldKey
-  , fiContents :: Text
+  , fiContents :: FieldValue
   }
   deriving stock Show
 

@@ -13,7 +13,7 @@ import qualified Data.HashMap.Strict as HS
 import qualified Data.Text as T
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Control.Monad (forM)
-import Entry (Entry)
+import Entry (Entry, FieldValue (FieldValue))
 import Fmt (pretty)
 import qualified Coffer.Path as Path
 import Data.Either.Extra (eitherToMaybe)
@@ -29,7 +29,7 @@ fieldConverter = prism' to from
           A.object
           [ "date_modified" A..= (field ^. E.dateModified)
           , "visibility" A..= (field ^. E.visibility)
-          , "value" A..= (field ^. E.value)
+          , "value" A..= (field ^. E.value . E.fieldValue)
           ]
         from (A.Object o) = do
           dateModified <- HS.lookup "date_modified" o
@@ -41,7 +41,7 @@ fieldConverter = prism' to from
                             _ -> Nothing
           _visibility <- HS.lookup "visibility" o >>= resultToMaybe . A.fromJSON
           pure
-            $ E.newField dateModified value
+            $ E.newField dateModified (FieldValue value)
             & E.visibility .~ _visibility
         from _ = Nothing
 

@@ -348,3 +348,21 @@ EOF
       second
 EOF
 }
+
+@test "'find' resets all ANSI control sequences" {
+  coffer create /a/b/c --field x="$(echo -e "\x1b[41;1mHi i'm red")"
+  coffer create /a/b/d --field x=y
+
+  run cleanOutput coffer find
+
+  assert_success
+  assert_output - <<EOF
+/
+  a/
+    b/
+      c - [2000-01-01 01:01:01]
+        x: $(printf '\x1b[41;1m')Hi i'm red$reset [2000-01-01 01:01:01]
+      d - [2000-01-01 01:01:01]
+        x: y [2000-01-01 01:01:01]
+EOF
+}
