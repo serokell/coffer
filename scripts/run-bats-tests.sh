@@ -4,10 +4,8 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-# This script updates bats git submodules, runs two vault instances,
-# then runs bats tests and after all kills vault instances.
-
-git submodule update --init --recursive
+# This script runs two vault instances,
+# then runs bats tests and finally kills the vault instances.
 
 FILTER=$1
 
