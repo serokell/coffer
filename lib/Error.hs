@@ -7,11 +7,52 @@ module Error
   ) where
 
 import BackendName (BackendName)
-import Data.Text (Text)
+import Fmt (Buildable(build), Builder, indentF, unlinesF)
+import Servant.Client.Core
+  (ClientError(ConnectionError, DecodeFailure, FailureResponse, InvalidContentTypeHeader, UnsupportedContentType))
 
 data CofferError
-  = MarshallingFailed
-  | ConnectError
+  = ServantError ClientError
   | BackendNotFound BackendName
-  | OtherError Text
+  | OtherError Builder
   deriving stock (Show)
+
+instance Buildable CofferError where
+  build = \case
+    ServantError (FailureResponse request response) ->
+      unlinesF @_ @Builder
+        [ "Request:"
+        , indentF 2 ((build . show) request)
+        , "failed with response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (DecodeFailure body response) ->
+      unlinesF @_ @Builder
+        [ "The body could not be decoded at the expected type."
+        , "Body: " <> build body
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (UnsupportedContentType mediatype response) ->
+      unlinesF @_ @Builder
+        [ "The content-type '" <> (build . show) mediatype <> "' of the response is not supported."
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (InvalidContentTypeHeader response) ->
+      unlinesF @_ @Builder
+        [ "The content-type header is invalid."
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (ConnectionError exception) ->
+      unlinesF @_ @Builder
+        [ "Connection error. No response was received."
+        , (build . show) exception
+        ]
+    BackendNotFound backendName -> "Backend with name '" <> build backendName <> "' not found."
+    OtherError t ->
+      unlinesF @_ @Builder
+        [ "An internal error occurred:"
+        , t
+        ]

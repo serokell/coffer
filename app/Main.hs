@@ -39,7 +39,7 @@ runBackendIO action =
     >>= \case
       Right a -> pure a
       Left err -> do
-        die $ show err
+        die $ pretty err
 
 readConfig :: FilePath -> IO Config
 readConfig configPath = do
