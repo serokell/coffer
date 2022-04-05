@@ -12,7 +12,8 @@ import BackendName (BackendName)
 import Coffer.Path (EntryPath, Path)
 import Data.Text (Text)
 import Entry (BadEntryTag, BadFieldName)
-import Fmt (Buildable(build), Builder, pretty, unlinesF, (+|), (|+))
+import Fmt (Buildable(build))
+import Text.Interpolation.Nyan
 
 -- | GADT for coffer internal errors.
 -- It is backend-agnostic, so it doesn't know about specific backend errors.
@@ -35,36 +36,36 @@ data InternalCommandsError
 instance Buildable InternalCommandsError where
   build = \case
     InvalidEntry entry ->
-      unlinesF @_ @Builder
-        [ "Backend returned a secret that is not a valid\
-          \ entry or directory name."
-        , "Got: '" +| entry |+ "'."
-        ]
+      [int|s|
+        Backend returned a secret that is not a valid \
+        entry or directory name.
+        Got: '#{entry}'.
+      |]
     EntryPathDoesntHavePrefix entryPath path ->
-      unlinesF @_ @Builder
-        [ "Expected path: '" <> pretty entryPath <> "'"
-        , "To have the prefix: '" <> pretty path <> "'"
-        ]
+      [int|s|
+        Expected path: '#{entryPath}'
+        To have the prefix: '#{path}'
+      |]
 
 instance Buildable CofferError where
   build = \case
     BackendError err ->
-      unlinesF @_ @Builder
-        [ "Internal backend error:"
-        , build err
-        ]
+      [int|s|
+        Internal backend error:
+        #{err}
+      |]
     InternalCommandsError err ->
-      unlinesF @_ @Builder
-        [ "Internal error:"
-        , build err
-        ]
+      [int|s|
+        Internal error:
+        #{err}
+      |]
     BackendNotFound backendName ->
-      "Backend with name '" <> build backendName <> "' not found."
+      [int|s|Backend with name '#{backendName}' not found.|]
     BadFieldNameError err -> build err
     BadMasterFieldName name err ->
-      unlinesF @_ @Builder
-        [ "Attempted to create new field name from '" +| name |+ "'"
-        , ""
-        , build err
-        ]
+      [int|s|
+        Attempted to create new field name from '#{name}'
+
+        #{err}
+      |]
     BadEntryTagError err -> build err

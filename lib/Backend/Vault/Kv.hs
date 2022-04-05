@@ -31,7 +31,7 @@ import Data.Time (UTCTime)
 import Entry (Entry, Field, FieldContents(FieldContents), FieldName, FieldVisibility)
 import Entry qualified as E
 import Error (BackendError, CofferError(..))
-import Fmt (Buildable(build), Builder, indentF, unlinesF, (+|), (|+))
+import Fmt (Buildable(build))
 import GHC.Generics (Generic)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -42,6 +42,7 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientEnv, ClientError(..), Scheme(Http, Https), mkClientEnv, parseBaseUrl,
   showBaseUrl)
 import Servant.Client.Core.Response (responseStatusCode)
+import Text.Interpolation.Nyan
 import Toml (TomlCodec, (.=))
 import Toml qualified
 
@@ -64,41 +65,41 @@ data VaultError
 instance Buildable VaultError where
   build = \case
     ServantError (FailureResponse request response) ->
-      unlinesF @_ @Builder
-        [ "Request:"
-        , indentF 2 ((build . show) request)
-        , "failed with response:"
-        , indentF 2 ((build . show) response)
-        ]
+      [int|s|
+        Request:
+          #{show request}
+        failed with response:
+          #{show response}
+      |]
     ServantError (DecodeFailure body response) ->
-      unlinesF @_ @Builder
-        [ "The body could not be decoded at the expected type."
-        , "Body: " <> build body
-        , "Response:"
-        , indentF 2 ((build . show) response)
-        ]
+      [int|s|
+        The body could not be decoded at the expected type.
+        Body: #{body}
+        Response:
+          #{show response}
+      |]
     ServantError (UnsupportedContentType mediatype response) ->
-      unlinesF @_ @Builder
-        [ "The content-type '" <> (build . show) mediatype <> "' of the response is not supported."
-        , "Response:"
-        , indentF 2 ((build . show) response)
-        ]
+      [int|s|
+        The content-type '#{show mediatype}' of the response is not supported.
+        Response:
+          #{show response}
+      |]
     ServantError (InvalidContentTypeHeader response) ->
-      unlinesF @_ @Builder
-        [ "The content-type header is invalid."
-        , "Response:"
-        , indentF 2 ((build . show) response)
-        ]
+      [int|s|
+        The content-type header is invalid.
+        Response:
+          #{show response}
+      |]
     ServantError (ConnectionError exception) ->
-      unlinesF @_ @Builder
-        [ "Connection error. No response was received."
-        , (build . show) exception
-        ]
+      [int|s|
+        Connection error. No response was received.
+        #{show exception}
+      |]
     FieldMetadataNotFound entryPath fieldName ->
-      "Could not find coffer metadata for field '" +| fieldName
-        |+ "' at '" +| entryPath |+ "'"
+      [int|s|Could not find coffer metadata for field \
+      '#{fieldName}' at '#{entryPath}'|]
     CofferSpecialsNotFound entryPath ->
-      "Could not find key '#$coffer' in the kv entry at '" +| entryPath |+ "'."
+      [int|s|Could not find key '#$coffer' in the kv entry at '#{entryPath}'.|]
     BadCofferSpecialsError err -> build err
 
 instance BackendError VaultError

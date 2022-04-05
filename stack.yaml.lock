@@ -33,6 +33,20 @@ packages:
   original:
     hackage: lens-5.1@sha256:eb01fc4b1cfbad0e94c497eaf7b9f0e9b6c3dc7645c8b4597da7dc9d579f8500,14519
 - completed:
+    hackage: nyan-interpolation-0.9@sha256:8cf238be4c04746e4e9eabb34001c990c23e5837a19eb8652c584e57e92ecb41,3797
+    pantry-tree:
+      size: 661
+      sha256: 1ba3d0b9c1dd65cd6c8a3e10dc31261c70366d5822281176b84617b6c7b7bbc1
+  original:
+    hackage: nyan-interpolation-0.9@sha256:8cf238be4c04746e4e9eabb34001c990c23e5837a19eb8652c584e57e92ecb41,3797
+- completed:
+    hackage: nyan-interpolation-core-0.9.0.1@sha256:1bda0e90d2045eb18c905f905082f4098829c1bdcbc4012663686a1c503b4ded,4067
+    pantry-tree:
+      size: 1463
+      sha256: 2a1a8d8b66746a246b3c0a4cd07daa6b961c9911676d30bc308a8a2682353b2b
+  original:
+    hackage: nyan-interpolation-core-0.9.0.1@sha256:1bda0e90d2045eb18c905f905082f4098829c1bdcbc4012663686a1c503b4ded,4067
+- completed:
     hackage: polysemy-1.7.1.0@sha256:3ead7a332abd70b202920ed3bf2e36866de163f821e643adfdcc9d39867b8033,5977
     pantry-tree:
       size: 4577

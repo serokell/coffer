@@ -35,6 +35,7 @@ import Entry
 import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
+import Text.Interpolation.Nyan
 import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
@@ -60,11 +61,11 @@ parser = Options
         [ long "config"
         , short 'c'
         , metavar "CONFIG"
-        , help $ unlines
-            [ "Specify config file path."
-            , "When this option is not set, the 'COFFER_CONFIG' environment variable will be used."
-            , "When neither is set, it will default to 'config.toml'."
-            ]
+        , help [int|s|
+            Specify config file path.
+            When this option is not set, the 'COFFER_CONFIG' environment variable will be used.
+            When neither is set, it will default to 'config.toml'.
+          |]
         ]
 
 commandParser :: Parser SomeCommand
@@ -401,11 +402,10 @@ readQualifiedPath = do
       [pathStr] -> do
         path <- readPath' pathStr
         pure $ QualifiedPath Nothing path
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified path format: " <> show input <> "."
-                , show expectedQualifiedPathFormat
-                ]
+      _ -> Left [int|s|
+        Invalid qualified path format: #{show input}.
+        #{show expectedQualifiedPathFormat}
+      |]
 
 readFieldContents :: ReadM FieldContents
 readFieldContents = str <&> FieldContents
@@ -413,13 +413,14 @@ readFieldContents = str <&> FieldContents
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
   eitherReader \input ->
-    P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid field format: " <> show input <> "."
-      , "Expected format: 'fieldname=fieldcontents'."
-      , ""
-      , "Parser error:"
-      , P.errorBundlePretty err
-      ]
+    P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err ->
+      [int|s|
+        Invalid field format: #{show input}.
+        Expected format: 'fieldname=fieldcontents'.
+
+        Parser error:
+        #{P.errorBundlePretty err}
+      |]
 
 readSort :: ReadM (Sort, Direction)
 readSort = do
@@ -430,28 +431,28 @@ readSort = do
         case means of
           "name" -> pure (SortByEntryName, direction')
           "date" -> pure (SortByEntryDate, direction')
-          _ -> Left $ unlines
-            [ "Invalid sort: " <> show means <> "."
-            , "Choose one of: 'name', 'date'."
-            , ""
-            , show expectedSortFormat
-            ]
+          _ -> Left [int|s|
+            Invalid sort: #{show means}.
+            Choose one of: 'name', 'date'.
+
+            #{show expectedSortFormat}
+          |]
       [fieldName, means, direction] -> do
         fieldName' <- readFieldName' fieldName
         direction' <- readDirection direction
         case means of
           "contents" -> pure (SortByFieldContents fieldName', direction')
           "date" -> pure (SortByFieldDate fieldName', direction')
-          _ -> Left $ unlines
-            [ "Invalid sort: " <> show means <> "."
-            , "Choose one of: 'contents', 'date'."
-            , ""
-            , show expectedSortFormat
-            ]
-      _ -> Left $ unlines
-        [ "Invalid sort format: " <> show input <> "."
-        , show expectedSortFormat
-        ]
+          _ -> Left [int|s|
+            Invalid sort: #{show means}.
+            Choose one of: 'contents', 'date'.
+
+            #{show expectedSortFormat}
+          |]
+      _ -> Left [int|s|
+        Invalid sort format: #{show input}.
+        #{show expectedSortFormat}
+      |]
 
 expectedSortFormat :: Pretty.Doc
 expectedSortFormat = Pretty.vsep
@@ -474,13 +475,14 @@ readDirection =
 readFilter :: ReadM Filter
 readFilter = do
   eitherReader \input ->
-    P.parse (parseFilter <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid filter format: " <> show input <> "."
-      , show expectedFilterFormat
-      , ""
-      , "Parser error:"
-      , P.errorBundlePretty err
-      ]
+    P.parse (parseFilter <* P.eof) "" (T.pack input) & first \err ->
+      [int|s|
+        Invalid filter format: #{show input}.
+        #{show expectedFilterFormat}
+
+        Parser error:
+        #{P.errorBundlePretty err}
+      |]
 
 expectedQualifiedEntryPathFormat :: Pretty.Doc
 expectedQualifiedEntryPathFormat = Pretty.vsep
@@ -624,10 +626,10 @@ readSum sumDescription constructors input =
   case M.lookup input constructors of
     Just cons -> Right cons
     Nothing ->
-      Left $ unlines
-        [ "Invalid " <> sumDescription <> ": '" <> input <> "'."
-        , "Choose one of: " <> constructorNames <> "."
-        ]
+      Left [int|s|
+        Invalid #{sumDescription}: '#{input}'.
+        Choose one of: #{constructorNames}.
+      |]
   where
     constructorNames :: String
     constructorNames =
