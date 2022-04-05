@@ -2,11 +2,11 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-main_backend = "vault-local"
+main_backend = "pass"
 
 [[backend]]
-type = "vault-kv"
-name = "vault-local"
-address = "localhost:8200"
-mount = "secret"
-token = "<vault token>"
+type = "debug"
+sub_type = "pass"
+name = "pass"
+store_dir = "/tmp/pass-store"
+pass_exe = "pass"
