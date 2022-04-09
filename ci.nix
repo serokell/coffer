@@ -30,6 +30,9 @@ rec {
     };
   };
 
+  # TODO: drop this when `serokell/nixpkgs` acquires stylish-haskell >= 0.13.0.0.
+  pkgs-stylish = import sources.nixpkgs-stylish {};
+
   project = (import ./coffer.nix { linux = true; });
 
   lib = project.coffer.components.library;
