@@ -228,7 +228,7 @@ kvReadSecret backend path = do
 kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [T.Text])
 kvListSecrets backend path = do
   env <- getEnv backend
-  embedCatchClientErrorMaybe $ do
+  embedCatchClientErrorMaybe do
     response <- listSecrets env (getPathSegments path)
     pure $ response ^. I.ddata . I.unListSecrets
   where

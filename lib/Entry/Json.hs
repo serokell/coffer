@@ -71,7 +71,7 @@ instance E.EntryConvertible JsonEntry where
             value <- HS.lookup "fields" o
             obj <- value ^? A._Object
             keyFields <-
-              forM (HS.toList obj) $ \(text, value) -> do
+              forM (HS.toList obj) \(text, value) -> do
                 key <- eitherToMaybe $ E.newFieldKey text
                 field <- value ^? fieldConverter
                 pure (key, field)

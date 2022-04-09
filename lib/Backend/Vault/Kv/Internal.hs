@@ -171,11 +171,11 @@ makeLensesWith abbreviatedFields ''UpdateMetadata
 -- others serialized, but never both.
 
 instance FromJSON ListSecrets where
-  parseJSON = withObject "ListSecrets" $ \o ->
+  parseJSON = withObject "ListSecrets" \o ->
     ListSecrets <$> o .: "keys"
 
 instance FromJSON ReadSecret where
-  parseJSON = withObject "ReadSecret" $ \o -> do
+  parseJSON = withObject "ReadSecret" \o -> do
     metadata <- o .: "metadata"
     ReadSecret
       <$> o .: "data"
@@ -186,7 +186,7 @@ instance FromJSON ReadSecret where
       <*> metadata .: "version"
 
 instance FromJSON a => FromJSON (KvResponse a) where
-  parseJSON = withObject "KvResponse" $ \o ->
+  parseJSON = withObject "KvResponse" \o ->
     KvResponse
     <$> o .: "request_id"
     <*> o .: "lease_id"
