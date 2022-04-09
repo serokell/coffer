@@ -52,10 +52,10 @@ data VaultKvBackend =
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
-                  <$> backendNameCodec "name" Toml..= vbName
-                  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
-                  <*> Toml.text "mount" Toml..= vbMount
-                  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
+  <$> backendNameCodec "name" Toml..= vbName
+  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
+  <*> Toml.text "mount" Toml..= vbMount
+  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
   where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
@@ -102,15 +102,15 @@ getEnv backend =
 -- 2. If it is @ConnectionError@, then we would get @ConnectError@
 -- 3. Otherwise we would get @MarshallingFailed@
 exceptionHandler :: ClientError -> Maybe CofferError
-exceptionHandler =
-  \case FailureResponse _request response ->
-            case statusCode $ responseStatusCode response of
-              404 -> Nothing
-              e -> Just $ OtherError (T.pack $ show e)
-        DecodeFailure _ _ -> Just MarshallingFailed
-        UnsupportedContentType _ _ -> Just MarshallingFailed
-        InvalidContentTypeHeader _ -> Just MarshallingFailed
-        ConnectionError _ -> Just ConnectError
+exceptionHandler = \case
+  FailureResponse _request response ->
+    case statusCode $ responseStatusCode response of
+      404 -> Nothing
+      e -> Just $ OtherError (T.pack $ show e)
+  DecodeFailure _ _ -> Just MarshallingFailed
+  UnsupportedContentType _ _ -> Just MarshallingFailed
+  InvalidContentTypeHeader _ -> Just MarshallingFailed
+  ConnectionError _ -> Just ConnectError
 
 -- | Runs an IO action and throws an error if happens.
 embedCatchClientError
@@ -118,10 +118,11 @@ embedCatchClientError
   => Member (Error CofferError) r
   => IO a
   -> Sem r a
-embedCatchClientError io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
-  \case Left l -> pure l
-        Right (Just r) -> throw r
-        Right Nothing -> throw $ OtherError "404"
+embedCatchClientError io =
+  embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>= \case
+    Left l -> pure l
+    Right (Just r) -> throw r
+    Right Nothing -> throw $ OtherError "404"
 
 -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
 --   Otherwise, it would be Nothing.
@@ -130,10 +131,11 @@ embedCatchClientErrorMaybe
   => Member (Error CofferError) r
   => IO a
   -> Sem r (Maybe a)
-embedCatchClientErrorMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
-  \case Left l -> (pure . Just) l
-        Right (Just r) -> throw r
-        Right Nothing -> pure Nothing
+embedCatchClientErrorMaybe io =
+  embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>= \case
+    Left l -> (pure . Just) l
+    Right (Just r) -> throw r
+    Right Nothing -> pure Nothing
 
 orThrow
   :: Member (Error e) r
@@ -167,10 +169,10 @@ kvWriteSecret backend entry = do
     secret = I.PostSecret
       { I.psCas = Nothing
       , I.psDdata =
-              HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
-            . HS.map (^. E.value . E.fieldValue)
-            . HS.mapKeys E.getFieldKey
-            $ entry ^. E.fields
+            HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
+          . HS.map (^. E.value . E.fieldValue)
+          . HS.mapKeys E.getFieldKey
+          $ entry ^. E.fields
         }
   env <- getEnv backend
   void $ embedCatchClientError do
@@ -192,19 +194,20 @@ kvReadSecret backend path = do
             _visibility <- cofferSpecials ^? fields . at key . _Just . visibility
             _key <- eitherToMaybe $ E.newFieldKey key
 
-            Just (_key
-                  , E.newField _modTime (FieldValue value)
-                    & E.visibility .~ _visibility
-                  )
+            Just
+              (_key
+              , E.newField _modTime (FieldValue value)
+                & E.visibility .~ _visibility
+              )
 
       fields <-
         (secrets & each %%~ keyAndValueToField <&> HS.fromList) `orThrow` MarshallingFailed
       _tags <- cofferSpecials ^. tags
-            & Set.toList
-            & mapM E.newEntryTag
-            <&> Set.fromList
-            & eitherToMaybe
-            & (`orThrow` MarshallingFailed)
+        & Set.toList
+        & mapM E.newEntryTag
+        <&> Set.fromList
+        & eitherToMaybe
+        & (`orThrow` MarshallingFailed)
 
       fieldKey <-
         case cofferSpecials ^. masterKey of

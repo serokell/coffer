@@ -33,12 +33,11 @@ fieldConverter = prism' to from
       ]
     from (A.Object o) = do
       dateModified <- HS.lookup "date_modified" o
-                            >>= \case A.String t -> Just t ; _ -> Nothing
-                            >>= iso8601ParseM . T.unpack
-      value <- HS.lookup "value" o
-                  >>= \case
-                        A.String t -> Just t
-                        _ -> Nothing
+        >>= \case A.String t -> Just t ; _ -> Nothing
+        >>= iso8601ParseM . T.unpack
+      value <- HS.lookup "value" o >>= \case
+        A.String t -> Just t
+        _ -> Nothing
       _visibility <- HS.lookup "visibility" o >>= resultToMaybe . A.fromJSON
       pure
         $ E.newField dateModified (FieldValue value)
@@ -58,32 +57,32 @@ instance E.EntryConvertible JsonEntry where
         , "tags" A..= (entry ^. E.tags)
         ]
       from (JsonEntry (A.Object o)) =
-          do
-            path <- HS.lookup "path" o
-              >>= (\case A.String t -> Just t ; _ -> Nothing)
-              >>= eitherToMaybe . Path.mkEntryPath
-            dateModified <- HS.lookup "date_modified" o
-              >>= \case A.String t -> Just t ; _ -> Nothing
-              >>= iso8601ParseM . T.unpack
-            let _masterField = HS.lookup "master_field" o >>= \case
-                  A.String t -> eitherToMaybe $ E.newFieldKey t
-                  _ -> Nothing
-            _fields <- do
-                value <- HS.lookup "fields" o
-                obj <- value ^? A._Object
-                keyFields <-
-                  forM (HS.toList obj) $ \(text, value) -> do
-                    key <- eitherToMaybe $ E.newFieldKey text
-                    field <- value ^? fieldConverter
-                    pure (key, field)
-                pure $ HS.fromList keyFields
-            _tags <- HS.lookup "tags" o >>= resultToMaybe . A.fromJSON
+        do
+          path <- HS.lookup "path" o
+            >>= (\case A.String t -> Just t ; _ -> Nothing)
+            >>= eitherToMaybe . Path.mkEntryPath
+          dateModified <- HS.lookup "date_modified" o
+            >>= \case A.String t -> Just t ; _ -> Nothing
+            >>= iso8601ParseM . T.unpack
+          let _masterField = HS.lookup "master_field" o >>= \case
+                A.String t -> eitherToMaybe $ E.newFieldKey t
+                _ -> Nothing
+          _fields <- do
+            value <- HS.lookup "fields" o
+            obj <- value ^? A._Object
+            keyFields <-
+              forM (HS.toList obj) $ \(text, value) -> do
+                key <- eitherToMaybe $ E.newFieldKey text
+                field <- value ^? fieldConverter
+                pure (key, field)
+            pure $ HS.fromList keyFields
+          _tags <- HS.lookup "tags" o >>= resultToMaybe . A.fromJSON
 
-            pure
-              $ E.newEntry path dateModified
-              & E.masterField .~ _masterField
-              & E.fields .~ _fields
-              & E.tags .~ _tags
+          pure
+            $ E.newEntry path dateModified
+            & E.masterField .~ _masterField
+            & E.fields .~ _fields
+            & E.tags .~ _tags
       from _ = Nothing
 
 resultToMaybe :: A.Result a -> Maybe a

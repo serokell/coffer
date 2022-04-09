@@ -19,19 +19,19 @@ backendPackedCodec :: TomlCodec SomeBackend
 backendPackedCodec = Toml.Codec input output
   where
     input :: Toml.TomlEnv SomeBackend
-    input toml = case HS.lookup "type" $ Toml.tomlPairs toml of
-                    Just t -> do
-                      case Toml.backward Toml._Text t >>= supportedBackends of
-                        Right c -> c toml
-                        Left e -> Failure
-                                  [ Toml.BiMapError "type" e
-                                  ]
-                    Nothing -> Failure
-                              [ Toml.BiMapError "type" $ Toml.ArbitraryError
-                                "Backend doesn't have a `type` key"
-                              ]
-    output (SomeBackend a) =  SomeBackend <$> Toml.codecWrite _codec a
-              <* Toml.codecWrite (Toml.text "type") "vault"
+    input toml =
+      case HS.lookup "type" $ Toml.tomlPairs toml of
+        Just t -> do
+          case Toml.backward Toml._Text t >>= supportedBackends of
+            Right c -> c toml
+            Left e -> Failure [ Toml.BiMapError "type" e ]
+        Nothing -> Failure
+          [ Toml.BiMapError "type" $ Toml.ArbitraryError
+            "Backend doesn't have a `type` key"
+          ]
+    output (SomeBackend a) = do
+      SomeBackend <$> Toml.codecWrite _codec a
+        <* Toml.codecWrite (Toml.text "type") "vault"
 
 supportedBackends
   :: T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
