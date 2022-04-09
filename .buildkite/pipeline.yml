@@ -15,6 +15,9 @@ steps:
   - label: stylish
     command: nix run -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
 
+  - label: lint
+    command: nix run -f ci.nix pkgs.haskellPackages.hlint -c hlint .
+
   - label: build
     key: build
     command: nix-build ci.nix -A lib -A cli
