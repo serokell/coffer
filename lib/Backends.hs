@@ -10,7 +10,7 @@ module Backends
 import Backend (Backend(..), SomeBackend(..))
 import Backend.Vault.Kv (VaultKvBackend)
 import Data.HashMap.Strict qualified as HS
-import Data.Text qualified as T
+import Data.Text (Text)
 import Toml (TomlCodec)
 import Toml qualified
 import Validation (Validation(Failure))
@@ -34,6 +34,6 @@ backendPackedCodec = Toml.Codec input output
         <* Toml.codecWrite (Toml.text "type") "vault"
 
 supportedBackends
-  :: T.Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
+  :: Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
 supportedBackends "vault-kv" = Right $ fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend)
 supportedBackends _ = Left (Toml.ArbitraryError "Unknown backend type")

@@ -7,11 +7,11 @@ module Error
   ) where
 
 import BackendName (BackendName)
-import Data.Text qualified as T
+import Data.Text (Text)
 
 data CofferError
   = MarshallingFailed
   | ConnectError
   | BackendNotFound BackendName
-  | OtherError T.Text
+  | OtherError Text
   deriving stock (Show)

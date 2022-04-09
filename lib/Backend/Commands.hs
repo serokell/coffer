@@ -27,6 +27,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time (UTCTime, getCurrentTime, utctDay)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
@@ -291,7 +292,7 @@ data CopyOperation = CopyOperation
 getOperationPaths :: CopyOperation -> (EntryPath, EntryPath)
 getOperationPaths (CopyOperation old new) = (old ^. E.path, new ^. E.path)
 
-{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: T.Text) #-}
+{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: Text) #-}
 buildCopyOperations
   :: forall r
    . ( Member BackendEffect r

@@ -13,18 +13,19 @@ module BackendName
 import Coffer.Util (didimatch)
 import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
+import Data.Text (Text)
 import Data.Text qualified as T
 import Fmt (Buildable)
 import Toml qualified
 
-newtype BackendName = UnsafeBackendName T.Text
+newtype BackendName = UnsafeBackendName Text
   deriving stock (Show, Eq)
   deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable)
 
 backendNameCharSet :: [Char]
 backendNameCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 
-newBackendName :: T.Text -> Either T.Text BackendName
+newBackendName :: Text -> Either Text BackendName
 newBackendName t
   | T.null t =
       Left "Backend name should contain at least 1 character"
@@ -33,7 +34,7 @@ newBackendName t
   | otherwise =
       Right $ UnsafeBackendName t
 
-getBackendName :: BackendName -> T.Text
+getBackendName :: BackendName -> Text
 getBackendName (UnsafeBackendName t) = t
 
 backendNameCodec :: Toml.Key -> Toml.TomlCodec BackendName

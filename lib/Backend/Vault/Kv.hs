@@ -13,19 +13,21 @@ import BackendName (BackendName, backendNameCodec)
 import Coffer.Path (EntryPath, HasPathSegments, Path, PathSegment, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
 import Control.Exception (catch)
-import Control.Lens
+import Control.Lens hiding ((.=))
 import Control.Monad (void)
 import Data.Aeson qualified as A
 import Data.Aeson.Text qualified as A
 import Data.Either.Extra (eitherToMaybe, maybeToEither)
 import Data.HashMap.Internal.Strict qualified as HS
+import Data.HashMap.Strict (HashMap)
+import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Time (UTCTime)
-import Entry (FieldValue(FieldValue), FieldVisibility)
+import Entry (Entry, FieldValue(FieldValue), FieldVisibility)
 import Entry qualified as E
 import Error (CofferError(..))
 import GHC.Generics (Generic)
@@ -38,32 +40,32 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientEnv, ClientError(..), Scheme(Http, Https), mkClientEnv, parseBaseUrl,
   showBaseUrl)
 import Servant.Client.Core.Response (responseStatusCode)
-import Toml (TomlCodec)
+import Toml (TomlCodec, (.=))
 import Toml qualified
 
 data VaultKvBackend =
   VaultKvBackend
   { vbName :: BackendName
   , vbAddress :: BaseUrl
-  , vbMount :: T.Text
+  , vbMount :: Text
   , vbToken :: I.VaultToken
   }
   deriving stock (Show)
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
-  <$> backendNameCodec "name" Toml..= vbName
-  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
-  <*> Toml.text "mount" Toml..= vbMount
-  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
+  <$> backendNameCodec "name" .= vbName
+  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") .= vbAddress
+  <*> Toml.text "mount" .= vbMount
+  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") .= vbToken
   where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
 
-    baseUrlToText :: BaseUrl -> Either T.Text T.Text
+    baseUrlToText :: BaseUrl -> Either Text Text
     baseUrlToText = Right . T.pack . showBaseUrl
 
-    textToBaseUrl :: T.Text -> Either T.Text BaseUrl
+    textToBaseUrl :: Text -> Either Text BaseUrl
     textToBaseUrl = maybeToEither "Cannot parse base url" . parseBaseUrl . T.unpack
 
 data FieldMetadata = FieldMetadata
@@ -76,10 +78,10 @@ makeLensesWith abbreviatedFields ''FieldMetadata
 
 data CofferSpecials =
   CofferSpecials
-  { csMasterKey :: Maybe T.Text
+  { csMasterKey :: Maybe Text
   , csGlobalDateModified :: UTCTime
-  , csFields :: HS.HashMap T.Text FieldMetadata
-  , csTags :: Set.Set T.Text
+  , csFields :: HashMap Text FieldMetadata
+  , csTags :: Set Text
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
@@ -149,7 +151,7 @@ getPathSegments
   => s -> [Text]
 getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
-kvWriteSecret :: Effects r => VaultKvBackend -> E.Entry -> Sem r ()
+kvWriteSecret :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteSecret backend entry = do
   let
     cofferSpecials = CofferSpecials
@@ -180,7 +182,7 @@ kvWriteSecret backend entry = do
   where
     postSecret env = (I.routes env ^. I.postSecret) (vbMount backend) (vbToken backend)
 
-kvReadSecret :: Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe E.Entry)
+kvReadSecret :: Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe Entry)
 kvReadSecret backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
@@ -225,7 +227,7 @@ kvReadSecret backend path = do
   where
     readSecret env = (I.routes env ^. I.readSecret) (vbMount backend) (vbToken backend)
 
-kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [T.Text])
+kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
 kvListSecrets backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe do
