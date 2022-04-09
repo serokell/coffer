@@ -100,7 +100,8 @@ getEnv backend =
     url = vbAddress backend
 
 -- | Handles @ClientError@ in the following way:
--- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error. It status code is 404, the result would be Nothing
+-- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error.
+--    It status code is 404, the result would be Nothing
 -- 2. If it is @ConnectionError@, then we would get @ConnectError@
 -- 3. Otherwise we would get @MarshallingFailed@
 exceptionHandler :: ClientError -> Maybe CofferError

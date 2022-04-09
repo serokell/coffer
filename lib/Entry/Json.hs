@@ -55,7 +55,13 @@ instance EntryConvertible JsonEntry where
         [ "path" .= pretty @_ @Text (entry ^. E.path)
         , "date_modified" .= (entry ^. E.dateModified)
         , "master_field" .= (entry ^. E.masterField)
-        , "fields" .= (HS.fromList . over (each . _1) E.getFieldKey . HS.toList  . HS.map (^. re fieldConverter) $ (entry ^. E.fields))
+        , "fields" .=
+            ( HS.fromList
+              . over (each . _1) E.getFieldKey
+              . HS.toList
+              . HS.map (^. re fieldConverter)
+              $ (entry ^. E.fields)
+            )
         , "tags" .= (entry ^. E.tags)
         ]
       from (JsonEntry (A.Object o)) =

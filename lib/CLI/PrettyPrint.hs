@@ -60,10 +60,17 @@ buildTags tags =
 buildFields :: [(FieldKey,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
-  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int) & maximum
+  let maxFieldLength =
+        formattedFields
+          <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int)
+          & maximum
 
   formattedFields `zip` fields <&> \((firstLine, otherLinesMb), (_, field)) -> do
-    let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified)
+    let formattedFirstLine = mconcat
+          [ padRightF maxFieldLength ' ' firstLine
+          , " "
+          , buildDate (field ^. dateModified)
+          ]
     case otherLinesMb of
       Nothing -> formattedFirstLine
       Just otherLines -> unlinesF [formattedFirstLine, otherLines]

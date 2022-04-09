@@ -120,7 +120,9 @@ createOptions =
   CreateOptions
     <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
-          , help "The path to insert the new entry into, this must not already be a directory or an entry unless `-f` is specified"
+          , help
+              "The path to insert the new entry into, this must not already be \
+              \a directory or an entry unless `-f` is specified"
           ])
     <*> switch ( mconcat
           [ long "edit"
@@ -134,7 +136,9 @@ createOptions =
     <*> switch ( mconcat
           [ long "force"
           , short 'f'
-          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          , help
+              "If a directory or entry already exists under the specified path, \
+              \delete it and insert this entry instead"
           ])
     <*> (Set.fromList <$> many ( option readEntryTag $ mconcat
           [ long "tag"
@@ -145,7 +149,9 @@ createOptions =
     <*> many ( option readFieldInfo $ mconcat
           [ long "field"
           , metavar "NAME=CONTENT"
-          , help "A field to insert into the new entry, with the format 'fieldname=fieldcontents', this may be specified multiple times"
+          , help
+              "A field to insert into the new entry, with the format 'fieldname=fieldcontents', \
+              \this may be specified multiple times"
           ])
     <*> many ( option readFieldInfo $ mconcat
           [ long "privatefield"
@@ -170,7 +176,10 @@ setFieldOptions =
           ])
     <*> optional (argument readFieldValue $ mconcat
           [ metavar "FIELDCONTENTS"
-          , help "The contents to insert into the field. Required when creating a new field, optional otherwise"
+          , help $ unlines
+              [ "The contents to insert into the field."
+              , "Required when creating a new field, optional otherwise."
+              ]
           ])
     <*> optional (option readFieldVisibility $ mconcat
           [ long "visibility"
@@ -251,7 +260,9 @@ renameOptions =
     <*> switch ( mconcat
           [ long "force"
           , short 'f'
-          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          , help
+              "If a directory or entry already exists under the specified path, \
+              \delete it and insert this entry instead"
           ])
 
 copyOptions :: Parser CopyOptions
@@ -273,7 +284,9 @@ copyOptions =
     <*> switch ( mconcat
           [ long "force"
           , short 'f'
-          , help "If a directory or entry already exists under the specified path, delete it and insert this entry instead"
+          , help
+              "If a directory or entry already exists under the specified path, \
+              \delete it and insert this entry instead"
           ])
 
 deleteOptions :: Parser DeleteOptions
