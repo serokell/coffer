@@ -9,8 +9,8 @@ module Error
 import BackendName (BackendName)
 import Data.Text qualified as T
 
-data CofferError =
-  MarshallingFailed
+data CofferError
+  = MarshallingFailed
   | ConnectError
   | BackendNotFound BackendName
   | OtherError T.Text
