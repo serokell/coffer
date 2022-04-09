@@ -8,6 +8,7 @@ import Coffer.Directory (Directory(..))
 import Coffer.Path (entryPathName)
 import Control.Lens
 import Data.HashMap.Strict qualified as HashMap
+import Data.Int (Int64)
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -59,7 +60,7 @@ buildTags tags =
 buildFields :: [(FieldKey,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
-  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral) & maximum
+  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int) & maximum
 
   formattedFields `zip` fields <&> \((firstLine, otherLinesMb), (_, field)) -> do
     let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified)

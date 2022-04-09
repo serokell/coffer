@@ -291,6 +291,7 @@ data CopyOperation = CopyOperation
 getOperationPaths :: CopyOperation -> (EntryPath, EntryPath)
 getOperationPaths (CopyOperation old new) = (old ^. E.path, new ^. E.path)
 
+{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: T.Text) #-}
 buildCopyOperations
   :: forall r
    . ( Member BackendEffect r
