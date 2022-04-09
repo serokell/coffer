@@ -4,20 +4,13 @@
 
 module Config where
 
-;
-
-import qualified Data.HashMap.Strict as HS
-import qualified Toml;
-import           Data.Foldable       (toList)
-
-import           Toml                (TomlCodec);
-
-import           Backend             (SomeBackend (..)
-                                     , Backend (..)
-
-                                     )
-import           Backends            (backendPackedCodec)
+import Backend (Backend(..), SomeBackend(..))
 import BackendName (BackendName, backendNameCodec)
+import Backends (backendPackedCodec)
+import Data.Foldable (toList)
+import Data.HashMap.Strict qualified as HS
+import Toml (TomlCodec)
+import Toml qualified
 
 data Config =
   Config

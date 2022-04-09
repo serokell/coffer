@@ -4,9 +4,8 @@
 
 module Backend.Interpreter where
 
+import Backend (Backend(..), BackendEffect(..), Effects, SomeBackend(..))
 import Polysemy
-
-import Backend (Backend (..), BackendEffect (..), SomeBackend (..), Effects)
 
 runBackend :: Effects r => Sem (BackendEffect ': r) a -> Sem r a
 runBackend = interpret \case

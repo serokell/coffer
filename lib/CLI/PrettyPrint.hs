@@ -4,21 +4,20 @@
 
 module CLI.PrettyPrint where
 
-import Control.Lens
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.HashMap.Strict as HashMap
-import Data.Time
-import Data.Maybe (catMaybes)
-import Fmt
-import Data.Set (Set)
-import qualified Data.Set as Set
-
-import Entry
-import Coffer.Directory ( Directory(..) )
+import Coffer.Directory (Directory(..))
 import Coffer.Path (entryPathName)
+import Control.Lens
+import Data.HashMap.Strict qualified as HashMap
+import Data.Maybe (catMaybes)
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Internal.Builder (toLazyText)
+import Data.Text.Lazy qualified as TL
+import Data.Time
+import Entry
+import Fmt
 
 buildDirectory :: Directory -> Builder
 buildDirectory = go ""

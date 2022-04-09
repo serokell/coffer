@@ -29,18 +29,16 @@ module Backend.Vault.Kv.Internal
   )
 where
 
-import qualified Data.Text              as T;
-import qualified Data.HashMap.Strict    as HS;
-import qualified Data.Aeson.Types       as AT
-
-import           Data.Aeson
-import           Servant.Client.Generic (AsClientT, genericClientHoist)
-import           Control.Exception      (throwIO)
-
-import           Control.Lens hiding ((.=))
-import           Servant.API
-import           Servant.Client
-import           Servant.API.Generic
+import Control.Exception (throwIO)
+import Control.Lens hiding ((.=))
+import Data.Aeson
+import Data.Aeson.Types qualified as AT
+import Data.HashMap.Strict qualified as HS
+import Data.Text qualified as T
+import Servant.API
+import Servant.API.Generic
+import Servant.Client
+import Servant.Client.Generic (AsClientT, genericClientHoist)
 
 -- |
 -- A type defining most responses from the Vault server, it wraps the data we're

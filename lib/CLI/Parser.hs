@@ -8,34 +8,35 @@ module CLI.Parser
   ( parserInfo
   ) where
 
-import Options.Applicative
-import qualified Options.Applicative.Help.Pretty as Pretty
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Functor ((<&>), ($>))
-import qualified Data.List as List
-import Data.Function ((&))
-import Control.Arrow ((>>>))
-import qualified Text.Megaparsec as P
-import qualified Text.Megaparsec.Char as P
-import qualified Text.Megaparsec.Char.Lexer as P
-import Data.Void ( Void )
-import Data.Foldable (asum)
-import Data.Time.Compat (LocalTime (..), makeTimeOfDayValid, localTimeToUTC, utc)
-import Data.Time.Calendar.Compat ( fromGregorianValid )
-import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
-import Control.Monad (guard, void)
-import qualified Data.Char as Char
-import Data.Fixed (Pico)
-import Data.Bifunctor (first)
-import qualified Data.Set as Set
-
+import BackendName (BackendName, newBackendName)
 import CLI.Types
-import Entry (FieldKey, EntryTag, newEntryTag, newFieldKey, FieldVisibility (Public, Private), FieldValue (FieldValue))
-import Coffer.Path (Path, mkPath, EntryPath, mkEntryPath, QualifiedPath (QualifiedPath))
-import BackendName (newBackendName, BackendName)
+import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
+import Control.Arrow ((>>>))
+import Control.Monad (guard, void)
+import Data.Bifunctor (first)
+import Data.Char qualified as Char
+import Data.Fixed (Pico)
+import Data.Foldable (asum)
+import Data.Function ((&))
+import Data.Functor (($>), (<&>))
+import Data.List qualified as List
+import Data.Map (Map)
+import Data.Map qualified as M
+import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Time.Calendar.Compat (fromGregorianValid)
+import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
+import Data.Time.Compat (LocalTime(..), localTimeToUTC, makeTimeOfDayValid, utc)
+import Data.Void (Void)
+import Entry
+  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
+  newFieldKey)
+import Options.Applicative
+import Options.Applicative.Help.Pretty qualified as Pretty
+import Text.Megaparsec qualified as P
+import Text.Megaparsec.Char qualified as P
+import Text.Megaparsec.Char.Lexer qualified as P
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 

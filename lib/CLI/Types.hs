@@ -4,13 +4,13 @@
 
 module CLI.Types where
 
-import Data.Text (Text)
-import Data.Time.Compat (Day, UTCTime , Year)
-import Data.Time.Calendar.Month.Compat (Month)
-import Entry (FieldKey, Field, Entry, FieldVisibility, EntryTag, FieldValue)
 import Coffer.Directory (Directory)
-import Coffer.Path (Path, EntryPath, QualifiedPath)
+import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Data.Set (Set)
+import Data.Text (Text)
+import Data.Time.Calendar.Month.Compat (Month)
+import Data.Time.Compat (Day, UTCTime, Year)
+import Entry (Entry, EntryTag, Field, FieldKey, FieldValue, FieldVisibility)
 
 data Options = Options
   { oConfigPathMb :: Maybe FilePath

@@ -4,40 +4,43 @@
 
 module Backend.Commands where
 
-import Fmt ( pretty )
-import Control.Lens hiding (view)
+import Backend (BackendEffect, SomeBackend, deleteSecret, listSecrets, readSecret, writeSecret)
+import BackendName (BackendName)
 import CLI.Types
-import Polysemy
+import Coffer.Directory (Directory)
+import Coffer.Directory qualified as Dir
+import Coffer.Path
+  (EntryPath, Path, QualifiedPath(QualifiedPath, qpBackendName, qpPath), entryPathName, mkPath,
+  mkPathSegment, pathSegments, unPathSegment)
+import Coffer.Path qualified as Path
+import Coffer.Util (catchAndReturn)
+import Config (Config(backends, mainBackend))
+import Control.Lens (view)
+import Control.Lens hiding (view)
+import Control.Monad.Extra (whenM)
 import Control.Monad.State
-import Data.Time (getCurrentTime, UTCTime, utctDay)
-import qualified Data.Text as T
-import qualified Data.HashMap.Strict as HashMap
-import GHC.Exts (Down(..), sortWith)
+import Data.Bifunctor (Bifunctor(first))
+import Data.Either (rights)
+import Data.HashMap.Strict ((!?))
+import Data.HashMap.Strict qualified as HashMap
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Text qualified as T
+import Data.Time (UTCTime, getCurrentTime, utctDay)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
 import Data.Time.Calendar.Month.Compat (pattern MonthDay)
-import Control.Lens (view)
-import Polysemy.Error (throw, Error)
-import Control.Monad.Extra (whenM)
-import qualified Data.List.NonEmpty as NE
-import Data.Set (Set)
-import qualified Data.Set as Set
-
-import Backend (BackendEffect, listSecrets, readSecret, writeSecret, deleteSecret, SomeBackend)
-import Entry (Entry, Field, FieldKey, value, fields, dateModified, newEntry, newField, visibility, FieldVisibility(..), EntryTag, path, fieldValue)
-import qualified Entry as E
-import Coffer.Directory (Directory)
-import qualified Coffer.Directory as Dir
-import Coffer.Path (Path, mkPath, mkPathSegment, unPathSegment, entryPathName, EntryPath, pathSegments, QualifiedPath (QualifiedPath, qpPath, qpBackendName))
-import qualified Coffer.Path as Path
+import Entry
+  (Entry, EntryTag, Field, FieldKey, FieldVisibility(..), dateModified, fieldValue, fields,
+  newEntry, newField, path, value, visibility)
+import Entry qualified as E
 import Error (CofferError(..))
-import Coffer.Util (catchAndReturn)
-import Data.Either (rights)
-import Validation (Validation (Success, Failure))
-import Data.Bifunctor (Bifunctor (first))
-import Config (Config (mainBackend, backends))
-import Data.HashMap.Strict ((!?))
-import BackendName (BackendName)
+import Fmt (pretty)
+import GHC.Exts (Down(..), sortWith)
+import Polysemy
+import Polysemy.Error (Error, throw)
+import Validation (Validation(Failure, Success))
 
 runCommand
   :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)

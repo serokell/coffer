@@ -6,8 +6,8 @@ module Error
   ( CofferError (..)
   ) where
 
-import qualified Data.Text as T
 import BackendName (BackendName)
+import Data.Text qualified as T
 
 data CofferError =
   MarshallingFailed

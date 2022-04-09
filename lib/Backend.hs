@@ -10,16 +10,14 @@ module Backend
   )
 where
 
-import qualified Data.Text           as T
-import qualified Entry               as E
-import qualified Toml
-
-import Error                         (CofferError)
-import Polysemy.Error                (Error)
-
-import Polysemy
-import Coffer.Path (EntryPath, Path)
 import BackendName (BackendName)
+import Coffer.Path (EntryPath, Path)
+import Data.Text qualified as T
+import Entry qualified as E
+import Error (CofferError)
+import Polysemy
+import Polysemy.Error (Error)
+import Toml qualified
 
 type Effects r = (Member (Embed IO) r, Member (Error CofferError) r)
 

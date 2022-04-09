@@ -17,13 +17,13 @@ module Coffer.Directory
   , filterEntries
   ) where
 
-import Control.Lens
-import qualified Data.HashMap.Strict as HashMap
-import Data.HashMap.Strict (HashMap)
-import qualified Data.Maybe as Maybe
 import Coffer.Path (PathSegment, entryPathParentDir, pathSegments)
+import Control.Lens
+import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HashMap
+import Data.Maybe qualified as Maybe
 import Entry (Entry)
-import qualified Entry as E
+import Entry qualified as E
 
 ----------------------------------------------------------------------------
 -- Directory
