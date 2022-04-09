@@ -3,16 +3,28 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module Entry
-  ( dateModified
+  ( FieldKey
   , keyCharSet
-  , Entry, EntryConvertible (..), newEntry
-  , path, masterField, fields
-  , Field (..), FieldKey,  newField, getFieldKey
-  , newFieldKey, newEntryTag, getEntryTag
-  , visibility, value, tags, EntryTag
+  , newFieldKey
+  , getFieldKey
+  , EntryTag
+  , newEntryTag
+  , getEntryTag
   , FieldVisibility(..)
   , FieldValue (..)
   , fieldValue
+  , Field (..)
+  , dateModified
+  , newField
+  , visibility
+  , value
+  , Entry
+  , newEntry
+  , path
+  , masterField
+  , fields
+  , tags
+  , EntryConvertible (..)
   )
 where
 

@@ -3,7 +3,11 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module Backend
-  ( BackendEffect (..), readSecret, writeSecret, listSecrets, deleteSecret
+  ( BackendEffect (..)
+  , readSecret
+  , writeSecret
+  , listSecrets
+  , deleteSecret
   , Backend (..)
   , SomeBackend (..)
   , Effects

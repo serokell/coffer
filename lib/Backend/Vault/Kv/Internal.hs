@@ -4,28 +4,37 @@
 
 module Backend.Vault.Kv.Internal
   ( KvResponse (..)
-  , requestId, leaseId, renewable, leaseDuration
+  , requestId
+  , leaseId
+  , renewable
+  , leaseDuration
+  , ddata
   , ReadSecret (..)
-  , secret, createdTime, deletionTime, destroyed, version
+  , secret
+  , customMetadata
+  , createdTime
+  , deletionTime
+  , destroyed
+  , version
   , ListSecrets (..)
   , unListSecrets
   , PostSecret (..)
   , cas
   , PatchSecret
   , UpdateMetadata (..)
-  , maxVersions, casRequired, deleteVersionAfter
+  , maxVersions
+  , casRequired
+  , deleteVersionAfter
   , VaultToken (..)
 
-  , ddata, customMetadata
-
+  -- * Routes
+  , routes
   , readSecret
   , listSecrets
   , postSecret
   , patchSecret
   , updateMetadata
   , deleteSecret
-
-  , routes
   )
 where
 
