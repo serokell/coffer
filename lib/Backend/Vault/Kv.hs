@@ -18,8 +18,8 @@ import Control.Monad (void)
 import Data.Aeson qualified as A
 import Data.Aeson.Text qualified as A
 import Data.Either.Extra (eitherToMaybe, maybeToEither)
-import Data.HashMap.Internal.Strict qualified as HS
 import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HS
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)

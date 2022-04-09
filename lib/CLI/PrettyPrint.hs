@@ -14,8 +14,8 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.Internal.Builder (toLazyText)
 import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Builder (toLazyText)
 import Data.Time
 import Entry
 import Fmt
