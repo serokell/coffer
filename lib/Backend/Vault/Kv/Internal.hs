@@ -60,11 +60,10 @@ data KvResponse a =
   , krLeaseId :: T.Text
   , krRenewable :: Bool
   , krLeaseDuration :: Int
-  , krKdata :: a
+  , krDdata :: a
   }
   deriving stock (Show)
 makeLensesWith abbreviatedFields ''KvResponse
-
 
 -- |
 -- A type defining the response from the Vault server at endpoint
@@ -158,11 +157,6 @@ data UpdateMetadata =
   }
   deriving stock (Show)
 makeLensesWith abbreviatedFields ''UpdateMetadata
-
--- Overloaded Lens accessors
-
-instance {-# OVERLAPPABLE #-} a ~ b => HasDdata (KvResponse a) b where
-  ddata = kdata
 
 -- JSON serialization/deserialization, logically some ADTs need to only be deserialized,
 -- others serialized, but never both.
