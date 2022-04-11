@@ -96,11 +96,11 @@ library:
     - http-client
     - http-client-tls
     - http-types
-    - interpolate
     - lens
     - lens-aeson
     - megaparsec
     - mtl
+    - nyan-interpolation
     - optparse-applicative
     - polysemy
     - process

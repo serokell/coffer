@@ -20,9 +20,11 @@ module Coffer.Path
   , entryPathAsPath
   , replacePathPrefix
   , QualifiedPath (..)
+  , mkQualifiedPath
+  , mkQualifiedEntryPath
   ) where
 
-import BackendName (BackendName)
+import BackendName (BackendName, newBackendName)
 import Control.Lens
 import Control.Monad ((>=>))
 import Data.Hashable (Hashable)
@@ -184,6 +186,30 @@ instance (Buildable path) => Buildable (QualifiedPath path) where
     case backendNameMb of
       Just backendName -> build backendName <> "#" <> build path
       Nothing -> build path
+
+mkQualifiedPath :: Text -> Either Text (QualifiedPath Path)
+mkQualifiedPath qPath =
+  case T.splitOn "#" qPath of
+    [backendNameStr, pathStr] -> do
+      backendName <- newBackendName backendNameStr
+      path <- mkPath pathStr
+      pure $ QualifiedPath (Just backendName) path
+    [pathStr] -> do
+      path <- mkPath pathStr
+      pure $ QualifiedPath Nothing path
+    _ -> Left "Unexpected qualified path format. Expected [BACKENDNAME#]PATH"
+
+mkQualifiedEntryPath :: Text -> Either Text (QualifiedPath EntryPath)
+mkQualifiedEntryPath qEntryPath = do
+  case T.splitOn "#" qEntryPath of
+    [backendNameStr, entryPathStr] -> do
+      backendName <- newBackendName backendNameStr
+      entryPath <- mkEntryPath entryPathStr
+      pure $ QualifiedPath (Just backendName) entryPath
+    [entryPathStr] -> do
+      entryPath <- mkEntryPath entryPathStr
+      pure $ QualifiedPath Nothing entryPath
+    _ -> Left "Unexpected qualified entry path format. Expected [BACKENDNAME#]ENTRYPATH"
 
 ----------------------------------------------------------------------------
 -- Optics

@@ -81,10 +81,11 @@ main = do
             "The entry at '" +| path |+ "' does not have a field '" +| fieldName |+ "'."
 
       SomeCommand (CmdCreate opts) -> do
-        cmd <- CmdCreate <$>
+        opts <-
           if coEdit opts
             then embed (editorMode opts)
             else pure opts
+        let cmd = CmdCreate opts
         runCommand config cmd >>= \case
           CRSuccess _ -> printSuccess $ "Entry created at '"  +| coQPath opts |+ "'."
           CRCreateError error -> do

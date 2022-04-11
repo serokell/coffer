@@ -27,6 +27,8 @@ library
       BackendName
       Backends
       CLI.EditorMode
+      CLI.EntryView
+      CLI.ParseError
       CLI.Parser
       CLI.PrettyPrint
       CLI.Types
@@ -103,11 +105,11 @@ library
     , http-client
     , http-client-tls
     , http-types
-    , interpolate
     , lens
     , lens-aeson
     , megaparsec
     , mtl
+    , nyan-interpolation
     , optparse-applicative
     , polysemy
     , process

@@ -9,12 +9,8 @@ module CLI.Parser
     parserInfo
     -- * Megaparsec
   , MParser
-  , parseEditorFile
   ) where
 
-import BackendName (BackendName, newBackendName)
-import CLI.Types
-import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
 import Control.Arrow ((>>>))
 import Control.Monad (guard, void)
 import Data.Bifunctor (first)
@@ -33,14 +29,17 @@ import Data.Time.Calendar.Compat (fromGregorianValid)
 import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
 import Data.Time.Compat (LocalTime(..), localTimeToUTC, makeTimeOfDayValid, utc)
 import Data.Void (Void)
-import Entry
-  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
-  newFieldKey)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as Lexer
+
+import CLI.Types
+import Coffer.Path (EntryPath, Path, QualifiedPath, mkQualifiedEntryPath, mkQualifiedPath)
+import Entry
+  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
+  newFieldKey)
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -332,23 +331,6 @@ tagOptions =
 -- Common
 ----------------------------------------------------------------------------
 
-readPath' :: Text -> Either String Path
-readPath' input =
-  mkPath input & first \err -> unlines
-    [ "Invalid path: " <> show input <> "."
-    , T.unpack err
-    ]
-
-readEntryPath' :: Text -> Either String EntryPath
-readEntryPath' input =
-  mkEntryPath input & first \err -> unlines
-    [ "Invalid entry path: " <> show input <> "."
-    , T.unpack err
-    ]
-
-_readEntryPath :: ReadM EntryPath
-_readEntryPath = str >>= toReader . readEntryPath'
-
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
   eitherReader \input ->
@@ -356,13 +338,6 @@ readEntryTag = do
       [ "Invalid tag: " <> show input <> "."
       , T.unpack err
       ]
-
-readBackendName' :: Text -> Either String BackendName
-readBackendName' input =
-  newBackendName input & first \err -> unlines
-    [ "Invalid backend name: " <> show input <> "."
-    , T.unpack err
-    ]
 
 readFieldVisibility :: ReadM FieldVisibility
 readFieldVisibility =
@@ -386,36 +361,20 @@ readFieldKey' input = do
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
 readQualifiedEntryPath = do
   eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, entryPathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath (Just backendName) entryPath
-      [entryPathStr] -> do
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath Nothing entryPath
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified entry path format: " <> show input <> "."
-                , show expectedQualifiedEntryPathFormat
-                ]
+    mkQualifiedEntryPath (T.pack input) & first \err -> unlines
+      [ "Invalid qualified entry path format: '" <> show input <> "'."
+      , T.unpack err
+      , show expectedQualifiedEntryPathFormat
+      ]
 
 readQualifiedPath :: ReadM (QualifiedPath Path)
 readQualifiedPath = do
   eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, pathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        path <- readPath' pathStr
-        pure $ QualifiedPath (Just backendName) path
-      [pathStr] -> do
-        path <- readPath' pathStr
-        pure $ QualifiedPath Nothing path
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified path format: " <> show input <> "."
-                , show expectedQualifiedPathFormat
-                ]
+    mkQualifiedPath (T.pack input) & first \err -> unlines
+      [ "Invalid qualified path format: '" <> show input <> "'."
+      , T.unpack err
+      , show expectedQualifiedPathFormat
+      ]
 
 readFieldValue :: ReadM FieldValue
 readFieldValue = str <&> FieldValue
@@ -637,54 +596,6 @@ parseFieldNameWhile whileCond = do
 -- | Parse the rest of the input as a field content.
 parseFieldContentsEof :: MParser FieldValue
 parseFieldContentsEof = FieldValue . T.pack <$> P.manyTill P.anySingle P.eof
-
--- | Parse the rest of the line as a field content.
-parseFieldContentsSingleLine :: MParser FieldValue
-parseFieldContentsSingleLine = FieldValue . T.pack <$> P.manyTill P.anySingle endOfLineOrFile
-
--- | Parse a field content wrapped in triple quotes @"""@. E.g.:
---
--- > """
--- > line1
--- > line2
--- > """
-parseFieldContentsTripleQuotes :: MParser FieldValue
-parseFieldContentsTripleQuotes = do
-  let beginBlock = tripleQuote >> void P.eol
-  let parseLine = P.manyTill P.anySingle P.eol
-  let endBlock = tripleQuote >> endOfLineOrFile
-
-  res <- beginBlock >> P.manyTill parseLine endBlock
-  pure $ res <&> T.pack & T.intercalate "\n" & FieldValue
-
-  where
-    tripleQuote :: MParser ()
-    tripleQuote = void $ P.string "\"\"\""
-
-parseEditorFile :: MParser ([FieldInfo], [FieldInfo])
-parseEditorFile = do
-  let parseFieldInfo' = parseFieldInfo (parseFieldContentsTripleQuotes <|> parseFieldContentsSingleLine) <* spaceConsumer
-
-  spaceConsumer >> P.string "[Public fields]" >> spaceConsumer
-  publicFields <- many (P.notFollowedBy (P.char '[') >> parseFieldInfo')
-  spaceConsumer >> P.string "[Private fields]" >> spaceConsumer
-  privateFields <- many parseFieldInfo'
-  P.space >> P.eof
-  pure (publicFields, privateFields)
-  where
-    comment :: MParser ()
-    comment = Lexer.skipLineComment "#"
-
-    -- | Skip empty lines and comments.
-    spaceConsumer :: MParser ()
-    spaceConsumer = Lexer.space
-      (void $ P.try $ P.hspace >> P.eol)
-      comment
-      empty
-
--- | Matches on @eol@ or @eof@.
-endOfLineOrFile :: MParser ()
-endOfLineOrFile = void P.eol <|> P.eof
 
 ----------------------------------------------------------------------------
 -- Utils
