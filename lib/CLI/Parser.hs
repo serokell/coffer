@@ -362,7 +362,7 @@ readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
 readQualifiedEntryPath = do
   eitherReader \input ->
     mkQualifiedEntryPath (T.pack input) & first \err -> unlines
-      [ "Invalid qualified entry path format: '" <> show input <> "'."
+      [ "Invalid qualified entry path format: " <> show input <> "."
       , T.unpack err
       , show expectedQualifiedEntryPathFormat
       ]
@@ -371,7 +371,7 @@ readQualifiedPath :: ReadM (QualifiedPath Path)
 readQualifiedPath = do
   eitherReader \input ->
     mkQualifiedPath (T.pack input) & first \err -> unlines
-      [ "Invalid qualified path format: '" <> show input <> "'."
+      [ "Invalid qualified path format: " <> show input <> "."
       , T.unpack err
       , show expectedQualifiedPathFormat
       ]

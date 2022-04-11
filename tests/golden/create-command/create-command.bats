@@ -13,7 +13,7 @@ load '../helpers'
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid entry path: "/".
+Invalid qualified entry path format: "/".
 Entry paths must not be empty.
 EOF
 }
