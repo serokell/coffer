@@ -121,12 +121,14 @@ viewOptions = do
 createOptions :: Parser CreateOptions
 createOptions =
   CreateOptions
-    <$> argument readQualifiedEntryPath ( mconcat
-          [ metavar "ENTRYPATH"
-          , help
-              "The path to insert the new entry into, this must not already be \
-              \a directory or an entry unless `-f` is specified"
-          ])
+    <$> optional
+          ( argument readQualifiedEntryPath ( mconcat
+              [ metavar "ENTRYPATH"
+              , help
+                  "The path to insert the new entry into, this must not already be \
+                  \a directory or an entry unless `-f` is specified"
+              ])
+          )
     <*> switch ( mconcat
           [ long "edit"
           , short 'e'

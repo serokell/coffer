@@ -7,6 +7,7 @@ module CLI.EditorMode where
 import CLI.EntryView
 import CLI.ParseError
 import CLI.Types
+import Coffer.Path (EntryPath, QualifiedPath, mkQualifiedEntryPath)
 import Control.Lens
 import Data.Bifunctor (Bifunctor(first))
 import Data.Either (lefts, rights)
@@ -52,16 +53,23 @@ headerExample = [int|s|
 # """
 |]
 
+examplePath :: QualifiedPath EntryPath
+examplePath =
+  case mkQualifiedEntryPath "/example/path" of
+    Right entryPath -> entryPath
+    _ -> undefined -- Idk what I should do in this case
+
 renderEditorFile :: CreateOptions -> Text
 renderEditorFile opts = Toml.encode entryViewCodec entryView
   where
     publicFields = coFields opts <&> \field -> FieldInfoView field False
     privateFields = coPrivateFields opts <&> \field -> FieldInfoView field True
-    entryView = EntryView (coQPath opts) (coTags opts) (publicFields <> privateFields)
+    entryPath = fromMaybe examplePath (coQPath opts)
+    entryView = EntryView entryPath (coTags opts) (publicFields <> privateFields)
 
 setOpts :: CreateOptions -> EntryView -> CreateOptions
 setOpts opts entryView = opts
-  { coQPath = qPath
+  { coQPath = Just qPath
   , coTags = tags
   , coFields = publicFields
   , coPrivateFields = privateFields

@@ -88,6 +88,7 @@ main = do
         let cmd = CmdCreate opts
         runCommand config cmd >>= \case
           CRSuccess _ -> printSuccess $ "Entry created at '"  +| coQPath opts |+ "'."
+          CREntryPathIsMissing -> printError "Please, specify the entry path."
           CRCreateError error -> do
             let errorMsg = createErrorToBuilder error
             printError $ unlinesF @_ @Builder $ "The entry cannot be created:" : "" : [errorMsg]
