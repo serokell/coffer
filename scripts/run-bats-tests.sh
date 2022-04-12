@@ -12,7 +12,7 @@ FILTER=$1
 vault server -dev -dev-root-token-id="root" -dev-listen-address="localhost:8209" > /dev/null 2>&1 &
 vault1_pid=$!
 
-vault server -dev -dev-root-token-id="second" -dev-listen-address="localhost:8210" > /dev/null 2>&1 &
+vault server -dev -dev-root-token-id="second" -dev-listen-address="localhost:8211" > /dev/null 2>&1 &
 vault2_pid=$!
 
 if [ -z "$FILTER" ]; then
