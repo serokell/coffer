@@ -317,14 +317,14 @@ tagOptions =
 readPath' :: Text -> Either String Path
 readPath' input =
   mkPath input & first \err -> unlines
-    [ "Invalid path: '" <> T.unpack input <> "'."
+    [ "Invalid path: " <> show input <> "."
     , T.unpack err
     ]
 
 readEntryPath' :: Text -> Either String EntryPath
 readEntryPath' input =
   mkEntryPath input & first \err -> unlines
-    [ "Invalid entry path: '" <> T.unpack input <> "'."
+    [ "Invalid entry path: " <> show input <> "."
     , T.unpack err
     ]
 
@@ -335,14 +335,14 @@ readEntryTag :: ReadM EntryTag
 readEntryTag = do
   eitherReader \input ->
     newEntryTag (T.pack input) & first \err -> unlines
-      [ "Invalid tag: '" <> input <> "'."
+      [ "Invalid tag: " <> show input <> "."
       , T.unpack err
       ]
 
 readBackendName' :: Text -> Either String BackendName
 readBackendName' input =
   newBackendName input & first \err -> unlines
-    [ "Invalid backend name: '" <> T.unpack input <> "'."
+    [ "Invalid backend name: " <> show input <> "."
     , T.unpack err
     ]
 
@@ -361,7 +361,7 @@ readFieldKey' input = do
   case newFieldKey input of
     Right tag -> pure tag
     Left err -> Left $ unlines
-      [ "Invalid field name: '" <> T.unpack input <> "'."
+      [ "Invalid field name: " <> show input <> "."
       , T.unpack err
       ]
 
@@ -378,7 +378,7 @@ readQualifiedEntryPath = do
         pure $ QualifiedPath Nothing entryPath
       _ ->
         Left $ unlines
-                [ "Invalid qualified entry path format: '" <> input <> "'."
+                [ "Invalid qualified entry path format: " <> show input <> "."
                 , show expectedQualifiedEntryPathFormat
                 ]
 
@@ -395,7 +395,7 @@ readQualifiedPath = do
         pure $ QualifiedPath Nothing path
       _ ->
         Left $ unlines
-                [ "Invalid qualified entry path format: '" <> input <> "'."
+                [ "Invalid qualified path format: " <> show input <> "."
                 , show expectedQualifiedPathFormat
                 ]
 
@@ -406,7 +406,7 @@ readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
   eitherReader \input ->
     P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid field format: '" <> input <> "'."
+      [ "Invalid field format: " <> show input <> "."
       , "Expected format: 'fieldname=fieldcontents'."
       , ""
       , "Parser error:"
@@ -423,7 +423,7 @@ readSort = do
           "name" -> pure (SortByEntryName, direction')
           "date" -> pure (SortByEntryDate, direction')
           _ -> Left $ unlines
-            [ "Invalid sort: '" <> T.unpack means <> "'."
+            [ "Invalid sort: " <> show means <> "."
             , "Choose one of: 'name', 'date'."
             , ""
             , show expectedSortFormat
@@ -435,13 +435,13 @@ readSort = do
           "value" -> pure (SortByFieldValue fieldName', direction')
           "date" -> pure (SortByFieldDate fieldName', direction')
           _ -> Left $ unlines
-            [ "Invalid sort: '" <> T.unpack means <> "'."
+            [ "Invalid sort: " <> show means <> "."
             , "Choose one of: 'value', 'date'."
             , ""
             , show expectedSortFormat
             ]
       _ -> Left $ unlines
-        [ "Invalid sort format: '" <> input <> "'."
+        [ "Invalid sort format: " <> show input <> "."
         , show expectedSortFormat
         ]
 
@@ -467,7 +467,7 @@ readFilter :: ReadM Filter
 readFilter = do
   eitherReader \input ->
     P.parse (parseFilter <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid filter format: '" <> input <> "'."
+      [ "Invalid filter format: " <> show input <> "."
       , show expectedFilterFormat
       , ""
       , "Parser error:"
@@ -500,7 +500,7 @@ readFilterField :: ReadM (FieldKey, FilterField)
 readFilterField = do
   eitherReader \input ->
     P.parse (parseFilterField <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid filter-field format: '" <> input <> "'."
+      [ "Invalid filter-field format: " <> show input <> "."
       , show expectedFilterFieldFormat
       , ""
       , "Parser error:"

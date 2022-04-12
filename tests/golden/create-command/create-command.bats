@@ -13,7 +13,7 @@ load '../helpers'
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid entry path: '/'.
+Invalid entry path: "/".
 Entry paths must not be empty.
 EOF
 }
@@ -68,7 +68,7 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-option --field: Invalid field format: '=johndoe@gmail.com'.
+option --field: Invalid field format: "=johndoe@gmail.com".
 Expected format: 'fieldname=fieldcontents'.
 
 Parser error:
