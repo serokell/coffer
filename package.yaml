@@ -94,7 +94,6 @@ library:
     - fmt
     - hashable
     - http-client
-    - http-client-tls
     - http-types
     - lens
     - lens-aeson
@@ -119,6 +118,8 @@ executables:
     dependencies:
       - coffer
       - fmt
+      - http-client
+      - http-client-tls
       - lens
       - optparse-applicative
       - polysemy

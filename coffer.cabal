@@ -99,7 +99,6 @@ library
     , fmt
     , hashable
     , http-client
-    , http-client-tls
     , http-types
     , lens
     , lens-aeson
@@ -178,6 +177,8 @@ executable coffer
       base >=4.14.3.0 && <5
     , coffer
     , fmt
+    , http-client
+    , http-client-tls
     , lens
     , optparse-applicative
     , polysemy

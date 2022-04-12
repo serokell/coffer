@@ -11,7 +11,7 @@ import qualified Entry                        as E
 import qualified Backend.Vault.Kv.Internal    as I
 
 import           Error                        (CofferError (..))
-import           Backend                      (Backend (..), Effects)
+import           Backend                      (Backend (..), Effects, ConnectionManagers (cmDefaultManager, cmTlsManager))
 
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
@@ -23,8 +23,6 @@ import qualified Toml
 
 import           Control.Monad                (void)
 import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, ClientError (..), parseBaseUrl, showBaseUrl, ClientEnv)
-import           Network.HTTP.Client.TLS      (tlsManagerSettings)
-import           Network.HTTP.Client          (newManager, defaultManagerSettings)
 import           Polysemy.Error               (Error, throw)
 import           Toml                         (TomlCodec)
 import           GHC.Generics                 (Generic)
@@ -42,6 +40,7 @@ import Data.Either.Extra (eitherToMaybe, maybeToEither)
 import Data.Text (Text)
 import BackendName (BackendName, backendNameCodec)
 import Coffer.Util (didimatch)
+import Polysemy.Reader (ask)
 
 data VaultKvBackend =
   VaultKvBackend
@@ -88,14 +87,13 @@ data CofferSpecials =
 makeLensesWith abbreviatedFields ''CofferSpecials
 
 getEnv :: Effects r => VaultKvBackend -> Sem r ClientEnv
-getEnv backend =
+getEnv backend = do
+  connectionManagers <- ask
   case url of
     (BaseUrl Http _ _ _) -> do
-      manager <- embed $ newManager defaultManagerSettings
-      pure $ mkClientEnv manager url
+      pure $ mkClientEnv (cmDefaultManager connectionManagers) url
     (BaseUrl Https _ _ _) -> do
-      manager <- embed $ newManager tlsManagerSettings
-      pure $ mkClientEnv manager url
+      pure $ mkClientEnv (cmTlsManager connectionManagers) url
   where
     url = vbAddress backend
 
