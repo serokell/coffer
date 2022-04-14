@@ -3,24 +3,38 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module Entry
-  ( dateModified
+  ( FieldKey
   , keyCharSet
-  , Entry, EntryConvertible (..), newEntry
-  , path, masterField, fields
-  , Field (..), FieldKey,  newField, getFieldKey
-  , newFieldKey, newEntryTag, getEntryTag
-  , visibility, value, tags, EntryTag
+  , newFieldKey
+  , getFieldKey
+  , EntryTag
+  , newEntryTag
+  , getEntryTag
   , FieldVisibility(..)
   , FieldValue (..)
   , fieldValue
+  , Field (..)
+  , dateModified
+  , newField
+  , visibility
+  , value
+  , Entry
+  , newEntry
+  , path
+  , masterField
+  , fields
+  , tags
+  , EntryConvertible (..)
   )
 where
 
 import Coffer.Path (EntryPath)
 import Control.Lens
 import Data.Aeson qualified as A
+import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
+import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -29,7 +43,7 @@ import Fmt (Buildable, build)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
-newtype FieldKey = UnsafeFieldKey T.Text
+newtype FieldKey = UnsafeFieldKey Text
   deriving stock (Show, Eq)
   deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable)
 
@@ -44,10 +58,10 @@ newFieldKey t
       Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
   | otherwise = Right $ UnsafeFieldKey t
 
-getFieldKey :: FieldKey -> T.Text
+getFieldKey :: FieldKey -> Text
 getFieldKey (UnsafeFieldKey t) = t
 
-newtype EntryTag = UnsafeEntryTag T.Text
+newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
   deriving newtype (A.ToJSON, A.FromJSON, Buildable)
 
@@ -59,7 +73,7 @@ newEntryTag tag
       Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
   | otherwise = Right $ UnsafeEntryTag tag
 
-getEntryTag :: EntryTag -> T.Text
+getEntryTag :: EntryTag -> Text
 getEntryTag (UnsafeEntryTag t) = t
 
 data FieldVisibility = Public | Private
@@ -80,7 +94,7 @@ instance A.FromJSON FieldVisibility where
     "private" -> pure Private
     other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
 
-newtype FieldValue = FieldValue { unFieldValue :: T.Text }
+newtype FieldValue = FieldValue { unFieldValue :: Text }
   deriving stock (Show, Eq, Ord)
 makeLensesFor [("unFieldValue", "fieldValue")] ''FieldValue
 
@@ -117,8 +131,8 @@ data Entry =
   { ePath :: EntryPath
   , eDateModified :: UTCTime
   , eMasterField :: Maybe FieldKey
-  , eFields :: HS.HashMap FieldKey Field
-  , eTags :: S.Set EntryTag
+  , eFields :: HashMap FieldKey Field
+  , eTags :: Set EntryTag
   }
   deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Entry

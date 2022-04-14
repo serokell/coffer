@@ -27,6 +27,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time (UTCTime, getCurrentTime, utctDay)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
@@ -43,7 +44,7 @@ import Polysemy.Error (Error, throw)
 import Validation (Validation(Failure, Success))
 
 runCommand
-  :: (Member BackendEffect r, Member (Embed IO) r, Member (Error CofferError) r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError] r)
   => Config -> Command res -> Sem r res
 runCommand config = \case
   CmdView opts -> catchAndReturn $ viewCmd config opts
@@ -57,7 +58,7 @@ runCommand config = \case
   CmdTag opts -> catchAndReturn $ tagCmd config opts
 
 viewCmd
-  :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error ViewResult) r)
+  :: (Members '[BackendEffect, Error CofferError, Error ViewResult] r)
   => Config -> ViewOptions -> Sem r ViewResult
 viewCmd config (ViewOptions (QualifiedPath backendNameMb path) fieldNameMb) = do
   backend <- getBackend config backendNameMb
@@ -86,9 +87,12 @@ viewCmd config (ViewOptions (QualifiedPath backendNameMb path) fieldNameMb) = do
 
 createCmd
   :: forall r
-   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error CreateResult) r)
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error CreateResult] r)
   => Config -> CreateOptions -> Sem r CreateResult
-createCmd config (CreateOptions (QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields) = do
+createCmd
+  config
+  (CreateOptions (QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields)
+    = do
   backend <- getBackend config backendNameMb
   nowUtc <- embed getCurrentTime
   let
@@ -109,9 +113,12 @@ createCmd config (CreateOptions (QualifiedPath backendNameMb entryPath) _edit fo
 
 setFieldCmd
   :: forall r
-   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error SetFieldResult) r)
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error SetFieldResult] r)
   => Config -> SetFieldOptions -> Sem r SetFieldResult
-setFieldCmd config (SetFieldOptions (QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb) = do
+setFieldCmd
+  config
+  (SetFieldOptions (QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb)
+    = do
   backend <- getBackend config backendNameMb
   readSecret backend entryPath >>= \case
     Nothing -> pure $ SFREntryNotFound entryPath
@@ -145,7 +152,7 @@ setFieldCmd config (SetFieldOptions (QualifiedPath backendNameMb entryPath) fiel
           Nothing -> throw $ SFRMissingFieldContents entryPath
 
 deleteFieldCmd
-  :: (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError] r)
   => Config -> DeleteFieldOptions -> Sem r DeleteFieldResult
 deleteFieldCmd config (DeleteFieldOptions (QualifiedPath backendNameMb path) fieldName) = do
   backend <- getBackend config backendNameMb
@@ -162,7 +169,9 @@ deleteFieldCmd config (DeleteFieldOptions (QualifiedPath backendNameMb path) fie
           void $ writeSecret backend newEntry
           pure $ DFRSuccess newEntry
 
-findCmd :: (Member BackendEffect r, Member (Error CofferError) r) => Config -> FindOptions -> Sem r (Maybe Directory)
+findCmd
+  :: (Members '[BackendEffect, Error CofferError] r)
+  => Config -> FindOptions -> Sem r (Maybe Directory)
 findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
   let backendNameMb = qPathMb >>= qpBackendName
   backend <- getBackend config backendNameMb
@@ -254,14 +263,18 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
       OpEQ -> (==)
 
 renameCmd
-  :: forall r.
-     ( Member BackendEffect r
-     , Member (Embed IO) r
-     , Member (Error CofferError) r
-     , Member (Error RenameResult) r
-     )
+  :: forall r
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error RenameResult] r)
   => Config -> RenameOptions -> Sem r RenameResult
-renameCmd config (RenameOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force) = do
+renameCmd
+  config
+  (RenameOptions
+    dryRun
+    (QualifiedPath oldBackendNameMb oldPath)
+    (QualifiedPath newBackendNameMb newPath)
+    force
+  )
+    = do
   oldBackend <- getBackend config oldBackendNameMb
   newBackend <- getBackend config newBackendNameMb
   operations <- buildCopyOperations oldBackend newBackend oldPath newPath force
@@ -274,7 +287,8 @@ renameCmd config (RenameOptions dryRun (QualifiedPath oldBackendNameMb oldPath) 
         flip filter operations \(CopyOperation old _) ->
           none (\(CopyOperation _ new) -> old ^. path == new ^. path) operations
 
-  -- If directory/entry was successfully copied, then we can delete old directory/entry without delete errors.
+  -- If directory/entry was successfully copied,
+  -- then we can delete old directory/entry without delete errors.
   unless dryRun do
     forM_ pathsToDelete \(CopyOperation old _) -> do
       let qPath = QualifiedPath oldBackendNameMb (Path.entryPathAsPath (old ^. path))
@@ -291,14 +305,10 @@ data CopyOperation = CopyOperation
 getOperationPaths :: CopyOperation -> (EntryPath, EntryPath)
 getOperationPaths (CopyOperation old new) = (old ^. E.path, new ^. E.path)
 
-{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: T.Text) #-}
+{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: Text) #-}
 buildCopyOperations
   :: forall r
-   . ( Member BackendEffect r
-     , Member (Embed IO) r
-     , Member (Error CofferError) r
-     , Member (Error CopyResult) r
-     )
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
   => SomeBackend -> SomeBackend -> Path -> Path -> Bool -> Sem r [CopyOperation]
 buildCopyOperations oldBackend newBackend oldPath newPath force = do
   entryOrDir <- getEntryOrDirThrow oldBackend CPRPathNotFound oldPath
@@ -343,7 +353,10 @@ buildCopyOperations oldBackend newBackend oldPath newPath force = do
       CopyOperation old (new & dateModified .~ nowUtc)
 
     -- | Performs a check on `CopyOperation` and returns @Failure@ if any of checks fail.
-    validateCopyOperation :: SomeBackend -> CopyOperation -> Sem r (Validation [(EntryPath, CreateError)] Entry)
+    validateCopyOperation
+      :: SomeBackend
+      -> CopyOperation
+      -> Sem r (Validation [(EntryPath, CreateError)] Entry)
     validateCopyOperation backend (CopyOperation old new) =
       checkCreateEntry backend force new <&> first \err -> [(old ^. path, err)]
 
@@ -353,13 +366,17 @@ runCopyOperations backend operations = do
   forM_ newEntries (writeSecret backend)
 
 copyCmd
-  :: ( Member BackendEffect r
-     , Member (Embed IO) r
-     , Member (Error CofferError) r
-     , Member (Error CopyResult) r
-     )
+  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
   => Config -> CopyOptions -> Sem r CopyResult
-copyCmd config (CopyOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force) = do
+copyCmd
+  config
+  (CopyOptions
+    dryRun
+    (QualifiedPath oldBackendNameMb oldPath)
+    (QualifiedPath newBackendNameMb newPath)
+    force
+  )
+    = do
   oldBackend <- getBackend config oldBackendNameMb
   newBackend <- getBackend config newBackendNameMb
   operations <- buildCopyOperations oldBackend newBackend oldPath newPath force
@@ -370,7 +387,7 @@ copyCmd config (CopyOptions dryRun (QualifiedPath oldBackendNameMb oldPath) (Qua
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
 deleteCmd
-  :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error DeleteResult) r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult] r)
   => Config -> DeleteOptions -> Sem r DeleteResult
 deleteCmd config (DeleteOptions dryRun (QualifiedPath backendNameMb path) recursive) = do
   backend <- getBackend config backendNameMb
@@ -389,7 +406,7 @@ deleteCmd config (DeleteOptions dryRun (QualifiedPath backendNameMb path) recurs
 
 tagCmd
   :: forall r
-   . (Member BackendEffect r, Member (Error CofferError) r, Member (Embed IO) r, Member (Error TagResult) r)
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error TagResult] r)
   => Config -> TagOptions -> Sem r TagResult
 tagCmd config (TagOptions (QualifiedPath backendNameMb entryPath) tag delete) = do
   backend <- getBackend config backendNameMb
@@ -440,7 +457,7 @@ pathIsEntry backend entryPath =
 -- | Returns the entry or directory that the path points to.
 -- If the path doesn't exist at all, throws an error.
 getEntryOrDirThrow
-  :: (Member BackendEffect r, Member (Error CofferError) r, Member (Error e) r)
+  :: (Members '[BackendEffect, Error CofferError, Error e] r)
   => SomeBackend -> (Path -> e) -> Path -> Sem r (Either Entry Directory)
 getEntryOrDirThrow backend mkError path = do
   getEntryOrDir backend path >>= \case
@@ -451,7 +468,7 @@ getEntryOrDirThrow backend mkError path = do
 -- If the path doesn't exist at all, returns `Nothing`.
 getEntryOrDir
   :: forall r
-   . (Member BackendEffect r, Member (Error CofferError) r)
+   . (Members '[BackendEffect, Error CofferError] r)
   => SomeBackend -> Path -> Sem r (Maybe (Either Entry Directory))
 getEntryOrDir backend path =
   tryGetEntry path >>= \case
@@ -507,7 +524,9 @@ getEntryOrDir backend path =
 --
 -- Note: the root path @/@ cannot possibly be occupied by an entry,
 -- therefore we skip the check for that path.
-getEntriesInEntryPath :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r [EntryPath]
+getEntriesInEntryPath
+  :: forall r. Member BackendEffect r
+  => SomeBackend -> EntryPath -> Sem r [EntryPath]
 getEntriesInEntryPath backend entryPath = do
   let parentDirsExceptRoot = entryPath
         & Path.entryPathParentDirs
@@ -545,7 +564,9 @@ checkCreateEntry backend force entry = catchAndReturn act
 
       pure $ Success entry
 
-getBackend :: forall r. Member (Error CofferError) r => Config -> Maybe BackendName -> Sem r SomeBackend
+getBackend
+  :: forall r. Member (Error CofferError) r
+  => Config -> Maybe BackendName -> Sem r SomeBackend
 getBackend config backendNameMb = do
   let backendName = fromMaybe (mainBackend config) backendNameMb
   let backendsHashMap = backends config

@@ -4,28 +4,37 @@
 
 module Backend.Vault.Kv.Internal
   ( KvResponse (..)
-  , requestId, leaseId, renewable, leaseDuration
+  , requestId
+  , leaseId
+  , renewable
+  , leaseDuration
+  , ddata
   , ReadSecret (..)
-  , secret, createdTime, deletionTime, destroyed, version
+  , secret
+  , customMetadata
+  , createdTime
+  , deletionTime
+  , destroyed
+  , version
   , ListSecrets (..)
   , unListSecrets
   , PostSecret (..)
   , cas
   , PatchSecret
   , UpdateMetadata (..)
-  , maxVersions, casRequired, deleteVersionAfter
+  , maxVersions
+  , casRequired
+  , deleteVersionAfter
   , VaultToken (..)
 
-  , ddata, customMetadata
-
+  -- * Routes
+  , routes
   , readSecret
   , listSecrets
   , postSecret
   , patchSecret
   , updateMetadata
   , deleteSecret
-
-  , routes
   )
 where
 
@@ -33,8 +42,9 @@ import Control.Exception (throwIO)
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Aeson.Types qualified as AT
+import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
-import Data.Text qualified as T
+import Data.Text (Text)
 import Servant.API
 import Servant.API.Generic
 import Servant.Client
@@ -56,15 +66,14 @@ import Servant.Client.Generic (AsClientT, genericClientHoist)
 -- >  }
 data KvResponse a =
   KvResponse
-  { krRequestId :: T.Text
-  , krLeaseId :: T.Text
+  { krRequestId :: Text
+  , krLeaseId :: Text
   , krRenewable :: Bool
   , krLeaseDuration :: Int
-  , krKdata :: a
+  , krDdata :: a
   }
   deriving stock (Show)
 makeLensesWith abbreviatedFields ''KvResponse
-
 
 -- |
 -- A type defining the response from the Vault server at endpoint
@@ -77,7 +86,7 @@ makeLensesWith abbreviatedFields ''KvResponse
 -- >    , "q1"
 -- >    ]
 -- >  }
-newtype ListSecrets = ListSecrets { _unListSecrets :: [T.Text] }
+newtype ListSecrets = ListSecrets { _unListSecrets :: [Text] }
   deriving stock (Show)
 makeLenses ''ListSecrets
 
@@ -103,10 +112,10 @@ makeLenses ''ListSecrets
 -- >  }
 data ReadSecret =
   ReadSecret
-  { rsSecret :: HS.HashMap T.Text T.Text
-  , rsCustomMetadata :: HS.HashMap T.Text T.Text
-  , rsCreatedTime :: T.Text
-  , rsDeletionTime :: T.Text
+  { rsSecret :: HashMap Text Text
+  , rsCustomMetadata :: HashMap Text Text
+  , rsCreatedTime :: Text
+  , rsDeletionTime :: Text
   , rsDestroyed :: Bool
   , rsVersion :: Int
   }
@@ -130,7 +139,7 @@ makeLensesWith abbreviatedFields ''ReadSecret
 data PostSecret =
   PostSecret
   { psCas :: Maybe Int
-  , psDdata :: HS.HashMap T.Text T.Text
+  , psDdata :: HashMap Text Text
   }
   deriving stock (Show)
 type PatchSecret = PostSecret
@@ -153,26 +162,21 @@ data UpdateMetadata =
   UpdateMetadata
   { umMaxVersions :: Maybe Int
   , umCasRequired :: Maybe Bool
-  , umDeleteVersionAfter :: Maybe T.Text
-  , umCustomMetadata :: HS.HashMap T.Text T.Text
+  , umDeleteVersionAfter :: Maybe Text
+  , umCustomMetadata :: HashMap Text Text
   }
   deriving stock (Show)
 makeLensesWith abbreviatedFields ''UpdateMetadata
-
--- Overloaded Lens accessors
-
-instance {-# OVERLAPPABLE #-} a ~ b => HasDdata (KvResponse a) b where
-  ddata = kdata
 
 -- JSON serialization/deserialization, logically some ADTs need to only be deserialized,
 -- others serialized, but never both.
 
 instance FromJSON ListSecrets where
-  parseJSON = withObject "ListSecrets" $ \o ->
+  parseJSON = withObject "ListSecrets" \o ->
     ListSecrets <$> o .: "keys"
 
 instance FromJSON ReadSecret where
-  parseJSON = withObject "ReadSecret" $ \o -> do
+  parseJSON = withObject "ReadSecret" \o -> do
     metadata <- o .: "metadata"
     ReadSecret
       <$> o .: "data"
@@ -183,7 +187,7 @@ instance FromJSON ReadSecret where
       <*> metadata .: "version"
 
 instance FromJSON a => FromJSON (KvResponse a) where
-  parseJSON = withObject "KvResponse" $ \o ->
+  parseJSON = withObject "KvResponse" \o ->
     KvResponse
     <$> o .: "request_id"
     <*> o .: "lease_id"
@@ -226,7 +230,7 @@ instance ReflectMethod 'LIST where
 
 -- TODO - A place holder, for a perhaps more complicated type. One with pinned memory which is
 --        overwritten many times or something like that
-newtype VaultToken = VaultToken T.Text
+newtype VaultToken = VaultToken Text
   deriving stock (Eq, Show)
 
 -- Could this be somehow automated? newtypes are just meaningless wrapper anyways, at least to GHC.
@@ -243,54 +247,54 @@ data Routes route =
   { -- | To read a secret under a path use `readSecret`
     rReadSecret :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "data"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> QueryParam "version" Int
     :> Get '[JSON] (KvResponse ReadSecret)
     -- | To patch a secret under a path use `patchSecret`
   , rPatchSecret :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "data"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> ReqBody '[JSON] PatchSecret
-    :> Patch '[JSON] (KvResponse (HS.HashMap T.Text Value))
+    :> Patch '[JSON] (KvResponse (HashMap Text Value))
     -- | To post a secret to a path use `postSecret`
   , rPostSecret :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "data"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> ReqBody '[JSON] PostSecret
-    :> Post '[JSON] (KvResponse (HS.HashMap T.Text Value))
+    :> Post '[JSON] (KvResponse (HashMap Text Value))
     -- | To list the paths under a path use `listSecrets`
   , rListSecrets :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "metadata"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> Verb 'LIST 200 '[JSON] (KvResponse ListSecrets)
     -- | To update metadata under a path use `updateMetadata`
   , rUpdateMetadata :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "metadata"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> ReqBody '[JSON] UpdateMetadata
     :> Post '[JSON] ()
     -- | To delete secret under a path use `deleteSecret`
   , rDeleteSecret :: route
     :- "v1"
-    :> Capture "mount" T.Text
+    :> Capture "mount" Text
     :> "metadata"
     :> VaultTokenHeader
-    :> CaptureAll "segments" T.Text
+    :> CaptureAll "segments" Text
     :> Delete '[JSON] NoContent
   }
   deriving stock (Generic)

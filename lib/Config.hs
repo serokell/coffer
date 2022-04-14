@@ -8,13 +8,14 @@ import Backend (Backend(..), SomeBackend(..))
 import BackendName (BackendName, backendNameCodec)
 import Backends (backendPackedCodec)
 import Data.Foldable (toList)
+import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
-import Toml (TomlCodec)
+import Toml (TomlCodec, (.=))
 import Toml qualified
 
 data Config =
   Config
-  { backends :: HS.HashMap BackendName SomeBackend
+  { backends :: HashMap BackendName SomeBackend
   , mainBackend :: BackendName
   }
   deriving stock (Show)
@@ -23,7 +24,7 @@ data Config =
 configCodec :: TomlCodec Config
 configCodec = Config
   <$> Toml.dimap toList listToHs
-  (Toml.list backendPackedCodec "backend") Toml..= backends
-  <*> backendNameCodec "main_backend" Toml..= mainBackend
+  (Toml.list backendPackedCodec "backend") .= backends
+  <*> backendNameCodec "main_backend" .= mainBackend
   where
     listToHs list = HS.fromList $ fmap (\y@(SomeBackend x) -> (_name x, y)) list

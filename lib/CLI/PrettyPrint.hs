@@ -14,8 +14,8 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.Internal.Builder (toLazyText)
 import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Builder (toLazyText)
 import Data.Time
 import Entry
 import Fmt
@@ -60,10 +60,17 @@ buildTags tags =
 buildFields :: [(FieldKey,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
-  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int) & maximum
+  let maxFieldLength =
+        formattedFields
+          <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int)
+          & maximum
 
   formattedFields `zip` fields <&> \((firstLine, otherLinesMb), (_, field)) -> do
-    let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified)
+    let formattedFirstLine = mconcat
+          [ padRightF maxFieldLength ' ' firstLine
+          , " "
+          , buildDate (field ^. dateModified)
+          ]
     case otherLinesMb of
       Nothing -> formattedFirstLine
       Just otherLines -> unlinesF [formattedFirstLine, otherLines]

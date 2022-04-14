@@ -13,19 +13,21 @@ import BackendName (BackendName, backendNameCodec)
 import Coffer.Path (EntryPath, HasPathSegments, Path, PathSegment, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
 import Control.Exception (catch)
-import Control.Lens
+import Control.Lens hiding ((.=))
 import Control.Monad (void)
 import Data.Aeson qualified as A
 import Data.Aeson.Text qualified as A
 import Data.Either.Extra (eitherToMaybe, maybeToEither)
-import Data.HashMap.Internal.Strict qualified as HS
+import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HS
+import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Time (UTCTime)
-import Entry (FieldValue(FieldValue), FieldVisibility)
+import Entry (Entry, FieldValue(FieldValue), FieldVisibility)
 import Entry qualified as E
 import Error (CofferError(..))
 import GHC.Generics (Generic)
@@ -38,32 +40,32 @@ import Servant.Client
   (BaseUrl(BaseUrl), ClientEnv, ClientError(..), Scheme(Http, Https), mkClientEnv, parseBaseUrl,
   showBaseUrl)
 import Servant.Client.Core.Response (responseStatusCode)
-import Toml (TomlCodec)
+import Toml (TomlCodec, (.=))
 import Toml qualified
 
 data VaultKvBackend =
   VaultKvBackend
   { vbName :: BackendName
   , vbAddress :: BaseUrl
-  , vbMount :: T.Text
+  , vbMount :: Text
   , vbToken :: I.VaultToken
   }
   deriving stock (Show)
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
-                  <$> backendNameCodec "name" Toml..= vbName
-                  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") Toml..= vbAddress
-                  <*> Toml.text "mount" Toml..= vbMount
-                  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") Toml..= vbToken
+  <$> backendNameCodec "name" .= vbName
+  <*> didimatch baseUrlToText textToBaseUrl (Toml.text "address") .= vbAddress
+  <*> Toml.text "mount" .= vbMount
+  <*> Toml.dimatch tokenToText textToToken (Toml.text "token") .= vbToken
   where
     tokenToText (I.VaultToken t) = Just t
     textToToken t = I.VaultToken t
 
-    baseUrlToText :: BaseUrl -> Either T.Text T.Text
+    baseUrlToText :: BaseUrl -> Either Text Text
     baseUrlToText = Right . T.pack . showBaseUrl
 
-    textToBaseUrl :: T.Text -> Either T.Text BaseUrl
+    textToBaseUrl :: Text -> Either Text BaseUrl
     textToBaseUrl = maybeToEither "Cannot parse base url" . parseBaseUrl . T.unpack
 
 data FieldMetadata = FieldMetadata
@@ -76,10 +78,10 @@ makeLensesWith abbreviatedFields ''FieldMetadata
 
 data CofferSpecials =
   CofferSpecials
-  { csMasterKey :: Maybe T.Text
+  { csMasterKey :: Maybe Text
   , csGlobalDateModified :: UTCTime
-  , csFields :: HS.HashMap T.Text FieldMetadata
-  , csTags :: Set.Set T.Text
+  , csFields :: HashMap Text FieldMetadata
+  , csTags :: Set Text
   }
   deriving stock (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
@@ -98,19 +100,20 @@ getEnv backend =
     url = vbAddress backend
 
 -- | Handles @ClientError@ in the following way:
--- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error. It status code is 404, the result would be Nothing
+-- 1. If it is @FailureResponse@ and status code isn't 404, then we would get an error.
+--    It status code is 404, the result would be Nothing
 -- 2. If it is @ConnectionError@, then we would get @ConnectError@
 -- 3. Otherwise we would get @MarshallingFailed@
 exceptionHandler :: ClientError -> Maybe CofferError
-exceptionHandler =
-  \case FailureResponse _request response ->
-            case statusCode $ responseStatusCode response of
-              404 -> Nothing
-              e -> Just $ OtherError (T.pack $ show e)
-        DecodeFailure _ _ -> Just MarshallingFailed
-        UnsupportedContentType _ _ -> Just MarshallingFailed
-        InvalidContentTypeHeader _ -> Just MarshallingFailed
-        ConnectionError _ -> Just ConnectError
+exceptionHandler = \case
+  FailureResponse _request response ->
+    case statusCode $ responseStatusCode response of
+      404 -> Nothing
+      e -> Just $ OtherError (T.pack $ show e)
+  DecodeFailure _ _ -> Just MarshallingFailed
+  UnsupportedContentType _ _ -> Just MarshallingFailed
+  InvalidContentTypeHeader _ -> Just MarshallingFailed
+  ConnectionError _ -> Just ConnectError
 
 -- | Runs an IO action and throws an error if happens.
 embedCatchClientError
@@ -118,10 +121,11 @@ embedCatchClientError
   => Member (Error CofferError) r
   => IO a
   -> Sem r a
-embedCatchClientError io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
-  \case Left l -> pure l
-        Right (Just r) -> throw r
-        Right Nothing -> throw $ OtherError "404"
+embedCatchClientError io =
+  embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>= \case
+    Left l -> pure l
+    Right (Just r) -> throw r
+    Right Nothing -> throw $ OtherError "404"
 
 -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
 --   Otherwise, it would be Nothing.
@@ -130,10 +134,11 @@ embedCatchClientErrorMaybe
   => Member (Error CofferError) r
   => IO a
   -> Sem r (Maybe a)
-embedCatchClientErrorMaybe io = embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>=
-  \case Left l -> (pure . Just) l
-        Right (Just r) -> throw r
-        Right Nothing -> pure Nothing
+embedCatchClientErrorMaybe io =
+  embed (catch @ClientError (io <&> Left) (pure . Right . exceptionHandler)) >>= \case
+    Left l -> (pure . Just) l
+    Right (Just r) -> throw r
+    Right Nothing -> pure Nothing
 
 orThrow
   :: Member (Error e) r
@@ -147,7 +152,7 @@ getPathSegments
   => s -> [Text]
 getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
-kvWriteSecret :: Effects r => VaultKvBackend -> E.Entry -> Sem r ()
+kvWriteSecret :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteSecret backend entry = do
   let
     cofferSpecials = CofferSpecials
@@ -167,10 +172,10 @@ kvWriteSecret backend entry = do
     secret = I.PostSecret
       { I.psCas = Nothing
       , I.psDdata =
-              HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
-            . HS.map (^. E.value . E.fieldValue)
-            . HS.mapKeys E.getFieldKey
-            $ entry ^. E.fields
+            HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
+          . HS.map (^. E.value . E.fieldValue)
+          . HS.mapKeys E.getFieldKey
+          $ entry ^. E.fields
         }
   env <- getEnv backend
   void $ embedCatchClientError do
@@ -178,7 +183,7 @@ kvWriteSecret backend entry = do
   where
     postSecret env = (I.routes env ^. I.postSecret) (vbMount backend) (vbToken backend)
 
-kvReadSecret :: Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe E.Entry)
+kvReadSecret :: Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe Entry)
 kvReadSecret backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
@@ -192,19 +197,20 @@ kvReadSecret backend path = do
             _visibility <- cofferSpecials ^? fields . at key . _Just . visibility
             _key <- eitherToMaybe $ E.newFieldKey key
 
-            Just (_key
-                  , E.newField _modTime (FieldValue value)
-                    & E.visibility .~ _visibility
-                  )
+            Just
+              (_key
+              , E.newField _modTime (FieldValue value)
+                & E.visibility .~ _visibility
+              )
 
       fields <-
         (secrets & each %%~ keyAndValueToField <&> HS.fromList) `orThrow` MarshallingFailed
       _tags <- cofferSpecials ^. tags
-            & Set.toList
-            & mapM E.newEntryTag
-            <&> Set.fromList
-            & eitherToMaybe
-            & (`orThrow` MarshallingFailed)
+        & Set.toList
+        & mapM E.newEntryTag
+        <&> Set.fromList
+        & eitherToMaybe
+        & (`orThrow` MarshallingFailed)
 
       fieldKey <-
         case cofferSpecials ^. masterKey of
@@ -222,10 +228,10 @@ kvReadSecret backend path = do
   where
     readSecret env = (I.routes env ^. I.readSecret) (vbMount backend) (vbToken backend)
 
-kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [T.Text])
+kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
 kvListSecrets backend path = do
   env <- getEnv backend
-  embedCatchClientErrorMaybe $ do
+  embedCatchClientErrorMaybe do
     response <- listSecrets env (getPathSegments path)
     pure $ response ^. I.ddata . I.unListSecrets
   where

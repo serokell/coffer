@@ -35,14 +35,14 @@ didimatch
   -> TomlCodec a  -- ^ Source 'Codec' object
   -> TomlCodec b  -- ^ Target 'Codec' object
 didimatch matchB matchA codec = Toml.Codec
-    { Toml.codecRead = \t -> case Toml.codecRead codec t of
-        Success a ->
-          case matchA a of
-            Left err -> Failure [Toml.ParseError $ Toml.TomlParseError err]
-            Right b -> Success b
-        Failure b -> Failure b
-    , Toml.codecWrite = \b -> do
-        a <- Toml.eitherToTomlState $ matchB b
-        a' <- Toml.codecWrite codec a
-        Toml.eitherToTomlState $ matchA a'
-    }
+  { Toml.codecRead = \t -> case Toml.codecRead codec t of
+      Success a ->
+        case matchA a of
+          Left err -> Failure [Toml.ParseError $ Toml.TomlParseError err]
+          Right b -> Success b
+      Failure b -> Failure b
+  , Toml.codecWrite = \b -> do
+      a <- Toml.eitherToTomlState $ matchB b
+      a' <- Toml.codecWrite codec a
+      Toml.eitherToTomlState $ matchA a'
+  }
