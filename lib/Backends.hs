@@ -7,13 +7,12 @@ module Backends
   , backendPackedCodec
   ) where
 
-import qualified Data.Text           as T
-import qualified Toml
-
-import           Backend.Vault.Kv    (VaultKvBackend)
-import           Toml                (TomlCodec)
-import           Backend             (SomeBackend (..), Backend (..))
-import qualified Data.HashMap.Strict as HS
+import Backend (Backend(..), SomeBackend(..))
+import Backend.Vault.Kv (VaultKvBackend)
+import Data.HashMap.Strict qualified as HS
+import Data.Text qualified as T
+import Toml (TomlCodec)
+import Toml qualified
 import Validation (Validation(Failure))
 
 backendPackedCodec :: TomlCodec SomeBackend

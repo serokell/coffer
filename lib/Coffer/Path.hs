@@ -22,17 +22,17 @@ module Coffer.Path
   , QualifiedPath (..)
   ) where
 
-import Data.Text (Text)
-import qualified Data.Text as T
-import Fmt (Buildable, build, pretty)
-import Data.Maybe (fromMaybe)
-import Data.Hashable (Hashable)
-import Data.List.NonEmpty (NonEmpty ((:|)))
-import Control.Lens
-import qualified Data.List.NonEmpty as NE
-import Control.Monad ((>=>))
-import qualified Data.List as List
 import BackendName (BackendName)
+import Control.Lens
+import Control.Monad ((>=>))
+import Data.Hashable (Hashable)
+import Data.List qualified as List
+import Data.List.NonEmpty (NonEmpty((:|)))
+import Data.List.NonEmpty qualified as NE
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import Data.Text qualified as T
+import Fmt (Buildable, build, pretty)
 
 -- $setup
 -- >>> import Fmt (pretty, build)

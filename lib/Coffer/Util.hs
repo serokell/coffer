@@ -7,12 +7,12 @@ module Coffer.Util
   , didimatch
   ) where
 
-import Polysemy ( Sem )
-import Polysemy.Error ( runError, Error )
-import Toml (TomlCodec)
-import qualified Toml
-import Validation (Validation(Success, Failure))
 import Data.Text (Text)
+import Polysemy (Sem)
+import Polysemy.Error (Error, runError)
+import Toml (TomlCodec)
+import Toml qualified
+import Validation (Validation(Failure, Success))
 
 ----------------------------------------------------------------------------
 -- Polysemy helpers

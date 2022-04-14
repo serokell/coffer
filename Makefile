@@ -24,6 +24,12 @@ haddock-no-deps:
 clean:
 	$(MAKE_PACKAGE) clean
 
+stylish:
+	find . -name '.stack-work' -prune -o -name '.dist-newstyle' -prune -o -name '*.hs' -exec stylish-haskell -i '{}' \;
+
+lint:
+	hlint .
+
 # Usage:
 #   * make bats
 #   * make bats FILTER="test name"

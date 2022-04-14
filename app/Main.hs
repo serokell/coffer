@@ -4,31 +4,30 @@
 
 module Main where
 
-import Control.Lens
-import Control.Monad (forM_, forM, when)
-import Options.Applicative ( execParser )
-import Polysemy
-import Polysemy.Error (errorToIOFinal, Error)
-import Data.Text (pack)
-import System.Exit (die, exitFailure)
-import Fmt
-import qualified Data.Text.IO as TIO
-import qualified Toml
-
-import CLI.Parser
-import CLI.Types
-import CLI.PrettyPrint
-import Backend.Interpreter
-import Error
-import Backend.Commands as Commands
 import Backend
-import Coffer.Path ( Path, EntryPath )
-import qualified Entry as E
-import qualified Coffer.Directory as Dir
-import Config (configCodec, Config (..))
-import Entry (path, Entry)
-import System.Environment (lookupEnv)
+import Backend.Commands as Commands
+import Backend.Interpreter
+import CLI.Parser
+import CLI.PrettyPrint
+import CLI.Types
+import Coffer.Directory qualified as Dir
+import Coffer.Path (EntryPath, Path)
+import Config (Config(..), configCodec)
+import Control.Lens
+import Control.Monad (forM, forM_, when)
 import Data.Maybe (fromMaybe)
+import Data.Text (pack)
+import Data.Text.IO qualified as TIO
+import Entry (Entry, path)
+import Entry qualified as E
+import Error
+import Fmt
+import Options.Applicative (execParser)
+import Polysemy
+import Polysemy.Error (Error, errorToIOFinal)
+import System.Environment (lookupEnv)
+import System.Exit (die, exitFailure)
+import Toml qualified
 
 runBackendIO
   :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a

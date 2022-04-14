@@ -4,19 +4,18 @@
 
 module Entry.Json where
 
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Lens as A
-
-import qualified Entry as E
+import Coffer.Path qualified as Path
 import Control.Lens
-import qualified Data.HashMap.Strict as HS
-import qualified Data.Text as T
-import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Control.Monad (forM)
-import Entry (Entry, FieldValue (FieldValue))
-import Fmt (pretty)
-import qualified Coffer.Path as Path
+import Data.Aeson qualified as A
+import Data.Aeson.Lens qualified as A
 import Data.Either.Extra (eitherToMaybe)
+import Data.HashMap.Strict qualified as HS
+import Data.Text qualified as T
+import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Entry (Entry, FieldValue(FieldValue))
+import Entry qualified as E
+import Fmt (pretty)
 
 newtype JsonEntry = JsonEntry A.Value
   deriving stock (Show)

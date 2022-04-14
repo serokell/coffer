@@ -7,41 +7,39 @@ module Backend.Vault.Kv
   , I.VaultToken(..)
   ) where
 
-import qualified Entry                        as E
-import qualified Backend.Vault.Kv.Internal    as I
-
-import           Error                        (CofferError (..))
-import           Backend                      (Backend (..), Effects)
-
-import qualified Data.Text                    as T
-import qualified Data.Text.Encoding           as T
-import qualified Data.Text.Lazy               as TL
-import qualified Data.HashMap.Internal.Strict as HS
-import qualified Data.Set                     as Set
-import qualified Data.Aeson                   as A
-import qualified Toml
-
-import           Control.Monad                (void)
-import           Servant.Client               (BaseUrl (BaseUrl), Scheme (Https, Http), mkClientEnv, ClientError (..), parseBaseUrl, showBaseUrl, ClientEnv)
-import           Network.HTTP.Client.TLS      (tlsManagerSettings)
-import           Network.HTTP.Client          (newManager, defaultManagerSettings)
-import           Polysemy.Error               (Error, throw)
-import           Toml                         (TomlCodec)
-import           GHC.Generics                 (Generic)
-import           Data.Time                    (UTCTime)
-import           Control.Exception            (catch)
-import           Servant.Client.Core.Response (responseStatusCode)
-import           Network.HTTP.Types           (statusCode)
-
-import           Polysemy
-import           Control.Lens
-import Coffer.Path (pathSegments, unPathSegment, HasPathSegments, PathSegment, EntryPath, Path)
-import qualified Data.Aeson.Text as A
-import Entry (FieldVisibility, FieldValue (FieldValue))
-import Data.Either.Extra (eitherToMaybe, maybeToEither)
-import Data.Text (Text)
+import Backend (Backend(..), Effects)
+import Backend.Vault.Kv.Internal qualified as I
 import BackendName (BackendName, backendNameCodec)
+import Coffer.Path (EntryPath, HasPathSegments, Path, PathSegment, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
+import Control.Exception (catch)
+import Control.Lens
+import Control.Monad (void)
+import Data.Aeson qualified as A
+import Data.Aeson.Text qualified as A
+import Data.Either.Extra (eitherToMaybe, maybeToEither)
+import Data.HashMap.Internal.Strict qualified as HS
+import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
+import Data.Text.Lazy qualified as TL
+import Data.Time (UTCTime)
+import Entry (FieldValue(FieldValue), FieldVisibility)
+import Entry qualified as E
+import Error (CofferError(..))
+import GHC.Generics (Generic)
+import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.HTTP.Types (statusCode)
+import Polysemy
+import Polysemy.Error (Error, throw)
+import Servant.Client
+  (BaseUrl(BaseUrl), ClientEnv, ClientError(..), Scheme(Http, Https), mkClientEnv, parseBaseUrl,
+  showBaseUrl)
+import Servant.Client.Core.Response (responseStatusCode)
+import Toml (TomlCodec)
+import Toml qualified
 
 data VaultKvBackend =
   VaultKvBackend

@@ -4,21 +4,21 @@
 
 module CLI.PrettyPrint where
 
-import Control.Lens
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.HashMap.Strict as HashMap
-import Data.Time
-import Data.Maybe (catMaybes)
-import Fmt
-import Data.Set (Set)
-import qualified Data.Set as Set
-
-import Entry
-import Coffer.Directory ( Directory(..) )
+import Coffer.Directory (Directory(..))
 import Coffer.Path (entryPathName)
+import Control.Lens
+import Data.HashMap.Strict qualified as HashMap
+import Data.Int (Int64)
+import Data.Maybe (catMaybes)
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Internal.Builder (toLazyText)
+import Data.Text.Lazy qualified as TL
+import Data.Time
+import Entry
+import Fmt
 
 buildDirectory :: Directory -> Builder
 buildDirectory = go ""
@@ -60,7 +60,7 @@ buildTags tags =
 buildFields :: [(FieldKey,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
-  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral) & maximum
+  let maxFieldLength = formattedFields <&> (\(firstLine, _) -> TL.length (toLazyText firstLine) & fromIntegral @Int64 @Int) & maximum
 
   formattedFields `zip` fields <&> \((firstLine, otherLinesMb), (_, field)) -> do
     let formattedFirstLine = padRightF maxFieldLength ' ' firstLine <> " " <> buildDate (field ^. dateModified)

@@ -16,17 +16,17 @@ module Entry
   )
 where
 
-import Fmt (Buildable, build)
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.HashMap.Strict as HS
-import qualified Data.Set as S
-import Control.Lens
-import qualified Data.Aeson as A
-import Data.Hashable (Hashable)
-import Data.Time (UTCTime)
 import Coffer.Path (EntryPath)
-import System.Console.ANSI (setSGRCode, SGR (Reset))
+import Control.Lens
+import Data.Aeson qualified as A
+import Data.HashMap.Strict qualified as HS
+import Data.Hashable (Hashable)
+import Data.Set qualified as S
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Time (UTCTime)
+import Fmt (Buildable, build)
+import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
 newtype FieldKey = UnsafeFieldKey T.Text

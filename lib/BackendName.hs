@@ -10,12 +10,12 @@ module BackendName
   , backendNameCodec
   ) where
 
-import Fmt (Buildable)
-import Data.Hashable (Hashable)
-import qualified Data.Aeson as A
-import qualified Data.Text as T
-import qualified Toml
 import Coffer.Util (didimatch)
+import Data.Aeson qualified as A
+import Data.Hashable (Hashable)
+import Data.Text qualified as T
+import Fmt (Buildable)
+import Toml qualified
 
 newtype BackendName = UnsafeBackendName T.Text
   deriving stock (Show, Eq)
