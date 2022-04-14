@@ -296,8 +296,7 @@ renameCmd
   -- then we can delete old directory/entry without delete errors.
   unless dryRun do
     forM_ pathsToDelete \(CopyOperation old _) -> do
-      let qPath = QualifiedPath oldBackendNameMb (Path.entryPathAsPath (qpPath old ^. path))
-      void $ catchAndReturn $ deleteCmd config (DeleteOptions dryRun qPath False)
+      deleteSecret oldBackend (qpPath old ^. path)
 
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
