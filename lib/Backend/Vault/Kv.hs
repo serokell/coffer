@@ -30,8 +30,8 @@ import Data.Text.Lazy qualified as TL
 import Data.Time (UTCTime)
 import Entry (Entry, Field, FieldKey, FieldValue(FieldValue), FieldVisibility)
 import Entry qualified as E
-import Error (CofferError(..))
-import Fmt
+import Error (BackendError, CofferError(..))
+import Fmt (Buildable(build), Builder, indentF, unlinesF, (+|), (|+))
 import GHC.Generics (Generic)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -53,6 +53,55 @@ data VaultKvBackend =
   , vbToken :: I.VaultToken
   }
   deriving stock (Show)
+
+-- | Errors that can be thrown in Vault backend.
+data VaultError
+  = ServantError ClientError
+  | FieldMetadataNotFound EntryPath FieldKey
+  | CofferSpecialsNotFound EntryPath
+  | BadCofferSpecialsError Text
+
+instance Buildable VaultError where
+  build = \case
+    ServantError (FailureResponse request response) ->
+      unlinesF @_ @Builder
+        [ "Request:"
+        , indentF 2 ((build . show) request)
+        , "failed with response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (DecodeFailure body response) ->
+      unlinesF @_ @Builder
+        [ "The body could not be decoded at the expected type."
+        , "Body: " <> build body
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (UnsupportedContentType mediatype response) ->
+      unlinesF @_ @Builder
+        [ "The content-type '" <> (build . show) mediatype <> "' of the response is not supported."
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (InvalidContentTypeHeader response) ->
+      unlinesF @_ @Builder
+        [ "The content-type header is invalid."
+        , "Response:"
+        , indentF 2 ((build . show) response)
+        ]
+    ServantError (ConnectionError exception) ->
+      unlinesF @_ @Builder
+        [ "Connection error. No response was received."
+        , (build . show) exception
+        ]
+    FieldMetadataNotFound entryPath fieldName ->
+      "Could not find coffer metadata for field '" +| fieldName
+        |+ "' at '" +| entryPath |+ "'"
+    CofferSpecialsNotFound entryPath ->
+      "Could not find key '#$coffer' in the kv entry at '" +| entryPath |+ "'."
+    BadCofferSpecialsError err -> build err
+
+instance BackendError VaultError
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
@@ -108,7 +157,7 @@ embedCatchClientError
   => IO a
   -> Sem r a
 embedCatchClientError io = embed (try @ClientError io) >>= \case
-  Left err -> throw $ ServantError err
+  Left err -> throw $ BackendError (ServantError err)
   Right r -> pure r
 
 -- | Runs an IO action and throws an error only if it isn't a failure response with status code 404.
@@ -121,7 +170,7 @@ embedCatchClientErrorMaybe
 embedCatchClientErrorMaybe io = embed (try @ClientError io) >>= \case
   Left (FailureResponse _ response)
     | statusCode (responseStatusCode response) == 404 -> pure Nothing
-  Left err -> throw $ ServantError err
+  Left err -> throw $ BackendError (ServantError err)
   Right r -> pure $ Just r
 
 orThrowEither
@@ -167,7 +216,7 @@ kvWriteSecret backend entry = do
   where
     postSecret env = (I.routes env ^. I.postSecret) (vbMount backend) (vbToken backend)
 
-kvReadSecret :: forall r. Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe E.Entry)
+kvReadSecret :: forall r. Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe Entry)
 kvReadSecret backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
@@ -176,12 +225,12 @@ kvReadSecret backend path = do
       cofferSpecials <- do
         case _data ^. at "#$coffer" of
           Nothing ->
-            throw (OtherError $ "Could not find key '#$coffer' in the kv entry at '" +| path |+ "'.")
+            throw $ BackendError (CofferSpecialsNotFound path)
           Just txt ->
             txt
               & A.eitherDecodeStrict' @CofferSpecials . T.encodeUtf8
-              & first build
-              & (`orThrowEither` OtherError)
+              & first T.pack
+              & (`orThrowEither` (BackendError . BadCofferSpecialsError))
 
       let secrets = HS.toList $ HS.delete "#$coffer" _data
 
@@ -194,8 +243,7 @@ kvReadSecret backend path = do
             & Set.toList
             & mapM E.newEntryTag
             <&> Set.fromList
-            & first build
-            & (`orThrowEither` OtherError)
+            & (`orThrowEither` BadEntryTagError)
 
       fieldKey <-
         case cofferSpecials ^. masterKey of
@@ -203,13 +251,7 @@ kvReadSecret backend path = do
           Just mKey ->
             case E.newFieldKey mKey of
               Left err ->
-                throw
-                  ( OtherError $ unlinesF
-                      [ "Attempted to create new field key from '" <> mKey <> "'"
-                      , ""
-                      , err
-                      ]
-                  )
+                throw $ BadMasterFieldName mKey err
               Right fieldKey -> (pure . Just) fieldKey
 
       pure . Just
@@ -222,26 +264,26 @@ kvReadSecret backend path = do
 
     keyAndValueToField :: CofferSpecials -> (Text, Text) -> Sem r (FieldKey, Field)
     keyAndValueToField cofferSpecials (fieldKey, value) = do
-      metadata <- maybe (throw $ OtherError metadataNotFound) pure (cofferSpecials ^. fields . at fieldKey)
-      let _modTime = metadata ^. dateModified
-      let _visibility = metadata ^. visibility
       _fieldKey <-
         fieldKey
           & E.newFieldKey
-          & first build
-          & (`orThrowEither` OtherError)
+          & (`orThrowEither` BadFieldNameError)
+
+      metadata <-
+        maybe
+          (throw $ BackendError (FieldMetadataNotFound path _fieldKey))
+          pure
+          (cofferSpecials ^. fields . at fieldKey)
+
+      let _modTime = metadata ^. dateModified
+      let _visibility = metadata ^. visibility
 
       pure (_fieldKey
            , E.newField _modTime (FieldValue value)
               & E.visibility .~ _visibility
            )
-      where
-        metadataNotFound :: Builder
-        metadataNotFound =
-          "Could not find coffer metadata for field '" +| fieldKey
-            |+ "' at '" +| path |+ "'"
 
-kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [T.Text])
+kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
 kvListSecrets backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe do
