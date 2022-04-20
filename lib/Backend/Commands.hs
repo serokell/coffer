@@ -37,7 +37,7 @@ import Entry
   newEntry, newField, path, value, visibility)
 import Entry qualified as E
 import Error (CofferError(..))
-import Fmt (pretty)
+import Fmt (Builder, pretty, unlinesF)
 import GHC.Exts (Down(..), sortWith)
 import Polysemy
 import Polysemy.Error (Error, throw)
@@ -350,7 +350,7 @@ buildCopyOperations oldBackend newBackend oldQPath@(QualifiedPath oldBackendName
         newEntry <- entry & E.path . Path.entryPathParentDir %%~ \parentDir ->
           case Path.replacePathPrefix oldPath newPath parentDir of
             Just newParentDir -> pure newParentDir
-            Nothing -> throw $ OtherError $ T.unlines
+            Nothing -> throw $ OtherError $ unlinesF @_ @Builder
               [ "Internal error:"
               , "Expected path: '" <> pretty (entry ^. E.path) <> "'"
               , "To have the prefix: '" <> pretty oldPath <> "'"
@@ -531,7 +531,7 @@ getEntryOrDir backend path =
                   Nothing -> pure ()
 
               (_, Right subdir) -> go (rootPath <> subdir)
-              _ -> lift $ throw $ OtherError $ T.unlines
+              _ -> lift $ throw $ OtherError $ unlinesF
                     [ "Internal error:"
                     , "Backend returned a secret that is not a valid\
                       \ entry or directory name."
