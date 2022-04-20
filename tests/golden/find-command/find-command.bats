@@ -76,7 +76,7 @@ EOF
   coffer set-field /secrets/c sortfield a
   coffer set-field /secrets/b sortfield b
 
-  run cleanOutput coffer find / --sort sortfield:value:asc
+  run cleanOutput coffer find / --sort sortfield:contents:asc
 
   assert_success
   assert_output - <<EOF
@@ -90,7 +90,7 @@ EOF
       sortfield: c [2000-01-01 01:01:01]
 EOF
 
-  run cleanOutput coffer find / --sort sortfield:value:desc
+  run cleanOutput coffer find / --sort sortfield:contents:desc
 
   assert_success
   assert_output - <<EOF
@@ -189,7 +189,7 @@ EOF
   coffer create /cd --field filtering=kek
   coffer create /abcd --field filtering=kek
 
-  run cleanOutput coffer find / --filter name~ab --filter-field filtering:value~kek
+  run cleanOutput coffer find / --filter name~ab --filter-field filtering:contents~kek
 
   assert_success
   assert_output - <<EOF
@@ -263,7 +263,7 @@ EOF
   coffer create /secrets/b --field filtering=cab
   coffer create /secrets/c --field filtering=zzz
 
-  run cleanOutput coffer find / --filter-field filtering:value~bb
+  run cleanOutput coffer find / --filter-field filtering:contents~bb
 
   assert_success
   assert_output - <<EOF
@@ -273,7 +273,7 @@ EOF
       filtering: abbacaba [2000-01-01 01:01:01]
 EOF
 
-  run cleanOutput coffer find / --filter-field filtering:value~ab
+  run cleanOutput coffer find / --filter-field filtering:contents~ab
 
   assert_success
   assert_output - <<EOF
@@ -285,7 +285,7 @@ EOF
       filtering: cab [2000-01-01 01:01:01]
 EOF
 
-  run cleanOutput coffer find / --filter-field filtering:value~zz
+  run cleanOutput coffer find / --filter-field filtering:contents~zz
 
   assert_success
   assert_output - <<EOF

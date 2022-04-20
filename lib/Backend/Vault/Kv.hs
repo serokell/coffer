@@ -28,7 +28,7 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Time (UTCTime)
-import Entry (Entry, Field, FieldKey, FieldValue(FieldValue), FieldVisibility)
+import Entry (Entry, Field, FieldContents(FieldContents), FieldName, FieldVisibility)
 import Entry qualified as E
 import Error (BackendError, CofferError(..))
 import Fmt (Buildable(build), Builder, indentF, unlinesF, (+|), (|+))
@@ -57,7 +57,7 @@ data VaultKvBackend =
 -- | Errors that can be thrown in Vault backend.
 data VaultError
   = ServantError ClientError
-  | FieldMetadataNotFound EntryPath FieldKey
+  | FieldMetadataNotFound EntryPath FieldName
   | CofferSpecialsNotFound EntryPath
   | BadCofferSpecialsError Text
 
@@ -129,7 +129,7 @@ makeLensesWith abbreviatedFields ''FieldMetadata
 
 data CofferSpecials =
   CofferSpecials
-  { csMasterKey :: Maybe Text
+  { csMasterField :: Maybe Text
   , csGlobalDateModified :: UTCTime
   , csFields :: HashMap Text FieldMetadata
   , csTags :: Set Text
@@ -189,8 +189,8 @@ kvWriteSecret :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteSecret backend entry = do
   let
     cofferSpecials = CofferSpecials
-      { csMasterKey =
-        entry ^. E.masterField <&> E.getFieldKey
+      { csMasterField =
+        entry ^. E.masterField <&> E.getFieldName
       , csGlobalDateModified = entry ^. E.dateModified
       , csFields =
         entry ^. E.fields & each %~
@@ -199,15 +199,15 @@ kvWriteSecret backend entry = do
           { fmDateModified = f ^. E.dateModified
           , fmVisibility = f ^. E.visibility
           })
-        & HS.mapKeys E.getFieldKey
+        & HS.mapKeys E.getFieldName
       , csTags = Set.map E.getEntryTag $ entry ^. E.tags
       }
     secret = I.PostSecret
       { I.psCas = Nothing
       , I.psDdata =
             HS.insert "#$coffer" (TL.toStrict $ A.encodeToLazyText cofferSpecials)
-          . HS.map (^. E.value . E.fieldValue)
-          . HS.mapKeys E.getFieldKey
+          . HS.map (^. E.contents . E.fieldContents)
+          . HS.mapKeys E.getFieldName
           $ entry ^. E.fields
         }
   env <- getEnv backend
@@ -236,7 +236,7 @@ kvReadSecret backend path = do
 
       fields <-
         secrets
-          & each %%~ keyAndValueToField cofferSpecials
+          & each %%~ nameAndContentsToField cofferSpecials
           <&> HS.fromList
 
       _tags <- cofferSpecials ^. tags
@@ -245,41 +245,41 @@ kvReadSecret backend path = do
             <&> Set.fromList
             & (`orThrowEither` BadEntryTagError)
 
-      fieldKey <-
-        case cofferSpecials ^. masterKey of
+      fieldName <-
+        case cofferSpecials ^. masterField of
           Nothing -> pure Nothing
-          Just mKey ->
-            case E.newFieldKey mKey of
+          Just mName ->
+            case E.newFieldName mName of
               Left err ->
-                throw $ BadMasterFieldName mKey err
-              Right fieldKey -> (pure . Just) fieldKey
+                throw $ BadMasterFieldName mName err
+              Right fieldName -> (pure . Just) fieldName
 
       pure . Just
         $ E.newEntry path (cofferSpecials ^. globalDateModified)
-        & E.masterField .~ fieldKey
+        & E.masterField .~ fieldName
         & E.fields .~ fields
         & E.tags .~ _tags
   where
     readSecret env = (I.routes env ^. I.readSecret) (vbMount backend) (vbToken backend)
 
-    keyAndValueToField :: CofferSpecials -> (Text, Text) -> Sem r (FieldKey, Field)
-    keyAndValueToField cofferSpecials (fieldKey, value) = do
-      _fieldKey <-
-        fieldKey
-          & E.newFieldKey
+    nameAndContentsToField :: CofferSpecials -> (Text, Text) -> Sem r (FieldName, Field)
+    nameAndContentsToField cofferSpecials (fieldName, contents) = do
+      _fieldName <-
+        fieldName
+          & E.newFieldName
           & (`orThrowEither` BadFieldNameError)
 
       metadata <-
         maybe
-          (throw $ BackendError (FieldMetadataNotFound path _fieldKey))
+          (throw $ BackendError (FieldMetadataNotFound path _fieldName))
           pure
-          (cofferSpecials ^. fields . at fieldKey)
+          (cofferSpecials ^. fields . at fieldName)
 
       let _modTime = metadata ^. dateModified
       let _visibility = metadata ^. visibility
 
-      pure (_fieldKey
-           , E.newField _modTime (FieldValue value)
+      pure (_fieldName
+           , E.newField _modTime (FieldContents contents)
               & E.visibility .~ _visibility
            )
 

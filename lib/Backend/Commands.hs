@@ -33,8 +33,8 @@ import Data.Time (UTCTime, getCurrentTime, utctDay)
 import Data.Time.Calendar.Compat (pattern YearMonthDay)
 import Data.Time.Calendar.Month.Compat (pattern MonthDay)
 import Entry
-  (Entry, EntryTag, Field, FieldKey, FieldVisibility(..), dateModified, fieldValue, fields,
-  newEntry, newField, path, value, visibility)
+  (Entry, EntryTag, Field, FieldName, FieldVisibility(..), contents, dateModified, fieldContents,
+  fields, newEntry, newField, path, visibility)
 import Entry qualified as E
 import Error (CofferError(..), InternalCommandsError(EntryPathDoesntHavePrefix, InvalidEntry))
 import GHC.Exts (Down(..), sortWith)
@@ -97,7 +97,7 @@ createCmd
   backend <- getBackend config backendNameMb
   nowUtc <- embed getCurrentTime
   let
-    mkField :: FieldVisibility -> FieldInfo -> (FieldKey, Field)
+    mkField :: FieldVisibility -> FieldInfo -> (FieldName, Field)
     mkField fv fi = (fiName fi, newField nowUtc (fiContents fi) & visibility .~ fv)
 
     allFields = (mkField Public <$> fields) <> (mkField Private <$> privateFields)
@@ -142,7 +142,7 @@ setFieldCmd
         -- The field already exists, update it.
         pure $ Just $ field
           & dateModified .~ nowUtc
-          & value %~ do \currentValue -> fromMaybe currentValue fieldContentsMb
+          & contents %~ do \currentContents -> fromMaybe currentContents fieldContentsMb
           & visibility %~ do \currentPrivate -> fromMaybe currentPrivate visibilityMb
       Nothing ->
         -- The field does not yet exist, insert a new one.
@@ -197,13 +197,13 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
       FilterByName substr -> substr `T.isInfixOf` (e ^. E.path . to entryPathName)
       FilterByDate op date -> matchDate op date (e ^. dateModified)
 
-    applyFilterField :: Entry -> (FieldKey, FilterField) -> Bool
+    applyFilterField :: Entry -> (FieldName, FilterField) -> Bool
     applyFilterField e (fieldName, filter) =
       case e ^? fields . ix fieldName of
         Nothing -> False
         Just field ->
           case filter of
-            FilterFieldByValue substr -> substr `T.isInfixOf` (field ^. value . fieldValue)
+            FilterFieldByContents substr -> substr `T.isInfixOf` (field ^. contents . fieldContents)
             FilterFieldByDate op date -> matchDate op date (field ^. dateModified)
 
   let path = maybe mempty qpPath qPathMb
@@ -224,9 +224,9 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
             Nothing -> entries
             Just (SortByEntryName, direction) ->
               sortWith' direction (view $ E.path . to entryPathName) entries
-            Just (SortByFieldValue fieldName, direction) -> do
-              let getFieldValue e = e ^? fields . ix fieldName . value
-              sortWith' direction getFieldValue entries
+            Just (SortByFieldContents fieldName, direction) -> do
+              let getFieldContents e = e ^? fields . ix fieldName . contents
+              sortWith' direction getFieldContents entries
             Just (SortByEntryDate, direction) ->
               sortWith' direction (view E.dateModified) entries
             Just (SortByFieldDate fieldName, direction) -> do
@@ -246,8 +246,8 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
       & fields
       . each
       . filtered (\field -> field ^. visibility == Private)
-      . value
-      . fieldValue
+      . contents
+      . fieldContents
       .~ "[private]"
 
     matchDate :: FilterOp -> FilterDate -> UTCTime -> Bool

@@ -57,7 +57,7 @@ buildTags tags =
     then Nothing
     else Just $ listF $ Set.toAscList tags
 
-buildFields :: [(FieldKey,  Field)] -> [Builder]
+buildFields :: [(FieldName,  Field)] -> [Builder]
 buildFields fields = do
   let formattedFields = fields <&> buildField
   let maxFieldLength =
@@ -81,16 +81,16 @@ buildFields fields = do
 --
 -- This function returns a tuple with the builder for the first line
 -- and an optional builder for the remaining lines.
-buildField :: (FieldKey, Field) -> (Builder, Maybe Builder)
+buildField :: (FieldName, Field) -> (Builder, Maybe Builder)
 buildField (fk, field) = do
-  let fkText = getFieldKey fk
-  if T.isInfixOf "\n" (field ^. value . fieldValue)
+  let fkText = getFieldName fk
+  if T.isInfixOf "\n" (field ^. contents . fieldContents)
     then
       ( build fkText <> ":"
-      , Just $ indentF 2 $ build $ field ^. value
+      , Just $ indentF 2 $ build $ field ^. contents
       )
     else
-      ( build fkText <> ": " <> build (field ^. value)
+      ( build fkText <> ": " <> build (field ^. contents)
       , Nothing
       )
 

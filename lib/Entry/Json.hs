@@ -15,7 +15,7 @@ import Data.HashMap.Strict qualified as HS
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import Entry (Entry, EntryConvertible, Field, FieldValue(FieldValue))
+import Entry (Entry, EntryConvertible, Field, FieldContents(FieldContents))
 import Entry qualified as E
 import Fmt (pretty)
 
@@ -31,18 +31,18 @@ fieldConverter = prism' to from
       A.object
       [ "date_modified" .= (field ^. E.dateModified)
       , "visibility" .= (field ^. E.visibility)
-      , "value" .= (field ^. E.value . E.fieldValue)
+      , "contents" .= (field ^. E.contents . E.fieldContents)
       ]
     from (A.Object o) = do
       dateModified <- HS.lookup "date_modified" o
         >>= \case A.String t -> Just t ; _ -> Nothing
         >>= iso8601ParseM . T.unpack
-      value <- HS.lookup "value" o >>= \case
+      contents <- HS.lookup "contents" o >>= \case
         A.String t -> Just t
         _ -> Nothing
       _visibility <- HS.lookup "visibility" o >>= resultToMaybe . fromJSON
       pure
-        $ E.newField dateModified (FieldValue value)
+        $ E.newField dateModified (FieldContents contents)
         & E.visibility .~ _visibility
     from _ = Nothing
 
@@ -57,7 +57,7 @@ instance EntryConvertible JsonEntry where
         , "master_field" .= (entry ^. E.masterField)
         , "fields" .=
             ( HS.fromList
-              . over (each . _1) E.getFieldKey
+              . over (each . _1) E.getFieldName
               . HS.toList
               . HS.map (^. re fieldConverter)
               $ (entry ^. E.fields)
@@ -73,17 +73,17 @@ instance EntryConvertible JsonEntry where
             >>= \case A.String t -> Just t ; _ -> Nothing
             >>= iso8601ParseM . T.unpack
           let _masterField = HS.lookup "master_field" o >>= \case
-                A.String t -> eitherToMaybe $ E.newFieldKey t
+                A.String t -> eitherToMaybe $ E.newFieldName t
                 _ -> Nothing
           _fields <- do
             value <- HS.lookup "fields" o
             obj <- value ^? A._Object
-            keyFields <-
+            fieldNameAndFields <-
               forM (HS.toList obj) \(text, value) -> do
-                key <- eitherToMaybe $ E.newFieldKey text
+                fieldName <- eitherToMaybe $ E.newFieldName text
                 field <- value ^? fieldConverter
-                pure (key, field)
-            pure $ HS.fromList keyFields
+                pure (fieldName, field)
+            pure $ HS.fromList fieldNameAndFields
           _tags <- HS.lookup "tags" o >>= resultToMaybe . fromJSON
 
           pure

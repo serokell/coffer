@@ -10,7 +10,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Data.Time.Calendar.Month.Compat (Month)
 import Data.Time.Compat (Day, UTCTime, Year)
-import Entry (Entry, EntryTag, Field, FieldKey, FieldValue, FieldVisibility)
+import Entry (Entry, EntryTag, Field, FieldContents, FieldName, FieldVisibility)
 
 data Options = Options
   { oConfigPathMb :: Maybe FilePath
@@ -43,10 +43,10 @@ deriving stock instance Show SomeCommand
 data ViewResult
   = VRDirectory Directory
   | VREntry Entry
-  | VRField FieldKey Field
+  | VRField FieldName Field
   | VRPathNotFound (QualifiedPath Path)
-  | VRDirectoryNoFieldMatch (QualifiedPath Path) FieldKey
-  | VREntryNoFieldMatch (QualifiedPath EntryPath) FieldKey
+  | VRDirectoryNoFieldMatch (QualifiedPath Path) FieldName
+  | VREntryNoFieldMatch (QualifiedPath EntryPath) FieldName
 
 data CreateError
   = CEParentDirectoryIsEntry (QualifiedPath EntryPath, QualifiedPath EntryPath)
@@ -65,7 +65,7 @@ data SetFieldResult
 data DeleteFieldResult
   = DFRSuccess Entry
   | DFREntryNotFound (QualifiedPath EntryPath)
-  | DFRFieldNotFound FieldKey
+  | DFRFieldNotFound FieldName
 
 type RenameResult = CopyResult
 
@@ -92,7 +92,7 @@ data TagResult
 
 data ViewOptions = ViewOptions
   { voQPath :: QualifiedPath Path
-  , voFieldName :: Maybe FieldKey
+  , voFieldName :: Maybe FieldName
   }
   deriving stock Show
 
@@ -108,15 +108,15 @@ data CreateOptions = CreateOptions
 
 data SetFieldOptions = SetFieldOptions
   { sfoQPath :: QualifiedPath EntryPath
-  , sfoFieldName :: FieldKey
-  , sfoFieldContents :: Maybe FieldValue
+  , sfoFieldName :: FieldName
+  , sfoFieldContents :: Maybe FieldContents
   , sfoVisibility :: Maybe FieldVisibility
   }
   deriving stock Show
 
 data DeleteFieldOptions = DeleteFieldOptions
   { dfoQPath :: QualifiedPath EntryPath
-  , dfoFieldName :: FieldKey
+  , dfoFieldName :: FieldName
   }
   deriving stock Show
 
@@ -125,7 +125,7 @@ data FindOptions = FindOptions
   , foText :: Maybe Text
   , foSort :: Maybe (Sort, Direction)
   , foFilters :: [Filter]
-  , foFilterFields :: [(FieldKey, FilterField)]
+  , foFilterFields :: [(FieldName, FilterField)]
   }
   deriving stock Show
 
@@ -164,8 +164,8 @@ data TagOptions = TagOptions
 ----------------------------------------------------------------------------
 
 data FieldInfo = FieldInfo
-  { fiName :: FieldKey
-  , fiContents :: FieldValue
+  { fiName :: FieldName
+  , fiContents :: FieldContents
   }
   deriving stock Show
 
@@ -175,8 +175,8 @@ data Direction = Asc | Desc
 data Sort
   = SortByEntryName
   | SortByEntryDate
-  | SortByFieldValue FieldKey
-  | SortByFieldDate FieldKey
+  | SortByFieldContents FieldName
+  | SortByFieldDate FieldName
   deriving stock Show
 
 data FilterOp = OpGT | OpGTE | OpLT | OpLTE | OpEQ
@@ -196,5 +196,5 @@ data Filter
 
 data FilterField
   = FilterFieldByDate FilterOp FilterDate
-  | FilterFieldByValue Text
+  | FilterFieldByContents Text
   deriving stock Show

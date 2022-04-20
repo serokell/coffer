@@ -48,12 +48,12 @@ Backend name can only contain the following characters: 'abcdefghijklmnopqrstuvw
 EOF
 }
 
-@test "bad field key" {
-  run coffer view /path "$(echo -e "bad\nfieldkey")"
+@test "bad field name" {
+  run coffer view /path "$(echo -e "bad\nfieldname")"
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid field name: "bad\nfieldkey".
+Invalid field name: "bad\nfieldname".
 Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
 EOF
 }
