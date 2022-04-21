@@ -33,8 +33,11 @@ parserInfo :: ParserInfo Options
 parserInfo =
   info (parser <**> helper) $
     fullDesc
-    <> progDesc "TODO: coffer description goes here"
-    <> header "TODO: coffer description goes here"
+    <> progDesc (unlines [ "Coffer CLI is just one frontend of the coffer project."
+                         , "Coffer, the project, is a multi-backend, multi-frontend password manager."
+                         , "It reaches out to multiple backends, allowing you to manage multiple password stores af it were one. From anywhere!"
+                         ])
+    <> header "multi-backend, multi-frontend password manager - CLI frontend"
 
 parser :: Parser Options
 parser = Options

@@ -5,7 +5,7 @@
 name:                coffer
 version:             0.1.0.0
 #synopsis:
-#description:
+description:         A multi-backend, multi-frontend password manager, reaching out to Vault, pass among others.
 homepage:            https://github.com/serokell/coffer/
 license:             BSD3
 author:              Serokell

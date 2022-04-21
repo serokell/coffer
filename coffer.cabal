@@ -6,6 +6,7 @@ cabal-version: 1.12
 
 name:           coffer
 version:        0.1.0.0
+description:    A multi-backend, multi-frontend password manager, reaching out to Vault, pass among others.
 category:       Command Line Tools
 homepage:       https://github.com/serokell/coffer/
 author:         Serokell
