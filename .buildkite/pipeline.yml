@@ -10,7 +10,7 @@ steps:
     command: nix run -f ci.nix pkgs.shellcheck -c find . -name '*.sh' -exec shellcheck {} +
 
   - label: validate cabal files
-    command: nix run -f ci.nix stack2cabal -c ./scripts/validate-cabal-files.sh
+    command: nix run -f ci.nix stack2cabal pkgs.diffutils -c ./scripts/validate-cabal-files.sh
 
   - label: stylish
     command: nix run -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
