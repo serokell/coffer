@@ -137,6 +137,7 @@ tests:
       - -threaded
     dependencies:
       - coffer
+      - containers
       - hedgehog
       - megaparsec
       - raw-strings-qq

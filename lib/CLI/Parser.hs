@@ -9,6 +9,7 @@ module CLI.Parser
     parserInfo
     -- * Megaparsec
   , MParser
+  , endOfLineOrFile
   ) where
 
 import Control.Arrow ((>>>))
@@ -598,6 +599,10 @@ parseFieldNameWhile whileCond = do
 -- | Parse the rest of the input as a field content.
 parseFieldContentsEof :: MParser FieldValue
 parseFieldContentsEof = FieldValue . T.pack <$> P.manyTill P.anySingle P.eof
+
+-- | Matches on @eol@ or @eof@.
+endOfLineOrFile :: MParser ()
+endOfLineOrFile = void P.eol <|> P.eof
 
 ----------------------------------------------------------------------------
 -- Utils

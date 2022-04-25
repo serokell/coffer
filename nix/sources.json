@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "4cf90b36955597d0151940eabfb1b61a8ec42256",
-        "sha256": "1gdy89dgv2n5ibb6lc03y6k0y9pcacdrlfgv6ipd9bwrivkhdaa9",
+        "rev": "cf5c7528576058a86f5c0e801549e4ccb8e7b73c",
+        "sha256": "1bgrg4v21pf9kbzamic4w0ylpnjw36fd56ghk08qqb1h8linp8m4",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/hackage.nix/archive/4cf90b36955597d0151940eabfb1b61a8ec42256.tar.gz",
+        "url": "https://github.com/input-output-hk/hackage.nix/archive/cf5c7528576058a86f5c0e801549e4ccb8e7b73c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "haskell-nix-weeder": {
@@ -47,18 +47,6 @@
         "url": "https://github.com/serokell/nixpkgs/archive/1714a2ead1a18678afa3cbf75dff3f024c579061.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "serokell.nix": {
-        "branch": "master",
-        "description": "Serokell Nix infrastructure library",
-        "homepage": null,
-        "owner": "serokell",
-        "repo": "serokell.nix",
-        "rev": "652105c5fc5564f5d8e682d61bdc0d51bbc1f939",
-        "sha256": "19zkjhyjbksf2fw32h7m3x0v8nvgdy2qkjkxg2qzzb25as245vmj",
-        "type": "tarball",
-        "url": "https://github.com/serokell/serokell.nix/archive/652105c5fc5564f5d8e682d61bdc0d51bbc1f939.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "nixpkgs-stylish": {
         "branch": "master",
         "description": "Nix Packages collection",
@@ -69,6 +57,18 @@
         "sha256": "0v3c4r8v40jimicdxqvxnzmdypnafm2baam7z131zk6ljhb8jpg9",
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/19574af0af3ffaf7c9e359744ed32556f34536bd.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "serokell.nix": {
+        "branch": "master",
+        "description": "Serokell Nix infrastructure library",
+        "homepage": null,
+        "owner": "serokell",
+        "repo": "serokell.nix",
+        "rev": "652105c5fc5564f5d8e682d61bdc0d51bbc1f939",
+        "sha256": "19zkjhyjbksf2fw32h7m3x0v8nvgdy2qkjkxg2qzzb25as245vmj",
+        "type": "tarball",
+        "url": "https://github.com/serokell/serokell.nix/archive/652105c5fc5564f5d8e682d61bdc0d51bbc1f939.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "stackage.nix": {

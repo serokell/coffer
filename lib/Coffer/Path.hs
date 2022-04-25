@@ -179,7 +179,7 @@ data QualifiedPath path = QualifiedPath
   { qpBackendName :: Maybe BackendName
   , qpPath :: path
   }
-  deriving stock (Show, Functor)
+  deriving stock (Show, Functor, Eq)
 
 instance (Buildable path) => Buildable (QualifiedPath path) where
   build (QualifiedPath backendNameMb path) =

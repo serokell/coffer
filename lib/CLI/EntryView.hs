@@ -7,74 +7,165 @@ module CLI.EntryView
   , fieldInfo
   , private
   , EntryView (..)
-  , qEntryPath
+  , mQEntryPath
   , entryTags
   , fields
-  , entryViewCodec
+  , parseEntryView
   ) where
 
+import CLI.Parser (MParser, endOfLineOrFile)
 import CLI.Types (FieldInfo(FieldInfo, fiContents, fiName))
 import Coffer.Path (EntryPath, QualifiedPath, mkQualifiedEntryPath)
-import Coffer.Util (didimatch)
+import Control.Applicative (Alternative(many, (<|>)), empty)
 import Control.Lens
-import Data.Bifunctor (Bifunctor(first))
+import Control.Monad (void)
 import Data.Set (Set)
-import Entry
-  (EntryTag, FieldKey, FieldValue(FieldValue, unFieldValue), getEntryTag, getFieldKey, newEntryTag,
-  newFieldKey)
-import Fmt (Buildable(build), fmt)
-import Toml qualified
+import Data.Set qualified as S
+import Data.Text (Text)
+import Data.Text qualified as T
+import Entry (EntryTag, FieldValue(FieldValue), fieldValue, newEntryTag, newFieldKey)
+import Fmt (Buildable(build), unlinesF)
+import Text.Interpolation.Nyan
+import Text.Megaparsec qualified as P
+import Text.Megaparsec.Char qualified as P
+import Text.Megaparsec.Char.Lexer qualified as Lexer
 
 data FieldInfoView = FieldInfoView
   { fivFieldInfo :: FieldInfo
   , fivPrivate   :: Bool
   }
-  deriving stock (Show)
+  deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''FieldInfoView
 
+instance Buildable FieldInfoView where
+  build (FieldInfoView fieldInfo private) = build fieldName <> delimeter <> buildedFieldContents
+    where
+      fieldName = fiName fieldInfo
+      fieldContents = fiContents fieldInfo
+
+      buildedFieldContents
+        | _ : _ : _ <- T.split (== '\n') (fieldContents ^. fieldValue) = [int|s|
+"""
+#{fieldContents}
+"""
+|]
+        | otherwise = build fieldContents
+
+      delimeter
+        | private = " =~ "
+        | otherwise = " = "
+
 data EntryView = EntryView
-  { evQEntryPath :: QualifiedPath EntryPath
-  , evEntryTags  :: Set EntryTag
+  { evMQEntryPath :: Maybe (QualifiedPath EntryPath)
   , evFields     :: [FieldInfoView]
+  , evEntryTags  :: Set EntryTag
   }
-  deriving stock (Show)
+  deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''EntryView
 
-fieldInfoViewCodec :: Toml.TomlCodec FieldInfoView
-fieldInfoViewCodec = FieldInfoView
-  <$> fieldInfoCodec      Toml..= fivFieldInfo
-  <*> Toml.bool "private" Toml..= fivPrivate
+instance Buildable EntryView where
+  build (EntryView mQEntryPath fields entryTags) = [int|s|
+#{buildedPath}
+
+[fields]
+#{buildedFields}
+[tags]
+#{buildedEntryTags}
+|]
+    where
+      buildedPath =
+        case mQEntryPath of
+          Nothing -> "path = # <-- write your qualified entry path here"
+          Just qPath -> "path = " <> build qPath
+
+      buildedFields =
+        fields
+          <&> build
+          & unlinesF
+
+      buildedEntryTags =
+        entryTags
+          & S.toList
+          <&> build
+          & unlinesF
+
+spaceConsumer :: MParser ()
+spaceConsumer = Lexer.space
+  P.space1
+  (Lexer.skipLineComment "#")
+  empty
+
+lexeme :: MParser a -> MParser a
+lexeme = Lexer.lexeme spaceConsumer
+
+symbol :: Text -> MParser Text
+symbol = Lexer.symbol spaceConsumer
+
+eitherToMParser :: Int -> Either Text a -> MParser a
+eitherToMParser offset = either failAction pure
   where
-    fieldKeyCodec :: Toml.TomlCodec FieldKey
-    fieldKeyCodec = didimatch (Right . getFieldKey) newFieldKey (Toml.text "name")
+    failAction :: Text -> MParser a
+    failAction errMsg = do
+      P.setOffset offset
+      fail $ T.unpack errMsg
 
-    fieldValueCodec :: Toml.TomlCodec FieldValue
-    fieldValueCodec = Toml.dimap unFieldValue FieldValue (Toml.text "contents")
+parseQualifiedPath :: MParser (Maybe (QualifiedPath EntryPath))
+parseQualifiedPath = do
+  offset <- P.getOffset
+  void $ symbol "path" >> symbol "="
+  qPathStr <- many (P.notFollowedBy P.space1 >> P.anySingle) <&> T.strip . T.pack
+  eitherToMParser offset (mkQualifiedEntryPath qPathStr) <&> Just
 
-    fieldInfoCodec :: Toml.TomlCodec FieldInfo
-    fieldInfoCodec = FieldInfo
-      <$> fieldKeyCodec   Toml..= fiName
-      <*> fieldValueCodec Toml..= fiContents
+parseFieldInfoView :: MParser FieldInfoView
+parseFieldInfoView = do
+  offset <- P.getOffset
+  fieldNameStr <- lexeme $ many (P.notFollowedBy (P.space1 <|> void (P.char '=')) >> P.anySingle) <&> T.pack
+  fieldName <- eitherToMParser offset $ newFieldKey fieldNameStr
+  delimeter <- P.string "=~" <|> P.string "="
+  void $ many P.hspace1
+  fieldContents <- lexeme (parseFieldContentsTripleQuotes <|> parseFieldContentsSingleLine)
 
-entryPathCodec :: Toml.TomlCodec (QualifiedPath EntryPath)
-entryPathCodec = didimatch (Right . fmt . build) mkQualifiedEntryPath (Toml.text "path")
+  let fieldInfo = FieldInfo fieldName fieldContents
+  let private = delimeter == "=~"
 
-_entryTag :: Toml.TomlBiMap EntryTag Toml.AnyValue
-_entryTag = Toml.BiMap to from
+  pure $ FieldInfoView fieldInfo private
   where
-    to :: EntryTag -> Either Toml.TomlBiMapError Toml.AnyValue
-    to = Toml.forward Toml._Text . getEntryTag
+    -- | Parse the rest of the line as a field content.
+    parseFieldContentsSingleLine :: MParser FieldValue
+    parseFieldContentsSingleLine = FieldValue . T.pack <$> P.manyTill P.anySingle endOfLineOrFile
 
-    from :: Toml.AnyValue -> Either Toml.TomlBiMapError EntryTag
-    from value = do
-      txt <- Toml.backward Toml._Text value
-      newEntryTag txt & first Toml.ArbitraryError
+    -- | Parse a field content wrapped in triple quotes @"""@. E.g.:
+    --
+    -- > """
+    -- > line1
+    -- > line2
+    -- > """
+    parseFieldContentsTripleQuotes :: MParser FieldValue
+    parseFieldContentsTripleQuotes = do
+      let beginBlock = tripleQuote >> void P.eol
+      let parseLine = P.manyTill P.anySingle P.eol
+      let endBlock = tripleQuote >> endOfLineOrFile
 
-entryTagsCodec :: Toml.TomlCodec (Set EntryTag)
-entryTagsCodec = Toml.arraySetOf _entryTag "tags"
+      res <- beginBlock >> P.manyTill parseLine endBlock
+      pure $ res <&> T.pack & T.intercalate "\n" & FieldValue
 
-entryViewCodec :: Toml.TomlCodec EntryView
-entryViewCodec = EntryView
-  <$> entryPathCodec                       Toml..= evQEntryPath
-  <*> entryTagsCodec                       Toml..= evEntryTags
-  <*> Toml.list fieldInfoViewCodec "field" Toml..= evFields
+      where
+        tripleQuote :: MParser ()
+        tripleQuote = void $ P.string "\"\"\""
+
+parseEntryTag :: MParser EntryTag
+parseEntryTag = do
+  offset <- P.getOffset
+  entryTagStr <- lexeme $ P.manyTill P.anySingle endOfLineOrFile <&> T.pack
+  eitherToMParser offset $ newEntryTag entryTagStr
+
+parseEntryView :: MParser EntryView
+parseEntryView = do
+  spaceConsumer
+  qEntryPath <- lexeme parseQualifiedPath
+  void $ symbol "[fields]"
+  fieldInfoViews <- P.manyTill (lexeme parseFieldInfoView) (P.char '[')
+  void $ symbol "tags]"
+  entryTags <- lexeme (many parseEntryTag) <&> S.fromList
+  endOfLineOrFile
+  pure $ EntryView qEntryPath fieldInfoViews entryTags

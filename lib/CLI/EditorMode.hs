@@ -5,23 +5,21 @@
 module CLI.EditorMode where
 
 import CLI.EntryView
-import CLI.ParseError
 import CLI.Types
-import Coffer.Path (EntryPath, QualifiedPath, mkQualifiedEntryPath)
 import Control.Lens
-import Data.Bifunctor (Bifunctor(first))
-import Data.Either (lefts, rights)
 import Data.Foldable (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Void (Void)
+import Fmt (pretty)
 import System.Environment (lookupEnv)
 import System.IO (SeekMode(AbsoluteSeek), hFlush, hGetContents, hPutStr, hSeek)
 import System.IO.Temp
 import System.Process as Process
 import Text.Interpolation.Nyan
+import Text.Megaparsec (ParseError, ParseErrorBundle, PosState)
 import Text.Megaparsec qualified as P
-import Toml qualified
 
 data AnnotatedLine = AnnotatedLine
   { _alLine :: Text
@@ -37,45 +35,37 @@ headerExample :: Text
 headerExample = [int|s|
 # Example:
 #
-# path = "/path/to/secret/entry"
-# tags = [
-#   "first tag",
-#   "important"
-# ]
+# path = backend#/path/to/entry
 #
-# [[field]]
-# name = "test field"
-# private = false
-# contents = """
-# Some
+# [fields]
+# public-field = public contents
+# private-field =~ private contents
+# multiline-thing = """
 # multiline
-# thing
+# contents
 # """
+#
+# [tags]
+# first-tag
+# important
 |]
 
-examplePath :: QualifiedPath EntryPath
-examplePath =
-  case mkQualifiedEntryPath "/example/path" of
-    Right entryPath -> entryPath
-    _ -> undefined -- Idk what I should do in this case
-
 renderEditorFile :: CreateOptions -> Text
-renderEditorFile opts = Toml.encode entryViewCodec entryView
+renderEditorFile opts = pretty entryView
   where
     publicFields = coFields opts <&> \field -> FieldInfoView field False
     privateFields = coPrivateFields opts <&> \field -> FieldInfoView field True
-    entryPath = fromMaybe examplePath (coQPath opts)
-    entryView = EntryView entryPath (coTags opts) (publicFields <> privateFields)
+    entryView = EntryView (coQPath opts) (publicFields <> privateFields) (coTags opts)
 
 setOpts :: CreateOptions -> EntryView -> CreateOptions
 setOpts opts entryView = opts
-  { coQPath = Just qPath
+  { coQPath = qPath
   , coTags = tags
   , coFields = publicFields
   , coPrivateFields = privateFields
   }
   where
-    qPath = entryView ^. qEntryPath
+    qPath = entryView ^. mQEntryPath
     tags = entryView ^. entryTags
     publicFields = entryView ^.. fields . each . filtered (not . view private) . fieldInfo
     privateFields = entryView ^.. fields . each . filtered (view private) . fieldInfo
@@ -104,11 +94,12 @@ editorMode opts = do
         hSeek fhandle AbsoluteSeek 0
         editorFileContents' <- T.pack <$> hGetContents fhandle
 
-        case Toml.decode entryViewCodec editorFileContents' of
+        case P.parse parseEntryView fpath editorFileContents' of
           Right entryView -> do
             pure $ setOpts opts entryView
           Left errors -> do
             putStrLn "Failed to parse file."
+            putStrLn $ P.errorBundlePretty errors
             go $ editorFileContents'
               & annotateEditorFile errors -- Add annotations for parsing errors
               & renderAnnotatedLines
@@ -116,69 +107,56 @@ editorMode opts = do
 
   go $ headerExample <> "\n\n" <> renderEditorFile opts
 
+-- | Remove all lines that begin with `#`.
+removeComments :: [AnnotatedLine] -> [AnnotatedLine]
+removeComments als =
+  als & filter (\al -> al ^? alLine . _head /= Just '#')
+
 renderAnnotatedLines :: [AnnotatedLine] -> Text
 renderAnnotatedLines als =
   als
     <&> (\al -> T.intercalate "\n" (al ^. alLine : al ^. alErrors))
     & T.unlines
 
-annotateEditorFile :: [Toml.TomlDecodeError] -> Text -> [AnnotatedLine]
-annotateEditorFile errors contents =
-  contents
-    & T.lines
-    -- Adding an extra empty line at the end.
-    -- If a parsing error occurs at EOF, we can annotate this line.
-    & (++ [""])
-    <&> mkAnnotatedLine
-    & annotateErrors errors
-
-{- | For each @ParseError@, adds a note with the parsing error
+{- | For each error in the bunddle, adds a note with the parsing error
 next to the offending line. E.g.:
-
 > pw 1234
 > #  ^
 > # unexpected '1'
 > # expecting '=' or white space
 -}
-annotateParseErrors :: [ParseError] -> [AnnotatedLine] -> [AnnotatedLine]
-annotateParseErrors errors lines = foldl' annotateParseError lines errors
+annotateEditorFile :: ParseErrorBundle Text Void -> Text -> [AnnotatedLine]
+annotateEditorFile bundle fileContents =
+  fileContents
+    & T.lines
+    -- Adding an extra empty line at the end.
+    -- If a parsing error occurs at EOF, we can annotate this line.
+    & (++ [""])
+    <&> mkAnnotatedLine
+    & annotateLines bundle
   where
+    mkAnnotatedLine :: Text -> AnnotatedLine
+    mkAnnotatedLine t = AnnotatedLine t []
+
+    annotateLines :: ParseErrorBundle Text Void -> [AnnotatedLine] -> [AnnotatedLine]
+    annotateLines bundle lines =
+      fst $
+        foldl' annotateLine
+          (lines, P.bundlePosState bundle)
+          (P.bundleErrors bundle)
+
     -- | Finds the offending line, and adds one annotation with the parser error.
-    annotateParseError :: [AnnotatedLine] -> ParseError -> [AnnotatedLine]
-    annotateParseError lines error = lines & ix (error ^. line - 1) . alErrors <>~ (caretLine : errMsg)
+    annotateLine :: ([AnnotatedLine], PosState Text) -> ParseError Text Void -> ([AnnotatedLine], PosState Text)
+    annotateLine (lines, posState) err = (lines', posState')
       where
-        caretLine = "#" <> T.replicate (error ^. offset - 2) " " <> "^"
+        (_, posState') = P.reachOffset (P.errorOffset err) posState
+        lineNumber = P.unPos (P.sourceLine $ P.pstateSourcePos posState') - 1
+        columnNumber = P.unPos (P.sourceColumn $ P.pstateSourcePos posState') - 1
         errMsg =
-          error ^. errorMessage
+          err
+            & P.parseErrorTextPretty
+            & T.pack
             & T.lines
             <&> mappend "# "
-
-annotateOtherErrors :: [Toml.TomlDecodeError] -> [AnnotatedLine] -> [AnnotatedLine]
-annotateOtherErrors errors lines = lines <> [AnnotatedLine "" errorLines]
-  where
-    prettifiedErrors = Toml.prettyTomlDecodeErrors errors
-    errorLines
-      | null errors = []
-      | otherwise =
-          prettifiedErrors
-            & T.lines
-            <&> mappend "# "
-
-annotateErrors :: [Toml.TomlDecodeError] -> [AnnotatedLine] -> [AnnotatedLine]
-annotateErrors errors lines =
-  lines
-    & annotateParseErrors parseErrors
-    & annotateOtherErrors otherErrors
-  where
-    parseAndOtherErrors :: [Either Toml.TomlDecodeError ParseError]
-    parseAndOtherErrors =
-      flip map errors \case
-        parseErr@(Toml.ParseError (Toml.TomlParseError err)) ->
-          P.parse (parseParseError <* P.eof) "" err & first (const parseErr)
-        otherErr -> Left otherErr
-
-    parseErrors :: [ParseError]
-    parseErrors = rights parseAndOtherErrors
-
-    otherErrors :: [Toml.TomlDecodeError]
-    otherErrors = lefts parseAndOtherErrors
+        caretLine = "#" <> T.replicate (columnNumber - 1) " " <> "^"
+        lines' = lines & ix lineNumber . alErrors <>~ (caretLine : errMsg)
