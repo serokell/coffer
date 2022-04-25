@@ -5,9 +5,12 @@
 module Test.CLI.EditorMode where
 
 import CLI.EditorMode (renderEditorFile)
-import CLI.Parser
-import CLI.Types (FieldInfo(..))
-import Entry (newFieldKey)
+import CLI.EntryView (EntryView(EntryView), FieldInfoView(FieldInfoView), parseEntryView)
+import CLI.Types (CreateOptions(CreateOptions), FieldInfo(..))
+import Coffer.Path (mkQualifiedEntryPath)
+import Data.Functor ((<&>))
+import Data.Set qualified as S
+import Entry (FieldValue(FieldValue), newEntryTag, newFieldKey)
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
@@ -16,20 +19,29 @@ import Text.RawString.QQ (r)
 
 hprop_render_parse_roundtrip :: Property
 hprop_render_parse_roundtrip = property $ do
-  entryPath <- forAll genEntryPath
+  qEntryPath <- forAll genQualifiedEntryPath
   publicFields <- forAll $ Gen.list (Range.linear 0 5) genFieldInfo
   privateFields <- forAll $ Gen.list (Range.linear 0 5) genFieldInfo
+  entryTags <- forAll $ Gen.set (Range.linear 0 5) genEntryTag
 
-  let rendered = renderEditorFile entryPath publicFields privateFields
-  hparserShouldSucceed parseEditorFile rendered (publicFields, privateFields)
+  let opts = CreateOptions (Just qEntryPath) True False entryTags publicFields privateFields
+  let rendered = renderEditorFile opts
+
+  let publicFieldInfoViews = publicFields <&> \field -> FieldInfoView field False
+  let privateFieldInfoViews = privateFields <&> \field -> FieldInfoView field True
+
+  let entryView = EntryView (Just qEntryPath) (publicFieldInfoViews <> privateFieldInfoViews) entryTags
+
+  hparserShouldSucceed parseEntryView rendered entryView
 
 unit_parse_editor_file :: IO ()
 unit_parse_editor_file = do
-  parserShouldSucceed parseEditorFile
+  parserShouldSucceed parseEntryView
     [r|
+path = /entry/path
 
 # comment1
-[Public fields]
+[fields]
 
 # comment2
 field1 = f1
@@ -46,105 +58,122 @@ first line:
 
 """
 
-field5 = âД😱👪日本
-
-[Private fields]
-
+field5 = âПривет😱👪日本🤔🤔
 # comment4
-privatefield1 = pf1
+privatefield1 =~ pf1
 # comment5
-privatefield2 =    pf2
+privatefield2 =~    pf2
+
+[tags]
+tag1
+important
 
     |]
-    ( [ FieldInfo (unsafeFromRight $ newFieldKey "field1") "f1"
-      , FieldInfo (unsafeFromRight $ newFieldKey "field2") "f2"
-      , FieldInfo (unsafeFromRight $ newFieldKey "field3") ""
-      , FieldInfo (unsafeFromRight $ newFieldKey "field4") "first line:\n  second line\n  third line\n"
-      , FieldInfo (unsafeFromRight $ newFieldKey "field5") "âД😱👪日本"
-      ]
-    , [ FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") "pf1"
-      , FieldInfo (unsafeFromRight $ newFieldKey "privatefield2") "pf2"
-
-      ]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/entry/path"))
+        [ FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "field1") (FieldValue "f1")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "field2") (FieldValue "f2")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "field3") (FieldValue "")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "field4") (FieldValue "first line:\n  second line\n  third line\n")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "field5") (FieldValue "âПривет😱👪日本🤔🤔")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") (FieldValue "pf1")) True
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "privatefield2") (FieldValue "pf2")) True
+        ]
+        ( S.fromList
+            [ unsafeFromRight $ newEntryTag "tag1"
+            , unsafeFromRight $ newEntryTag "important"
+            ]
+        )
     )
 
 unit_parses_file_without_trailing_newline :: IO ()
 unit_parses_file_without_trailing_newline = do
-  parserShouldSucceed parseEditorFile
-    [r|[Public fields]
-[Private fields]|]
-    ( []
-    , []
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        []
+        S.empty
     )
 
-  parserShouldSucceed parseEditorFile
-    [r|[Public fields]
-[Private fields]
-privatefield1=pf1|]
-    ( []
-    , [ FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") "pf1"
-      ]
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
+privatefield1=~pf1
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        [FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") (FieldValue "pf1")) True]
+        S.empty
     )
 
-  parserShouldSucceed parseEditorFile
-    [r|[Public fields]
-[Private fields]
-privatefield1="""
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
+privatefield1=~"""
 pf1
-"""|]
-    ( []
-    , [ FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") "pf1"
-      ]
+"""
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        [FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "privatefield1") (FieldValue "pf1")) True]
+        S.empty
     )
 
 unit_parse_minimal_editor_file :: IO ()
 unit_parse_minimal_editor_file = do
-  parserShouldSucceed parseEditorFile
-    [r|[Public fields]
-[Private fields]|]
-    ( []
-    , []
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        []
+        S.empty
     )
 
-unit_fieldname_and_fieldcontents_must_be_on_the_same_line :: IO ()
-unit_fieldname_and_fieldcontents_must_be_on_the_same_line = do
-  parserShouldFail parseEditorFile
-    [r|[Public fields]
-name =
-  contents
-[Private fields]|]
+unit_fieldname_and_fieldcontents_must_be_separated_by_eq_sign :: IO ()
+unit_fieldname_and_fieldcontents_must_be_separated_by_eq_sign = do
+  parserShouldFail parseEntryView
+    [r|path = /path
+[fields]
+name contents
+[tags]|]
 
-    [r|3:1:
+    [r|3:6:
   |
-3 |   contents
-  | ^^^^^^^^^^^
-unexpected "  contents<newline>[Priv"
-expecting "[Private fields]" or fieldname
+3 | name contents
+  |      ^^
+unexpected "co"
+expecting "=~" or '='
 |]
 
-unit_fieldname_must_be_0_indented :: IO ()
-unit_fieldname_must_be_0_indented = do
-  parserShouldFail parseEditorFile
-    [r|[Public fields]
+unit_fieldname_may_not_be_0_indented :: IO ()
+unit_fieldname_may_not_be_0_indented = do
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
 name1 = contents1
   name2 = contents2
-[Private fields]|]
-    [r|3:1:
-  |
-3 |   name2 = contents2
-  | ^^^^^^^^^^^^^^^^
-unexpected "  name2 = conten"
-expecting "[Private fields]" or fieldname
-|]
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        [ FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "name1") (FieldValue "contents1")) False
+        , FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "name2") (FieldValue "contents2")) False
+        ]
+        S.empty
+    )
 
-  parserShouldFail parseEditorFile
-    [r|[Public fields]
+
+  parserShouldSucceed parseEntryView
+    [r|path = /path
+[fields]
   name = contents
-[Private fields]|]
-    [r|2:1:
-  |
-2 |   name = contents
-  | ^^^^^^^^^^^^^^^^
-unexpected "  name = content"
-expecting "[Private fields]" or fieldname
-|]
+[tags]|]
+    ( EntryView
+        (Just (unsafeFromRight $ mkQualifiedEntryPath "/path"))
+        [FieldInfoView (FieldInfo (unsafeFromRight $ newFieldKey "name") (FieldValue "contents")) False]
+        S.empty
+    )

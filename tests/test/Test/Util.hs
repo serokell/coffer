@@ -13,15 +13,19 @@ module Test.Util
   , hparserShouldSucceed
 
   -- * hedgehog generators
-  , genEntryPath
+  , genQualifiedEntryPath
   , genFieldInfo
+  , genEntryTag
   ) where
 
+import BackendName (BackendName, backendNameCharSet, newBackendName)
 import CLI.Parser
 import CLI.Types (FieldInfo(..))
-import Coffer.Path (EntryPath(..), PathSegment, mkPathSegment, pathSegmentAllowedCharacters)
+import Coffer.Path
+  (EntryPath(..), PathSegment, QualifiedPath(QualifiedPath), mkPathSegment,
+  pathSegmentAllowedCharacters)
 import Data.Text (Text)
-import Entry (FieldKey, keyCharSet, newFieldKey)
+import Entry (EntryTag, FieldKey, FieldValue(FieldValue), keyCharSet, newEntryTag, newFieldKey)
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
@@ -74,6 +78,11 @@ hparserShouldSucceed p input expected =
         ]
       failure
 
+genFromCharSet :: Int -> Int -> [Char] -> (Text -> Either Text a) -> Gen a
+genFromCharSet from to charSet smartCtor =
+  unsafeFromRight . smartCtor <$>
+    Gen.text (Range.linear from to) (Gen.element charSet)
+
 ----------------------------------------------------------------------------
 -- Hedgehog generators
 ----------------------------------------------------------------------------
@@ -82,22 +91,38 @@ genEntryPath :: Gen EntryPath
 genEntryPath = EntryPath <$> Gen.nonEmpty (Range.linear 1 3) genPathSegment
 
 genPathSegment :: Gen PathSegment
-genPathSegment =
-  unsafeFromRight . mkPathSegment <$>
-    Gen.text (Range.linear 1 5) (Gen.element pathSegmentAllowedCharacters)
+genPathSegment = genFromCharSet 1 5 pathSegmentAllowedCharacters mkPathSegment
 
 genFieldKey :: Gen FieldKey
-genFieldKey =
-  unsafeFromRight . newFieldKey <$>
-    Gen.text (Range.linear 1 20) (Gen.element keyCharSet)
+genFieldKey = genFromCharSet 1 20 keyCharSet newFieldKey
+
+genMaybeBackendName :: Gen (Maybe BackendName)
+genMaybeBackendName = Gen.maybe genBackendName
+  where
+    genBackendName :: Gen BackendName
+    genBackendName = genFromCharSet 1 10 backendNameCharSet newBackendName
+
+genQualifiedEntryPath :: Gen (QualifiedPath EntryPath)
+genQualifiedEntryPath =
+  QualifiedPath
+    <$> genMaybeBackendName
+    <*> genEntryPath
 
 genFieldInfo :: Gen FieldInfo
 genFieldInfo =
   FieldInfo
     <$> genFieldKey
-    <*> Gen.text (Range.linear 0 20)
-          (Gen.frequency
-            [ (4, Gen.unicode)
-            , (1, pure '\n')
-            ]
-          )
+    <*> genFieldContents
+    where
+      genFieldContents :: Gen FieldValue
+      genFieldContents =
+        FieldValue
+          <$> Gen.text (Range.linear 0 20)
+                (Gen.frequency
+                  [ (4, Gen.unicode)
+                  , (1, pure '\n')
+                  ]
+                )
+
+genEntryTag :: Gen EntryTag
+genEntryTag = genFromCharSet 1 5 keyCharSet newEntryTag
