@@ -93,8 +93,9 @@ createCmd
   => Config -> CreateOptions -> Sem r CreateResult
 createCmd
   config
-  (CreateOptions (QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields)
+  (CreateOptions mQEntryPath _edit force tags fields privateFields)
     = do
+  (QualifiedPath backendNameMb entryPath) <- maybe (throw CREntryPathIsMissing) pure mQEntryPath
   backend <- getBackend config backendNameMb
   nowUtc <- embed getCurrentTime
   let

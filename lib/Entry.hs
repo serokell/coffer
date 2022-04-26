@@ -53,9 +53,9 @@ keyCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 newFieldKey :: Text -> Either Text FieldKey
 newFieldKey t
   | T.null t =
-      Left "Tags must contain at least 1 character"
+      Left "Field name must contain at least 1 character"
   | T.any (`notElem` keyCharSet) t =
-      Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
+      Left $ "Field name can only contain the following characters: '" <> T.pack keyCharSet <> "'"
   | otherwise = Right $ UnsafeFieldKey t
 
 getFieldKey :: FieldKey -> Text

@@ -13,7 +13,7 @@ load '../helpers'
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid path: "bad\npath".
+Invalid qualified path format: "bad\npath".
 Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
 EOF
 }
@@ -23,7 +23,7 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid entry path: "bad/entry\npath".
+Invalid qualified entry path format: "bad/entry\npath".
 Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
 EOF
 }
@@ -43,7 +43,7 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid backend name: "bad\nbackend".
+Invalid qualified entry path format: "bad\nbackend#/path".
 Backend name can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
 EOF
 }
@@ -54,7 +54,7 @@ EOF
   assert_failure
   assert_output --partial - <<EOF
 Invalid field name: "bad\nfieldkey".
-Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
+Field name can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
 EOF
 }
 
@@ -64,6 +64,7 @@ EOF
   assert_failure
   assert_output --partial - <<EOF
 Invalid qualified entry path format: "back#/path#\n\nsmth".
+Unexpected qualified entry path format. Expected [BACKENDNAME#]ENTRYPATH
 Expected format is: [<backend-name>#]<entry-path>.
 <backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
 Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'.
@@ -76,6 +77,7 @@ EOF
   assert_failure
   assert_output --partial - <<EOF
 Invalid qualified path format: "back#/path#\n\nsmth".
+Unexpected qualified path format. Expected [BACKENDNAME#]PATH
 Expected format is: [<backend-name>#]<path>.
 <backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
 Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'.

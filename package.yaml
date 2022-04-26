@@ -91,7 +91,6 @@ library:
     - ansi-terminal
     - containers
     - extra
-    - extra
     - fmt
     - hashable
     - http-client
@@ -101,11 +100,14 @@ library:
     - lens-aeson
     - megaparsec
     - mtl
+    - nyan-interpolation
     - optparse-applicative
     - polysemy
+    - process
     - servant
     - servant-client
     - servant-client-core
+    - temporary
     - text
     - time
     - time-compat
@@ -134,7 +136,16 @@ tests:
     ghc-options:
       - -threaded
     dependencies:
+      - coffer
+      - containers
+      - hedgehog
+      - megaparsec
+      - raw-strings-qq
       - tasty
+      - tasty-hedgehog
+      - tasty-hunit
+      - text
+
   doctests:
     source-dirs:      tests/doctests
     main:             Doctests.hs

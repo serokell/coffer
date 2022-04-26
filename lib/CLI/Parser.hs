@@ -5,12 +5,13 @@
 {-# LANGUAGE OverloadedLists #-}
 
 module CLI.Parser
-  ( parserInfo
+  ( -- * optparse-applicative
+    parserInfo
+    -- * Megaparsec
+  , MParser
+  , endOfLineOrFile
   ) where
 
-import BackendName (BackendName, newBackendName)
-import CLI.Types
-import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
 import Control.Arrow ((>>>))
 import Control.Monad (guard, void)
 import Data.Bifunctor (first)
@@ -29,14 +30,17 @@ import Data.Time.Calendar.Compat (fromGregorianValid)
 import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
 import Data.Time.Compat (LocalTime(..), localTimeToUTC, makeTimeOfDayValid, utc)
 import Data.Void (Void)
-import Entry
-  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
-  newFieldKey)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
-import Text.Megaparsec.Char.Lexer qualified as P
+import Text.Megaparsec.Char.Lexer qualified as Lexer
+
+import CLI.Types
+import Coffer.Path (EntryPath, Path, QualifiedPath, mkQualifiedEntryPath, mkQualifiedPath)
+import Entry
+  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
+  newFieldKey)
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -118,12 +122,14 @@ viewOptions = do
 createOptions :: Parser CreateOptions
 createOptions =
   CreateOptions
-    <$> argument readQualifiedEntryPath ( mconcat
-          [ metavar "ENTRYPATH"
-          , help
-              "The path to insert the new entry into, this must not already be \
-              \a directory or an entry unless `-f` is specified"
-          ])
+    <$> optional
+          ( argument readQualifiedEntryPath ( mconcat
+              [ metavar "ENTRYPATH"
+              , help
+                  "The path to insert the new entry into, this must not already be \
+                  \a directory or an entry unless `-f` is specified"
+              ])
+          )
     <*> switch ( mconcat
           [ long "edit"
           , short 'e'
@@ -328,23 +334,6 @@ tagOptions =
 -- Common
 ----------------------------------------------------------------------------
 
-readPath' :: Text -> Either String Path
-readPath' input =
-  mkPath input & first \err -> unlines
-    [ "Invalid path: " <> show input <> "."
-    , T.unpack err
-    ]
-
-readEntryPath' :: Text -> Either String EntryPath
-readEntryPath' input =
-  mkEntryPath input & first \err -> unlines
-    [ "Invalid entry path: " <> show input <> "."
-    , T.unpack err
-    ]
-
-_readEntryPath :: ReadM EntryPath
-_readEntryPath = str >>= toReader . readEntryPath'
-
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
   eitherReader \input ->
@@ -352,13 +341,6 @@ readEntryTag = do
       [ "Invalid tag: " <> show input <> "."
       , T.unpack err
       ]
-
-readBackendName' :: Text -> Either String BackendName
-readBackendName' input =
-  newBackendName input & first \err -> unlines
-    [ "Invalid backend name: " <> show input <> "."
-    , T.unpack err
-    ]
 
 readFieldVisibility :: ReadM FieldVisibility
 readFieldVisibility =
@@ -382,36 +364,20 @@ readFieldKey' input = do
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
 readQualifiedEntryPath = do
   eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, entryPathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath (Just backendName) entryPath
-      [entryPathStr] -> do
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath Nothing entryPath
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified entry path format: " <> show input <> "."
-                , show expectedQualifiedEntryPathFormat
-                ]
+    mkQualifiedEntryPath (T.pack input) & first \err -> unlines
+      [ "Invalid qualified entry path format: " <> show input <> "."
+      , T.unpack err
+      , show expectedQualifiedEntryPathFormat
+      ]
 
 readQualifiedPath :: ReadM (QualifiedPath Path)
 readQualifiedPath = do
   eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, pathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        path <- readPath' pathStr
-        pure $ QualifiedPath (Just backendName) path
-      [pathStr] -> do
-        path <- readPath' pathStr
-        pure $ QualifiedPath Nothing path
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified path format: " <> show input <> "."
-                , show expectedQualifiedPathFormat
-                ]
+    mkQualifiedPath (T.pack input) & first \err -> unlines
+      [ "Invalid qualified path format: " <> show input <> "."
+      , T.unpack err
+      , show expectedQualifiedPathFormat
+      ]
 
 readFieldValue :: ReadM FieldValue
 readFieldValue = str <&> FieldValue
@@ -419,7 +385,7 @@ readFieldValue = str <&> FieldValue
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
   eitherReader \input ->
-    P.parse (parseFieldInfo <* P.eof) "" (T.pack input) & first \err -> unlines
+    P.parse (parseFieldInfo parseFieldContentsEof <* P.eof) "" (T.pack input) & first \err ->unlines
       [ "Invalid field format: " <> show input <> "."
       , "Expected format: 'fieldname=fieldcontents'."
       , ""
@@ -543,7 +509,7 @@ type MParser = P.Parsec Void Text
 -- * @YYYY-MM-DD HH:MM:SS@
 parseFilterDate :: MParser FilterDate
 parseFilterDate = do
-  y <- P.decimal
+  y <- Lexer.decimal
   optional (P.char '-') >>= \case
     Nothing -> pure $ FDYear y
     Just _ -> do
@@ -618,11 +584,11 @@ parseFilterField = do
       localTime <- parseFilterDate
       pure $ FilterFieldByDate op localTime
 
-parseFieldInfo :: MParser FieldInfo
-parseFieldInfo = do
+parseFieldInfo :: MParser FieldValue -> MParser FieldInfo
+parseFieldInfo fieldContentsParser = do
   fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
   P.hspace >> P.char '=' >> P.hspace
-  fieldContents <- parseFieldContentsEof
+  fieldContents <- fieldContentsParser
   pure $ FieldInfo fieldName fieldContents
 
 parseFieldNameWhile :: (Char -> Bool) -> MParser FieldKey
@@ -633,6 +599,10 @@ parseFieldNameWhile whileCond = do
 -- | Parse the rest of the input as a field content.
 parseFieldContentsEof :: MParser FieldValue
 parseFieldContentsEof = FieldValue . T.pack <$> P.manyTill P.anySingle P.eof
+
+-- | Matches on @eol@ or @eof@.
+endOfLineOrFile :: MParser ()
+endOfLineOrFile = void P.eol <|> P.eof
 
 ----------------------------------------------------------------------------
 -- Utils

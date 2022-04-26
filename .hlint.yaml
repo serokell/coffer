@@ -6,7 +6,7 @@
 # Settings
 ###########################################################################
 
-- arguments: [-XTypeApplications, -XRecursiveDo, -XBlockArguments]
+- arguments: [-XTypeApplications, -XRecursiveDo, -XBlockArguments, -XQuasiQuotes]
 
 # These are just too annoying
 - ignore: { name: Redundant do }

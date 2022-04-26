@@ -26,6 +26,8 @@ library
       Backend.Vault.Kv.Internal
       BackendName
       Backends
+      CLI.EditorMode
+      CLI.EntryView
       CLI.Parser
       CLI.PrettyPrint
       CLI.Types
@@ -106,11 +108,14 @@ library
     , lens-aeson
     , megaparsec
     , mtl
+    , nyan-interpolation
     , optparse-applicative
     , polysemy
+    , process
     , servant
     , servant-client
     , servant-client-core
+    , temporary
     , text
     , time
     , time-compat
@@ -255,6 +260,8 @@ test-suite test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.CLI.EditorMode
+      Test.Util
       Tree
       Paths_coffer
   hs-source-dirs:
@@ -314,5 +321,13 @@ test-suite test
       tasty-discover:tasty-discover
   build-depends:
       base >=4.14.3.0 && <5
+    , coffer
+    , containers
+    , hedgehog
+    , megaparsec
+    , raw-strings-qq
     , tasty
+    , tasty-hedgehog
+    , tasty-hunit
+    , text
   default-language: Haskell2010

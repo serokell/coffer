@@ -55,6 +55,7 @@ data CreateError
 
 data CreateResult
   = CRSuccess Entry
+  | CREntryPathIsMissing
   | CRCreateError CreateError
 
 data SetFieldResult
@@ -97,7 +98,7 @@ data ViewOptions = ViewOptions
   deriving stock Show
 
 data CreateOptions = CreateOptions
-  { coQPath :: QualifiedPath EntryPath
+  { coQPath :: Maybe (QualifiedPath EntryPath)
   , coEdit :: Bool
   , coForce :: Bool
   , coTags :: Set EntryTag
@@ -167,7 +168,7 @@ data FieldInfo = FieldInfo
   { fiName :: FieldKey
   , fiContents :: FieldValue
   }
-  deriving stock Show
+  deriving stock (Show, Eq)
 
 data Direction = Asc | Desc
   deriving stock Show
