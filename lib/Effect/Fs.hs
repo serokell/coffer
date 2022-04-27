@@ -2,7 +2,6 @@
 --
 -- SPDX-License-Identifier: MPL-2.0
 
-{-# LANGUAGE ImportQualifiedPost #-}
 module Effect.Fs
   ( FsEffect
   , nodeExists
@@ -29,6 +28,7 @@ import Polysemy
 import Polysemy.Error
 import System.Directory hiding (listDirectory)
 import System.Directory qualified as D
+import Data.Text (Text)
 
 type Node f d = Either (File f) (Directory d)
 type Node' a = Node a a
@@ -43,7 +43,7 @@ data FsError
   = FENodeNotFound Path
   | FENodeExists (MismatchError (Node' Path))
   | FEMissingParent (Node' Path)
-  | FEInvalidPath Path
+  | FEInvalidPath Text Path
   deriving stock (Show)
 
 data MismatchError a = MismatchError
@@ -57,17 +57,11 @@ newtype NodeRec = NodeRec (Node Path [NodeRec])
 pathToString :: Path -> Either FsError String
 pathToString path =
   case decodeUtf8' path of
-    Left a -> Left $ FEInvalidPath path
+    Left a -> Left $ FEInvalidPath (T.pack $ show a) path
     Right b -> Right $ T.unpack b
+    
 stringToPath :: String -> Path
 stringToPath = encodeUtf8 . T.pack
-
-extractNodePath
-  :: Node' Path
-  -> Path
-extractNodePath =
-  \case Left (File path) -> path
-        Right (Directory path) -> path
 
 eitherError
   :: Member (Error e) r
@@ -77,9 +71,14 @@ eitherError
 eitherError f = either (throw . f) pure
 
 data FsEffect m a where
+  -- | Checks whether a 'Node' exists and retuns 'Just (Node' ())' or 'Nothing'
+  -- | if the node wasn't found. 'Node'' is either a 'Directory ()' or a
+  -- | 'File ()' according to what was found.
   NodeExists :: Path -> FsEffect m (Maybe (Node' ()))
-  GetNode :: Path -> FsEffect m (Maybe (Node' Path))
-  ListDirectory :: Directory Path -> FsEffect m [Node' ByteString]
+  GetNode :: Path -> FsEffect m (Maybe (Node' ByteString))
+  -- | Lists a directories contents, returns the path to each of its contents.
+  -- | If the directory is not found or it's a file, it returns a 'Nothing'
+  ListDirectory :: Directory Path -> FsEffect m (Maybe [Node' Path])
   ListDirectoryRec :: Directory Path -> FsEffect m [NodeRec]
 --  ReadNode :: Node' Path -> FsEffect m (Node ByteString [ByteString])
 --  CreateNode :: Node' Path -> FsEffect m (Node' ())
@@ -109,7 +108,7 @@ _nodeExists
 _nodeExists path = do
   stringPath <-
     eitherError
-    (const $ FEInvalidPath path)
+    (\unicodeError -> FEInvalidPath (T.pack $ show unicodeError) path)
     (decodeUtf8' path <&> T.unpack)
   file <- embed $ doesFileExist stringPath
   dir <- embed $ doesDirectoryExist stringPath
@@ -134,18 +133,27 @@ _getNode path = do
 
 
 _listDirectory
-  :: ( Member (Error FsError) r
+  :: forall r.
+     ( Member (Error FsError) r
      , Member (Embed IO) r
      )
   => Directory Path
-  -> Sem r [Node' ByteString]
+  -> Sem r (Maybe [Node' Path])
 _listDirectory (Directory path) = do
   stringPath <- eitherError id (pathToString path)
   nodes <- embed $ D.listDirectory stringPath
-  mapM (_getNodeThrow . stringToPath) nodes
-    where
-      _getNodeThrow path =
-        _getNode path >>= maybe (throw $ FENodeNotFound path) pure
+
+  _getNode path >>=
+    \case
+      Just _ -> mapM (_getNodeThrow . stringToPath) nodes <&> Just
+      _ -> pure Nothing
+
+  where
+    _getNodeThrow
+      :: Path
+      -> Sem r (Node' Path)
+    _getNodeThrow path =
+      _getNode path >>= maybe (throw $ FENodeNotFound path) pure
 
 _listDirectoryRec
   :: ( Member (Error FsError) r
@@ -153,11 +161,14 @@ _listDirectoryRec
      )
   => Directory Path
   -> Sem r [NodeRec]
-_listDirectoryRec dirPath = do
-  list <- _listDirectory dirPath
-  forM list $ \case Left f -> pure $ NodeRec $ Left f
-                    Right d -> _listDirectoryRec d
-                              <&> NodeRec . Right . Directory
+_listDirectoryRec dirPath@(Directory path) =
+  _listDirectory dirPath >>= \case
+    Nothing -> throw $ FENodeNotFound path
+    Just nodes -> do
+      forM nodes $ \case
+        Left f -> pure $ NodeRec $ Left f
+        Right d ->
+          _listDirectoryRec d <&> NodeRec . Right . Directory
 
 -- _readNode
 --   :: Member (Error FsError) r

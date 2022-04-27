@@ -29,46 +29,50 @@ data DebugBackend =
 
 debugCodec :: TomlCodec DebugBackend
 debugCodec = Toml.Codec input output
-  where input :: TomlEnv DebugBackend
-        input toml = case HS.lookup "sub_type" $ Toml.tomlPairs toml of
-                       Just x ->
-                         case Toml.backward Toml._Text x of
-                           Right t ->
-                             case supportedBackends t of
-                               Right y ->
-                                 let newToml = toml { Toml.tomlPairs =
-                                                      Toml.tomlPairs toml
-                                                      & HS.delete "sub_type"
-                                                    }
-                                 in
-                                 case y newToml of
-                                   Success b -> Success $ DebugBackend
-                                                { dSubType = t
-                                                , dSubBackend = b
-                                                }
-                                   Failure e -> Failure e
-                               Left e ->
-                                 Failure
-                                 [ Toml.BiMapError "type" e
-                                 ]
-                           Left e ->
-                             Failure
-                             [ Toml.BiMapError "type" e
-                             ]
-                       Nothing ->
-                         Failure
-                         [ Toml.BiMapError "sub_type" $
-                           Toml.ArbitraryError
-                           "Debug backend doesn't have a `sub_type` key"
-                         ]
-        output :: DebugBackend -> Toml.TomlState DebugBackend
-        output debugBackend =
-          case dSubBackend debugBackend of
-            SomeBackend (be :: a) -> do
-              Toml.codecWrite (Toml.text "type") "debug"
-              Toml.codecWrite (Toml.text "sub_type") (dSubType debugBackend)
-              Toml.codecWrite (_codec @a) be
-              pure debugBackend
+  where
+    input :: TomlEnv DebugBackend
+    input toml =
+      case HS.lookup "sub_type" $ Toml.tomlPairs toml of
+        Just x ->
+          case Toml.backward Toml._Text x of
+            Right t ->
+              case supportedBackends t of
+                Right y ->
+                  let newToml =
+                        toml { Toml.tomlPairs =
+                               Toml.tomlPairs toml
+                               & HS.delete "sub_type"
+                             }
+                  in
+                    case y newToml of
+                      Success b ->
+                        Success $ DebugBackend
+                        { dSubType = t
+                        , dSubBackend = b
+                        }
+                      Failure e -> Failure e
+                Left e ->
+                  Failure
+                  [ Toml.BiMapError "type" e
+                  ]
+            Left e ->
+              Failure
+              [ Toml.BiMapError "type" e
+              ]
+        Nothing ->
+          Failure
+          [ Toml.BiMapError "sub_type" $
+            Toml.ArbitraryError
+            "Debug backend doesn't have a `sub_type` key"
+          ]
+    output :: DebugBackend -> Toml.TomlState DebugBackend
+    output debugBackend =
+      case dSubBackend debugBackend of
+        SomeBackend (be :: a) -> do
+          Toml.codecWrite (Toml.text "type") "debug"
+          Toml.codecWrite (Toml.text "sub_type") (dSubType debugBackend)
+          Toml.codecWrite (_codec @a) be
+          pure debugBackend
 
 dbWriteSecret
   :: Effects r => DebugBackend -> Entry -> Sem r ()

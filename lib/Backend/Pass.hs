@@ -7,7 +7,6 @@ module Backend.Pass
 import Backend
 import BackendName
 import Coffer.Path
-import Coffer.Path qualified as P
 import Control.Exception (IOException)
 import Control.Lens
 import Data.ByteString.Lazy (ByteString)
@@ -22,15 +21,15 @@ import Entry (Entry)
 import Entry qualified as E
 import Entry.Pass
 import Error
-import Fmt (build, fmt)
 import Polysemy
 import Polysemy.Error
 import System.Directory qualified as D
-import System.FilePath (makeRelative)
+import System.FilePath (makeRelative, (</>))
 import System.IO.Error (isDoesNotExistError)
 import System.Process.Typed
 import Toml (TomlCodec)
 import Toml qualified
+import Fmt (pretty)
 
 data PassBackend =
   PassBackend
@@ -40,19 +39,18 @@ data PassBackend =
   }
   deriving stock (Show)
 
+
 passCodec :: TomlCodec PassBackend
 passCodec =
   PassBackend
   <$> backendNameCodec "name" Toml..= pbName
   <*> Toml.string "store_dir" Toml..= pbStoreDir
-  <*> Toml.dimatch fPathToT tToFPath (Toml.text "pass_exe") Toml..= pbPassExe
-  where tToFPath = Just . T.unpack
-        fPathToT :: Maybe String -> Maybe Text
-        fPathToT a = a <&> T.pack
+  <*> Toml.dioptional (Toml.string "pass_exe") Toml..= pbPassExe
 
 
 verifyPassStore
-  :: Member (Error CofferError) r
+  :: forall r .
+     Member (Error CofferError) r
   => Member (Embed IO) r
   => FilePath
   -> Sem r ()
@@ -63,8 +61,9 @@ verifyPassStore storeDir =
     Right Nothing -> throw . OtherError $
       "You must first initialize the password store at: " <> T.pack storeDir
   where
+    res :: Sem r (Either FsError (Maybe (Node' ())))
     res = runError @FsError . runFsInIO $ do
-      nodeExists (stringToPath $ storeDir <> "/.gpg-id")
+      nodeExists (stringToPath $ storeDir </> "/.gpg-id")
 
 
 wrapper
@@ -85,8 +84,7 @@ wrapper backend args input = do
     & setEnv [("PASSWORD_STORE_DIR", storeDir)]
     & readProcess
 
-
-
+    
 pbWriteSecret
   :: Effects r => PassBackend -> Entry -> Sem r ()
 pbWriteSecret backend entry = do
@@ -100,7 +98,7 @@ pbWriteSecret backend entry = do
       backend
       [ "insert"
       , "-mf"
-      , entry ^. E.path & P.entryPathAsPath & build & fmt
+      , entry ^. E.path & pretty
       ]
       (Just $ byteStringInput input)
 
@@ -116,7 +114,7 @@ pbReadSecret backend path = do
     wrapper
       backend
       [ "show"
-      , path & P.entryPathAsPath & build & fmt
+      , pretty path
       ]
       Nothing
 
@@ -125,24 +123,35 @@ pbReadSecret backend path = do
       pure $ T.decodeUtf8 (BS.toStrict stdout) ^? passTextPrism . E.entry
     ExitFailure 1 ->
       pure Nothing
-    ExitFailure _e ->
+    ExitFailure _i ->
       throw $ OtherError (T.decodeUtf8 $ BS.toStrict stderr)
+
 
 pbListSecrets
   :: Effects r => PassBackend -> Path -> Sem r (Maybe [Text])
-pbListSecrets backend path = do
+pbListSecrets backend path = runFsInIO do
   let storeDir = pbStoreDir backend
   verifyPassStore storeDir
 
-  let fpath = storeDir <> (path & build & fmt)
-  contents <- runError (fromException @IOException $ D.listDirectory fpath)
-              >>= (\case Left e ->
-                           if | isDoesNotExistError e -> pure Nothing
-                              | True -> throw $ OtherError (T.pack $ show e)
-                         Right v -> pure $ Just v)
-              <&> \a -> a <&> map (makeRelative fpath)
+  let qualifiedPath = stringToPath $ storeDir <> pretty path
+  dirPath <-
+    nodeExists qualifiedPath
+    >>= maybe (nodeNotFound path) pure
+    <&> bimap (const path) (const path)
+  runError (listDirectory dirPath) >>= \case
+    Left e
+       | isDoesNotExistError e -> pure Nothing
+       | otherwise -> throw $ OtherError (T.pack $ show e)
+    Right filePaths -> do
+      pure $ Just filePaths
+        <&> map (T.drop 4 . T.pack . makeRelative fpath)
+   where
+     nodeNotFound
+       :: Effects r
+       => Path
+       -> Sem r a
+     nodeNotFound = undefined
 
-  pure $ contents <&> map (T.dropEnd 4 . T.pack)
 
 pbDeleteSecret
   :: Effects r => PassBackend -> EntryPath -> Sem r ()
@@ -152,7 +161,7 @@ pbDeleteSecret backend path = do
       backend
       [ "rm"
       , "-f"
-      , path & P.entryPathAsPath & build & fmt
+      , pretty path
       ]
       Nothing
 
