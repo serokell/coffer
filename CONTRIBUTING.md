@@ -36,7 +36,7 @@ Haddock documentation.
 ## Legal
 
 We want to make sure that our projects come with correct licensing information
-and that this information is machine-readable, thus we are following the
+and that this information is machine-readable, thus we are following the <!-- xrefcheck: ignore link -->
 [REUSE Practices][reuse] – feel free to click the link and read about them,
 but, basically, it all boils down to the following:
 
@@ -73,6 +73,7 @@ but, basically, it all boils down to the following:
   * All the same rules apply to documentation that is stored in the repository.
 
 These simple rules should cover most of situation you are likely to encounter.
+<!-- xrefcheck: ignore link -->
 In case of doubt, consult the [REUSE Practices][reuse] document.
 
 [reuse]: https://reuse.software/spec/
