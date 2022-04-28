@@ -73,6 +73,7 @@ data CopyResult
   = CPRSuccess [(QualifiedPath EntryPath, QualifiedPath EntryPath)]
   | CPRPathNotFound (QualifiedPath Path)
   | CPRMissingEntryName
+  | CPRSamePath (QualifiedPath Path)
   | CPRCreateErrors [(QualifiedPath EntryPath, CreateError)]
 
 data DeleteResult
