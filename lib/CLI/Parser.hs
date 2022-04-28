@@ -32,6 +32,7 @@ import Data.Void (Void)
 import Entry
   (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
   newFieldKey)
+import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Megaparsec qualified as P
@@ -350,7 +351,7 @@ readEntryTag = do
   eitherReader \input ->
     newEntryTag (T.pack input) & first \err -> unlines
       [ "Invalid tag: " <> show input <> "."
-      , T.unpack err
+      ,  pretty err
       ]
 
 readBackendName' :: Text -> Either String BackendName
@@ -376,7 +377,7 @@ readFieldKey' input = do
     Right tag -> pure tag
     Left err -> Left $ unlines
       [ "Invalid field name: " <> show input <> "."
-      , T.unpack err
+      , pretty err
       ]
 
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)

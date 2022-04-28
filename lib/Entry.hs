@@ -4,10 +4,12 @@
 
 module Entry
   ( FieldKey
+  , BadFieldName (..)
   , keyCharSet
   , newFieldKey
   , getFieldKey
   , EntryTag
+  , BadEntryTag (..)
   , newEntryTag
   , getEntryTag
   , FieldVisibility(..)
@@ -50,12 +52,15 @@ newtype FieldKey = UnsafeFieldKey Text
 keyCharSet :: [Char]
 keyCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 
-newFieldKey :: Text -> Either Text FieldKey
+newtype BadFieldName = BadFieldName { unBadFieldName :: Text }
+  deriving newtype Buildable
+
+newFieldKey :: Text -> Either BadFieldName FieldKey
 newFieldKey t
   | T.null t =
-      Left "Tags must contain at least 1 character"
+      Left $ BadFieldName "Tags must contain at least 1 character"
   | T.any (`notElem` keyCharSet) t =
-      Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
+      Left $ BadFieldName ("Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'")
   | otherwise = Right $ UnsafeFieldKey t
 
 getFieldKey :: FieldKey -> Text
@@ -65,12 +70,15 @@ newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
   deriving newtype (A.ToJSON, A.FromJSON, Buildable)
 
-newEntryTag :: Text -> Either Text EntryTag
+newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
+  deriving newtype Buildable
+
+newEntryTag :: Text -> Either BadEntryTag EntryTag
 newEntryTag tag
   | T.null tag =
-      Left "Tags must contain at least 1 character"
+      Left $ BadEntryTag "Tags must contain at least 1 character"
   | T.any (`notElem` keyCharSet) tag =
-      Left $ "Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'"
+      Left $ BadEntryTag ("Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'")
   | otherwise = Right $ UnsafeEntryTag tag
 
 getEntryTag :: EntryTag -> Text

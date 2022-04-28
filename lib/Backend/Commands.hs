@@ -36,8 +36,7 @@ import Entry
   (Entry, EntryTag, Field, FieldKey, FieldVisibility(..), dateModified, fieldValue, fields,
   newEntry, newField, path, value, visibility)
 import Entry qualified as E
-import Error (CofferError(..))
-import Fmt (Builder, pretty, unlinesF)
+import Error (CofferError(..), InternalCommandsError(EntryPathDoesntHavePrefix, InvalidEntry))
 import GHC.Exts (Down(..), sortWith)
 import Polysemy
 import Polysemy.Error (Error, throw)
@@ -349,11 +348,9 @@ buildCopyOperations oldBackend newBackend oldQPath@(QualifiedPath oldBackendName
         newEntry <- entry & E.path . Path.entryPathParentDir %%~ \parentDir ->
           case Path.replacePathPrefix oldPath newPath parentDir of
             Just newParentDir -> pure newParentDir
-            Nothing -> throw $ OtherError $ unlinesF @_ @Builder
-              [ "Internal error:"
-              , "Expected path: '" <> pretty (entry ^. E.path) <> "'"
-              , "To have the prefix: '" <> pretty oldPath <> "'"
-              ]
+            Nothing -> do
+              let err = EntryPathDoesntHavePrefix (entry ^. E.path) oldPath
+              throw $ InternalCommandsError err
 
         let old = QualifiedPath oldBackendNameMb entry
         let new = QualifiedPath newBackendNameMb newEntry
@@ -530,12 +527,7 @@ getEntryOrDir backend path =
                   Nothing -> pure ()
 
               (_, Right subdir) -> go (rootPath <> subdir)
-              _ -> lift $ throw $ OtherError $ unlinesF
-                    [ "Internal error:"
-                    , "Backend returned a secret that is not a valid\
-                      \ entry or directory name."
-                    , "Got: '" <> secret <> "'."
-                    ]
+              _ -> lift $ throw $ InternalCommandsError (InvalidEntry secret)
 
 -- | This function gets all entries, that are exist in given entry path.
 --
