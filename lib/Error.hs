@@ -61,9 +61,9 @@ instance Buildable CofferError where
     BackendNotFound backendName ->
       "Backend with name '" <> build backendName <> "' not found."
     BadFieldNameError err -> build err
-    BadMasterFieldName key err ->
+    BadMasterFieldName name err ->
       unlinesF @_ @Builder
-        [ "Attempted to create new field name from '" +| key |+ "'"
+        [ "Attempted to create new field name from '" +| name |+ "'"
         , ""
         , build err
         ]

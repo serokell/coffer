@@ -30,8 +30,8 @@ import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
 import Data.Time.Compat (LocalTime(..), localTimeToUTC, makeTimeOfDayValid, utc)
 import Data.Void (Void)
 import Entry
-  (EntryTag, FieldKey, FieldValue(FieldValue), FieldVisibility(Private, Public), newEntryTag,
-  newFieldKey)
+  (EntryTag, FieldContents(FieldContents), FieldName, FieldVisibility(..), newEntryTag,
+  newFieldName)
 import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
@@ -110,7 +110,7 @@ viewOptions = do
           , help "The path to either a directory of entries, or a single entry"
           ])
     <*> optional
-          ( argument readFieldKey $ mconcat
+          ( argument readFieldName $ mconcat
               [ metavar "FIELDNAME"
               , help "The optional field name to fetch the contents of"
               ]
@@ -169,13 +169,13 @@ setFieldOptions =
   SetFieldOptions
     <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
-          , help "The path to set the field value on, this must already exist as an entry"
+          , help "The path to set the field contents on, this must already exist as an entry"
           ])
-    <*> argument readFieldKey ( mconcat
+    <*> argument readFieldName ( mconcat
           [ metavar "FIELDNAME"
           , help "The name of the field to set"
           ])
-    <*> optional (argument readFieldValue $ mconcat
+    <*> optional (argument readFieldContents $ mconcat
           [ metavar "FIELDCONTENTS"
           , help $ unlines
               [ "The contents to insert into the field."
@@ -201,7 +201,7 @@ deleteFieldOptions =
           [ metavar "ENTRYPATH"
           , help "The path to the entry with the field to delete"
           ])
-    <*> argument readFieldKey ( mconcat
+    <*> argument readFieldName ( mconcat
           [ metavar "FIELDNAME"
           , help "The name of the field to delete"
           ])
@@ -368,12 +368,12 @@ readFieldVisibility =
     , ("private", Private)
     ]
 
-readFieldKey :: ReadM FieldKey
-readFieldKey = str >>= toReader . readFieldKey'
+readFieldName :: ReadM FieldName
+readFieldName = str >>= toReader . readFieldName'
 
-readFieldKey' :: Text -> Either String FieldKey
-readFieldKey' input = do
-  case newFieldKey input of
+readFieldName' :: Text -> Either String FieldName
+readFieldName' input = do
+  case newFieldName input of
     Right tag -> pure tag
     Left err -> Left $ unlines
       [ "Invalid field name: " <> show input <> "."
@@ -414,8 +414,8 @@ readQualifiedPath = do
                 , show expectedQualifiedPathFormat
                 ]
 
-readFieldValue :: ReadM FieldValue
-readFieldValue = str <&> FieldValue
+readFieldContents :: ReadM FieldContents
+readFieldContents = str <&> FieldContents
 
 readFieldInfo :: ReadM FieldInfo
 readFieldInfo = do
@@ -444,14 +444,14 @@ readSort = do
             , show expectedSortFormat
             ]
       [fieldName, means, direction] -> do
-        fieldName' <- readFieldKey' fieldName
+        fieldName' <- readFieldName' fieldName
         direction' <- readDirection direction
         case means of
-          "value" -> pure (SortByFieldValue fieldName', direction')
+          "contents" -> pure (SortByFieldContents fieldName', direction')
           "date" -> pure (SortByFieldDate fieldName', direction')
           _ -> Left $ unlines
             [ "Invalid sort: " <> show means <> "."
-            , "Choose one of: 'value', 'date'."
+            , "Choose one of: 'contents', 'date'."
             , ""
             , show expectedSortFormat
             ]
@@ -465,7 +465,7 @@ expectedSortFormat = Pretty.vsep
   [ "Expected format is:"
   , " * to sort by entry name: 'name:<direction>',"
   , " * to sort by the entry's last modified date: 'date:<direction>',"
-  , " * to sort by a field's value: '<fieldname>:value:<direction>',"
+  , " * to sort by a field's contents: '<fieldname>:contents:<direction>',"
   , " * to sort by a field's last modified date: '<fieldname>:date:<direction>'."
   , "Direction can be 'asc' or 'desc'."
   , "Examples: 'name:desc', 'password:date:asc'."
@@ -511,7 +511,7 @@ expectedFilterFormat = Pretty.vsep
   , "Examples: 'name~vault', 'date<2020-02'."
   ]
 
-readFilterField :: ReadM (FieldKey, FilterField)
+readFilterField :: ReadM (FieldName, FilterField)
 readFilterField = do
   eitherReader \input ->
     P.parse (parseFilterField <* P.eof) "" (T.pack input) & first \err -> unlines
@@ -524,10 +524,10 @@ readFilterField = do
 
 expectedFilterFieldFormat :: Pretty.Doc
 expectedFilterFieldFormat = Pretty.vsep
-  [ "Expected format is: '<fieldname>:value~<substring>' or `<fieldname>:date<op><date>`."
+  [ "Expected format is: '<fieldname>:contents~<substring>' or `<fieldname>:date<op><date>`."
   , "<op> can be '<=', '>=', '<', '>', or '='."
   , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
-  , "Examples: 'url:value~google.com', 'pw:date<2020-02'."
+  , "Examples: 'url:contents~google.com', 'pw:date<2020-02'."
   ]
 
 ----------------------------------------------------------------------------
@@ -601,19 +601,19 @@ parseFilter =
       localTime <- parseFilterDate
       pure $ FilterByDate op localTime
 
-parseFilterField :: MParser (FieldKey, FilterField)
+parseFilterField :: MParser (FieldName, FilterField)
 parseFilterField = do
   fieldName <- parseFieldNameWhile (/= ':')
   void $ P.char ':'
-  filterField <- parseFilterFieldByValue <|> parseFilterFieldByDate
+  filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
 
   pure (fieldName, filterField)
   where
-    parseFilterFieldByValue = do
-      void $ P.string "value" >> P.char '~'
+    parseFilterFieldByContents = do
+      void $ P.string "contents" >> P.char '~'
       rest <- P.takeRest
       guard (not $ T.null rest)
-      pure $ FilterFieldByValue rest
+      pure $ FilterFieldByContents rest
     parseFilterFieldByDate = do
       op <- P.string "date" >> parseFilterOp
       localTime <- parseFilterDate
@@ -626,14 +626,14 @@ parseFieldInfo = do
   fieldContents <- parseFieldContentsEof
   pure $ FieldInfo fieldName fieldContents
 
-parseFieldNameWhile :: (Char -> Bool) -> MParser FieldKey
+parseFieldNameWhile :: (Char -> Bool) -> MParser FieldName
 parseFieldNameWhile whileCond = do
   fieldName <- P.takeWhile1P (Just "fieldname") whileCond
-  either fail pure $ readFieldKey' fieldName
+  either fail pure $ readFieldName' fieldName
 
 -- | Parse the rest of the input as a field content.
-parseFieldContentsEof :: MParser FieldValue
-parseFieldContentsEof = FieldValue . T.pack <$> P.manyTill P.anySingle P.eof
+parseFieldContentsEof :: MParser FieldContents
+parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
 
 ----------------------------------------------------------------------------
 -- Utils

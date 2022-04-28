@@ -3,23 +3,23 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module Entry
-  ( FieldKey
+  ( FieldName
   , BadFieldName (..)
-  , keyCharSet
-  , newFieldKey
-  , getFieldKey
+  , allowedCharSet
+  , newFieldName
+  , getFieldName
   , EntryTag
   , BadEntryTag (..)
   , newEntryTag
   , getEntryTag
   , FieldVisibility(..)
-  , FieldValue (..)
-  , fieldValue
+  , FieldContents (..)
+  , fieldContents
   , Field (..)
   , dateModified
   , newField
   , visibility
-  , value
+  , contents
   , Entry
   , newEntry
   , path
@@ -45,26 +45,26 @@ import Fmt (Buildable, build)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
-newtype FieldKey = UnsafeFieldKey Text
+newtype FieldName = UnsafeFieldName Text
   deriving stock (Show, Eq)
   deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable)
 
-keyCharSet :: [Char]
-keyCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
+allowedCharSet :: [Char]
+allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
 
 newtype BadFieldName = BadFieldName { unBadFieldName :: Text }
   deriving newtype Buildable
 
-newFieldKey :: Text -> Either BadFieldName FieldKey
-newFieldKey t
+newFieldName :: Text -> Either BadFieldName FieldName
+newFieldName t
   | T.null t =
       Left $ BadFieldName "Tags must contain at least 1 character"
-  | T.any (`notElem` keyCharSet) t =
-      Left $ BadFieldName ("Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'")
-  | otherwise = Right $ UnsafeFieldKey t
+  | T.any (`notElem` allowedCharSet) t =
+      Left $ BadFieldName ("Tags can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
+  | otherwise = Right $ UnsafeFieldName t
 
-getFieldKey :: FieldKey -> Text
-getFieldKey (UnsafeFieldKey t) = t
+getFieldName :: FieldName -> Text
+getFieldName (UnsafeFieldName t) = t
 
 newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
@@ -77,8 +77,8 @@ newEntryTag :: Text -> Either BadEntryTag EntryTag
 newEntryTag tag
   | T.null tag =
       Left $ BadEntryTag "Tags must contain at least 1 character"
-  | T.any (`notElem` keyCharSet) tag =
-      Left $ BadEntryTag ("Tags can only contain the following characters: '" <> T.pack keyCharSet <> "'")
+  | T.any (`notElem` allowedCharSet) tag =
+      Left $ BadEntryTag ("Tags can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
   | otherwise = Right $ UnsafeEntryTag tag
 
 getEntryTag :: EntryTag -> Text
@@ -102,16 +102,16 @@ instance A.FromJSON FieldVisibility where
     "private" -> pure Private
     other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
 
-newtype FieldValue = FieldValue { unFieldValue :: Text }
+newtype FieldContents = FieldContents { unFieldContents :: Text }
   deriving stock (Show, Eq, Ord)
-makeLensesFor [("unFieldValue", "fieldValue")] ''FieldValue
+makeLensesFor [("unFieldContents", "fieldContents")] ''FieldContents
 
--- | User can use ANSI control sequences in field values.
--- If some ANSI control sequence contain in field value then we append @reset@ ANSI control sequence.
+-- | User can use ANSI control sequences in field contents.
+-- If some ANSI control sequence contain in field contents then we append @reset@ ANSI control sequence.
 -- Otherwise, we just return wrapped text.
 -- You can see explanation here (https://github.com/serokell/coffer/issues/48)
-instance Buildable FieldValue where
-  build (FieldValue t) =
+instance Buildable FieldContents where
+  build (FieldContents t) =
     if T.pack (csi [] "") `T.isInfixOf` t then
       build t <> build (setSGRCode [Reset])
     else
@@ -121,25 +121,25 @@ data Field =
   Field
   { fDateModified :: UTCTime
   , fVisibility :: FieldVisibility
-  , fValue :: FieldValue
+  , fContents :: FieldContents
   }
   deriving stock (Show, Eq)
 makeLensesWith abbreviatedFields ''Field
 
-newField :: UTCTime -> FieldValue -> Field
-newField time value =
+newField :: UTCTime -> FieldContents -> Field
+newField time contents =
   Field
   { fDateModified = time
   , fVisibility = Public
-  , fValue = value
+  , fContents = contents
   }
 
 data Entry =
   Entry
   { ePath :: EntryPath
   , eDateModified :: UTCTime
-  , eMasterField :: Maybe FieldKey
-  , eFields :: HashMap FieldKey Field
+  , eMasterField :: Maybe FieldName
+  , eFields :: HashMap FieldName Field
   , eTags :: Set EntryTag
   }
   deriving stock (Show, Eq)

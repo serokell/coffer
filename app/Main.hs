@@ -72,7 +72,7 @@ main = do
         runCommand config cmd >>= \case
           VRDirectory dir -> pprint $ buildDirectory dir
           VREntry entry -> pprint $ buildDirectory $ Dir.singleton entry
-          VRField _ field -> pprint $ build $ field ^. E.value
+          VRField _ field -> pprint $ build $ field ^. E.contents
           VRPathNotFound path -> pathNotFound path
           VRDirectoryNoFieldMatch path fieldName -> printError $
             "There are no entries at path '" +| path |+ "' with the field '" +| fieldName |+ "'."
@@ -102,7 +102,7 @@ main = do
               "Set field '" +| fieldName |+
               "' (" +| (field ^. E.visibility) |+
               ") at '" +| qPath |+
-              "' to:\n" +| (field ^. E.value) |+ ""
+              "' to:\n" +| (field ^. E.contents) |+ ""
 
       SomeCommand cmd@(CmdDeleteField opts) -> do
         runCommand config cmd >>= \case
