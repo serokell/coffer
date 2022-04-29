@@ -366,3 +366,32 @@ EOF
         x: y [2000-01-01 01:01:01]
 EOF
 }
+
+@test "filter field with name 'date' and 'name'" {
+  coffer create /secrets/d/ab --field date=2000 --field name=a
+  coffer create /secrets/d/ad --field date=2020 --field name=b
+  coffer create /secrets/d/abc --field date=9999
+
+  run cleanOutput coffer find / ab --filter date:contents~20 --filter "date>1000" --filter name~a
+
+  assert_success
+  assert_output - <<EOF
+/
+  secrets/
+    d/
+      ab - [2000-01-01 01:01:01]
+        name: a    [2000-01-01 01:01:01]
+        date: 2000 [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer find --filter name:contents~a --filter name~a
+  assert_success
+  assert_output - <<EOF
+/
+  secrets/
+    d/
+      ab - [2000-01-01 01:01:01]
+        name: a    [2000-01-01 01:01:01]
+        date: 2000 [2000-01-01 01:01:01]
+EOF
+}
