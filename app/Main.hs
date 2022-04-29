@@ -130,6 +130,7 @@ main = do
           CPRCreateErrors errors -> do
             errorMsgs <- buildErrorMessages errors
             printError $ unlinesF @_ @Builder $ "The following entries cannot be renamed:" : "" : errorMsgs
+          CPRSamePath path -> samePaths path
 
       SomeCommand cmd@(CmdCopy opts) -> do
         runCommand config cmd >>= \case
@@ -144,6 +145,7 @@ main = do
           CPRCreateErrors errors -> do
             errorMsgs <- buildErrorMessages errors
             printError $ unlinesF @_ @Builder $ "The following entries cannot be copied:" : "" : errorMsgs
+          CPRSamePath path -> samePaths path
 
       SomeCommand cmd@(CmdDelete opts) -> do
         runCommand config cmd >>= \case
@@ -187,6 +189,10 @@ main = do
 
       pathNotFound :: Member (Embed IO) r => QualifiedPath Path -> Sem r ()
       pathNotFound path = printError $ "Entry or directory not found at '" +| path |+ "'."
+
+      samePaths :: Member (Embed IO) r => QualifiedPath Path -> Sem r ()
+      samePaths path =
+        printError $ "'" +| path |+ "' and '" +| path |+ "' are the same path."
 
       createErrorToBuilder :: CreateError -> Builder
       createErrorToBuilder = \case

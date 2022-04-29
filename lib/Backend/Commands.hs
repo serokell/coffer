@@ -314,8 +314,17 @@ buildCopyOperations
   :: forall r
    . (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
   => SomeBackend -> SomeBackend -> QualifiedPath Path -> QualifiedPath Path -> Bool -> Sem r [CopyOperation]
-buildCopyOperations oldBackend newBackend oldQPath@(QualifiedPath oldBackendNameMb oldPath) (QualifiedPath newBackendNameMb newPath) force = do
+buildCopyOperations
+  oldBackend
+  newBackend
+  oldQPath@(QualifiedPath oldBackendNameMb oldPath)
+  newQPath@(QualifiedPath newBackendNameMb newPath)
+  force
+    = do
   entryOrDir <- getEntryOrDirThrow oldBackend CPRPathNotFound oldQPath
+
+  -- Don't need to copy directory or entry to itself
+  when (oldQPath == newQPath) $ throw (CPRSamePath oldQPath)
 
   -- Build a list of operations to perform.
   nowUtc <- embed getCurrentTime

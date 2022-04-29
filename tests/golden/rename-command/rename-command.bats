@@ -156,22 +156,14 @@ EOF
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The following entries cannot be renamed:
-
-'/dir/a' to '/dir/a':
-  An entry already exists at '/dir/a'.
-  Use '--force' or '-f' to overwrite existing entries.
-'/dir/b' to '/dir/b':
-  An entry already exists at '/dir/b'.
-  Use '--force' or '-f' to overwrite existing entries.
+[ERROR] '/dir' and '/dir' are the same path.
 EOF
 
   run coffer rename /dir /dir -f
 
-  assert_success
+  assert_failure
   assert_output - <<EOF
-[SUCCESS] Renamed '/dir/a' to '/dir/a'.
-[SUCCESS] Renamed '/dir/b' to '/dir/b'.
+[ERROR] '/dir' and '/dir' are the same path.
 EOF
 
   run cleanOutput coffer view /

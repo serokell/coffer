@@ -277,3 +277,77 @@ EOF
     b - [2000-01-01 01:01:01]
 EOF
 }
+
+@test "copy an entry to itself" {
+  coffer create /a
+
+  run coffer copy -f /a /a
+
+  assert_failure
+  assert_output "[ERROR] '/a' and '/a' are the same path."
+
+  run coffer copy /a /a
+
+  assert_failure
+  assert_output "[ERROR] '/a' and '/a' are the same path."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a - [2000-01-01 01:01:01]
+EOF
+}
+
+@test "copy entry to itself with backend" {
+  coffer create vault-local#/a
+  coffer create vault-local#/dir/c
+
+  run coffer copy -f vault-local#/a vault-local#/a
+
+  assert_failure
+  assert_output "[ERROR] 'vault-local#/a' and 'vault-local#/a' are the same path."
+
+  run coffer copy -f vault-local#/dir vault-local#/dir
+
+  assert_failure
+  assert_output "[ERROR] 'vault-local#/dir' and 'vault-local#/dir' are the same path."
+}
+
+@test "copy a directory to itself" {
+  coffer create /a/b
+
+  run coffer copy -f /a /a
+
+  assert_failure
+  assert_output "[ERROR] '/a' and '/a' are the same path."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+}
+
+@test "equal paths copy from one backend to the other" {
+  coffer create /a/b
+
+  run coffer copy /a second#/a
+
+  assert_success
+  assert_output "[SUCCESS] Copied '/a/b' to 'second#/a/b'."
+
+  run cleanOutput coffer view /
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+
+  run cleanOutput coffer view second#/
+  assert_output - <<EOF
+/
+  a/
+    b - [2000-01-01 01:01:01]
+EOF
+}
