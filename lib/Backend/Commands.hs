@@ -176,7 +176,7 @@ deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb pat
 findCmd
   :: (Members '[BackendEffect, Error CofferError] r)
   => Config -> FindOptions -> Sem r (Maybe Directory)
-findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
+findCmd config (FindOptions qPathMb textMb sortMb filters) = do
   let backendNameMb = qPathMb >>= qpBackendName
   backend <- getBackend config backendNameMb
   let
@@ -196,9 +196,10 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
     applyFilter e = \case
       FilterByName substr -> substr `T.isInfixOf` (e ^. E.path . to entryPathName)
       FilterByDate op date -> matchDate op date (e ^. dateModified)
+      FilterByField name field -> applyFilterField e name field
 
-    applyFilterField :: Entry -> (FieldName, FilterField) -> Bool
-    applyFilterField e (fieldName, filter) =
+    applyFilterField :: Entry -> FieldName -> FilterField -> Bool
+    applyFilterField e fieldName filter =
       case e ^? fields . ix fieldName of
         Nothing -> False
         Just field ->
@@ -217,7 +218,6 @@ findCmd config (FindOptions qPathMb textMb sortMb filters filterFields) = do
       & Dir.filterEntries (\e ->
           (filterByPath e || filterByTag e)
           && all (applyFilter e) filters
-          && all (applyFilterField e) filterFields
         )
       & Dir.mapDir (\entries ->
           case sortMb of

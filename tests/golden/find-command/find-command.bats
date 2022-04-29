@@ -189,7 +189,7 @@ EOF
   coffer create /cd --field filtering=kek
   coffer create /abcd --field filtering=kek
 
-  run cleanOutput coffer find / --filter name~ab --filter-field filtering:contents~kek
+  run cleanOutput coffer find / --filter name~ab --filter filtering:contents~kek
 
   assert_success
   assert_output - <<EOF
@@ -263,7 +263,7 @@ EOF
   coffer create /secrets/b --field filtering=cab
   coffer create /secrets/c --field filtering=zzz
 
-  run cleanOutput coffer find / --filter-field filtering:contents~bb
+  run cleanOutput coffer find / --filter filtering:contents~bb
 
   assert_success
   assert_output - <<EOF
@@ -273,7 +273,7 @@ EOF
       filtering: abbacaba [2000-01-01 01:01:01]
 EOF
 
-  run cleanOutput coffer find / --filter-field filtering:contents~ab
+  run cleanOutput coffer find / --filter filtering:contents~ab
 
   assert_success
   assert_output - <<EOF
@@ -285,7 +285,7 @@ EOF
       filtering: cab [2000-01-01 01:01:01]
 EOF
 
-  run cleanOutput coffer find / --filter-field filtering:contents~zz
+  run cleanOutput coffer find / --filter filtering:contents~zz
 
   assert_success
   assert_output - <<EOF
