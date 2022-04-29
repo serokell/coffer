@@ -90,7 +90,7 @@
         "owner": "serokell",
         "repo": "xrefcheck",
         "rev": "dd0ad17f9cfed378be796fbd974aae7efb26d6b4",
-        "sha256": "1c2vlbcp82pik26y583fc5m17k3s7ir8gvvli6pri4f6njfr8x8c",
+        "sha256": "1jn6vz2ii8j24jszg9iqw0z292910g8420kp419n2wcywhiswwah",
         "type": "tarball",
         "url": "https://github.com/serokell/xrefcheck/archive/dd0ad17f9cfed378be796fbd974aae7efb26d6b4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
