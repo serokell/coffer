@@ -1,37 +1,74 @@
 {
-  inputs =
-    { nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-21.11";
+  description = "Multi-backend password store with multiple frontends";
+
+  nixConfig = {
+    flake-registry = "https://github.com/serokell/flake-registry/raw/master/flake-registry.json";
+  };
+
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+
+    flake-compat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
     };
+  };
 
-  outputs = { self, nixpkgs }:
-    with nixpkgs.lib;
-    let
-      supportedSystems = [ "x86_64-linux" ];
-      forAllSystems' = genAttrs;
-      forAllSystems = forAllSystems' supportedSystems;
-      pkgsForSystem = system:
-        import nixpkgs { inherit system; overlays = singleton self.overlay; };
-    in
+  outputs = { self, nixpkgs, haskell-nix, flake-utils, common-infra, serokell-nix, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        src = pkgs.haskell-nix.haskellLib.cleanGit {
+          name = "coffer";
+          src = ./.;
+        };
+
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ haskell-nix.overlay serokell-nix.overlay ];
+        };
+
+        project = pkgs.haskell-nix.stackProject {
+          inherit src;
+
+          modules = [{
+            packages.coffer = {
+              # strip executable to reduce closure size
+              dontStrip = false;
+            };
+          }];
+        };
+
+        inherit (project) coffer;
+      in
       {
-        overlay = final: prev:
-          {};
+        packages = {
+          coffer = coffer.components.exes.coffer;
+        };
 
-        devShell = forAllSystems
-          (system:
-            let
-              pkgs = pkgsForSystem system;
-            in
-              pkgs.mkShell {
-                nativeBuildInputs = with pkgs;
-                  [ ghc
-                    cabal-install
-                    haskell-language-server
-                    haskellPackages.implicit-hie
-                  ];
-                buildInputs = with pkgs;
-                  [ zlib
-                  ];
-              }
-          );
-      };
+        checks = {
+          reuse = pkgs.build.reuseLint src;
+          trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
+
+          hlint = pkgs.build.hlint src;
+
+          tests = coffer.components.tests.test;
+          doctests = coffer.components.tests.doctests;
+          lib = coffer.components.library;
+          haddock = coffer.components.haddock;
+        };
+
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            ghc
+            cabal-install
+            haskell-language-server
+            haskellPackages.implicit-hie
+          ];
+          buildInputs = with pkgs; [
+            zlib
+          ];
+        };
+
+        pipelineFile = common-infra.mkPipelineFile self;
+      });
 }
