@@ -89,8 +89,9 @@ library:
   dependencies:
     - aeson
     - ansi-terminal
+    - bytestring
     - containers
-    - extra
+    - exceptions
     - extra
     - fmt
     - hashable
@@ -107,6 +108,7 @@ library:
     - servant
     - servant-client
     - servant-client-core
+    - servant-server
     - text
     - time
     - time-compat
@@ -116,7 +118,7 @@ library:
 
 executables:
   coffer:
-    source-dirs:      app
+    source-dirs:      app/cli
     main:             Main.hs
     dependencies:
       - coffer
@@ -128,6 +130,16 @@ executables:
       - text
       - tomland
 
+  coffer-server:
+    source-dirs:      app/server
+    main:             Main.hs
+    dependencies:
+      - coffer
+      - servant-server
+      - text
+      - tomland
+      - warp
+
 tests:
   test:
     source-dirs:      tests/test
@@ -137,7 +149,6 @@ tests:
       - -threaded
     dependencies:
       - tasty
-
   doctests:
     source-dirs:      tests/doctests
     main:             Doctests.hs
