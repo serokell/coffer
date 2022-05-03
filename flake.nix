@@ -46,7 +46,7 @@
             packages.coffer = {
               # strip executable to reduce closure size
               dontStrip = false;
-              ghcOptions = "-ddump-to-file -ddump-hi";
+              ghcOptions = ["-ddump-to-file" "-ddump-hi"];
               postInstall = weeder-hacks.collect-dump-hi-files;
             };
           }];
