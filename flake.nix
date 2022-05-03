@@ -92,6 +92,7 @@
           ];
           buildInputs = with pkgs; [
             zlib
+            reuse
           ];
         };
       }) // {
