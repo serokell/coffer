@@ -74,8 +74,8 @@
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
 
-          hlint = pkgs.build.runCheck "${pkgs.haskellPackages.hlint}/bin/hlint";
-          shellcheck = pkgs.build.runCheck "find . -name '*.sh' -exec ${pkgs.shellcheck}/bin/shellcheck {} +";
+          hlint = pkgs.build.runCheck "cd ${src} && ${pkgs.haskellPackages.hlint}/bin/hlint";
+          shellcheck = pkgs.build.runCheck "find ${src} -name '*.sh' -exec ${pkgs.shellcheck}/bin/shellcheck {} +";
 
           weeder = let
             script = weeder-hacks.weeder-script {
@@ -88,8 +88,8 @@
             };
           in pkgs.build.runCheck script;
 
-          test = pkgs.build.runCheck "${project.coffer.components.tests.test}/bin/test";
-          doctests = pkgs.build.runCheck "${project.coffer.components.tests.doctests}/bin/doctests";
+          test = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.test}/bin/test";
+          doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
           lib = project.coffer.components.library;
           haddock = project.coffer.components.library.haddock;
         };
