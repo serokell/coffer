@@ -32,6 +32,8 @@
           overlays = [ haskell-nix.overlay serokell-nix.overlay ];
         };
 
+        inherit (pkgs) lib;
+
         weeder-hacks = import haskell-nix-weeder { inherit pkgs; };
         weeder-legacy = pkgs.haskellPackages.callHackageDirect {
           pkg = "weeder";
@@ -39,28 +41,29 @@
           sha256 = "0gfvhw7n8g2274k74g8gnv1y19alr1yig618capiyaix6i9wnmpa";
         } {};
 
-        project = pkgs.haskell-nix.stackProject {
+        mkProject = release: pkgs.haskell-nix.stackProject {
           inherit src;
 
           modules = [{
             packages.coffer = {
               # strip executable to reduce closure size
-              dontStrip = false;
-              ghcOptions = ["-ddump-to-file" "-ddump-hi"];
-              postInstall = weeder-hacks.collect-dump-hi-files;
+              dontStrip = !release;
+              doHaddock = !release;
+              ghcOptions = lib.optionals (!release) ["-ddump-to-file" "-ddump-hi"];
+              postInstall = if release then null else weeder-hacks.collect-dump-hi-files;
             };
           }];
         };
-
-        inherit (project) coffer;
       in
       {
         packages = {
-          coffer = coffer.components.exes.coffer;
+          coffer = (mkProject true).coffer.components.exes.coffer;
           nix = pkgs.nixUnstable;
         };
 
-        checks = {
+        checks = let
+          project = mkProject false;
+        in {
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
 
@@ -77,10 +80,10 @@
             };
           in pkgs.build.runCheck script;
 
-          tests = coffer.components.tests.test;
-          doctests = coffer.components.tests.doctests;
-          lib = coffer.components.library;
-          haddock = coffer.components.library.haddock;
+          tests = project.coffer.components.tests.test;
+          doctests = project.coffer.components.tests.doctests;
+          lib = project.coffer.components.library;
+          haddock = project.coffer.components.library.haddock;
         };
 
         devShell = pkgs.mkShell {
