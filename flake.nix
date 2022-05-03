@@ -8,6 +8,9 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
 
+    # Remove once registry-pinned haskell.nix is repinned
+    haskell-nix.url = "github:input-output-hk/haskell.nix";
+
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
@@ -49,12 +52,12 @@
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
 
-          hlint = pkgs.build.hlint src;
+          hlint = pkgs.build.haskell.hlint src;
 
           tests = coffer.components.tests.test;
           doctests = coffer.components.tests.doctests;
           lib = coffer.components.library;
-          haddock = coffer.components.haddock;
+          haddock = coffer.components.library.haddock;
         };
 
         devShell = pkgs.mkShell {
@@ -68,7 +71,10 @@
             zlib
           ];
         };
-
-        pipelineFile = common-infra.mkPipelineFile self;
-      });
+      }) // {
+        pipelineFile = common-infra.mkPipelineFile (self // {
+          # Remove once https://github.com/serokell/common-infra/issues/4 is fixed
+          deployFromPipeline = [];
+        });
+      };
 }
