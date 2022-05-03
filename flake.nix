@@ -56,9 +56,16 @@
         };
       in
       {
+        defaultPackage = self.packages."${system}".coffer;
         packages = {
           coffer = (mkProject true).coffer.components.exes.coffer;
           nix = pkgs.nixUnstable;
+        };
+
+        defaultApp = self.apps."${system}".coffer;
+        apps.coffer = {
+          type = "app";
+          program = "${self.defaultPackage."${system}"}/bin/coffer";
         };
 
         checks = let
