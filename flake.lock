@@ -302,6 +302,21 @@
         "type": "github"
       }
     },
+    "haskell-nix-weeder": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1592887493,
+        "narHash": "sha256-gKZh2jrn8b9VC23ZXWfd6wOgXG+pHeTKDLJ/uHaztN4=",
+        "owner": "serokell",
+        "repo": "haskell-nix-weeder",
+        "rev": "a959fce7499df473e13336959cba77fbc87f3b7f",
+        "type": "github"
+      },
+      "original": {
+        "id": "haskell-nix-weeder",
+        "type": "indirect"
+      }
+    },
     "hpc-coveralls": {
       "flake": false,
       "locked": {
@@ -602,6 +617,7 @@
         "flake-compat": "flake-compat_2",
         "flake-utils": "flake-utils",
         "haskell-nix": "haskell-nix",
+        "haskell-nix-weeder": "haskell-nix-weeder",
         "nixpkgs": "nixpkgs_3",
         "serokell-nix": "serokell-nix"
       }
