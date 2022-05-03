@@ -35,6 +35,7 @@ import Entry
 import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
+import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as P
@@ -231,14 +232,6 @@ findOptions =
           , helpDoc $ Just $ Pretty.vsep
             [ "Filter entries."
             , expectedFilterFormat
-            ]
-          ])
-    <*> many (option readFilterField $ mconcat
-          [ metavar "FILTERFIELD"
-          , long "filter-field"
-          , helpDoc $ Just $ Pretty.vsep
-            [ "Filter entries based on a field."
-            , expectedFilterFieldFormat
             ]
           ])
 
@@ -505,29 +498,14 @@ expectedQualifiedPathFormat = Pretty.vsep
 
 expectedFilterFormat :: Pretty.Doc
 expectedFilterFormat = Pretty.vsep
-  [ "Expected format is: 'name~<substring>' or `date<op><date>`."
+  [ "Expected format is:"
+  , " * to filter by entry name: 'name~<substring>',"
+  , " * to filter by entry's last modified date: 'date<op><date>',"
+  , " * to filter by a field's contents: '<fieldname>:contents~<substring>',"
+  , " * to filter by a field's last modified date: '<fieldname>:date<op><date>'."
   , "<op> can be '<=', '>=', '<', '>', or '='."
   , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
-  , "Examples: 'name~vault', 'date<2020-02'."
-  ]
-
-readFilterField :: ReadM (FieldName, FilterField)
-readFilterField = do
-  eitherReader \input ->
-    P.parse (parseFilterField <* P.eof) "" (T.pack input) & first \err -> unlines
-      [ "Invalid filter-field format: " <> show input <> "."
-      , show expectedFilterFieldFormat
-      , ""
-      , "Parser error:"
-      , P.errorBundlePretty err
-      ]
-
-expectedFilterFieldFormat :: Pretty.Doc
-expectedFilterFieldFormat = Pretty.vsep
-  [ "Expected format is: '<fieldname>:contents~<substring>' or `<fieldname>:date<op><date>`."
-  , "<op> can be '<=', '>=', '<', '>', or '='."
-  , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
-  , "Examples: 'url:contents~google.com', 'pw:date<2020-02'."
+  , "Examples: 'name~vault', 'date<2020-02', 'url:contents~google.com', 'pw:date<2020-02'."
   ]
 
 ----------------------------------------------------------------------------
@@ -588,7 +566,7 @@ parseFilterOp =
 
 parseFilter :: MParser Filter
 parseFilter =
-  parseFilterByName <|> parseFilterByDate
+  try parseFilterByName <|> try parseFilterByDate <|> parseFilterByField
   where
     parseFilterByName = do
       void $ P.string "name" >> P.char '~'
@@ -601,13 +579,12 @@ parseFilter =
       localTime <- parseFilterDate
       pure $ FilterByDate op localTime
 
-parseFilterField :: MParser (FieldName, FilterField)
-parseFilterField = do
+parseFilterByField :: MParser Filter
+parseFilterByField = do
   fieldName <- parseFieldNameWhile (/= ':')
   void $ P.char ':'
   filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
-
-  pure (fieldName, filterField)
+  pure $ FilterByField fieldName filterField
   where
     parseFilterFieldByContents = do
       void $ P.string "contents" >> P.char '~'

@@ -126,7 +126,6 @@ data FindOptions = FindOptions
   , foText :: Maybe Text
   , foSort :: Maybe (Sort, Direction)
   , foFilters :: [Filter]
-  , foFilterFields :: [(FieldName, FilterField)]
   }
   deriving stock Show
 
@@ -193,6 +192,7 @@ data FilterDate
 data Filter
   = FilterByDate FilterOp FilterDate
   | FilterByName Text
+  | FilterByField FieldName FilterField
   deriving stock Show
 
 data FilterField

@@ -110,10 +110,10 @@ EOF
 }
 
 @test "bad filter field" {
-  run coffer find --filter-field "$(echo -e "name:bad\n\n~str")"
+  run coffer find --filter "$(echo -e "name:bad\n\n~str")"
 
   assert_failure
   assert_output --partial - <<EOF
-option --filter-field: Invalid filter-field format: "name:bad\n\n~str".
+option --filter: Invalid filter format: "name:bad\n\n~str".
 EOF
 }
