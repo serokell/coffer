@@ -101,6 +101,7 @@ library:
     - lens-aeson
     - megaparsec
     - mtl
+    - nyan-interpolation
     - optparse-applicative
     - polysemy
     - servant
@@ -121,6 +122,7 @@ executables:
       - coffer
       - fmt
       - lens
+      - nyan-interpolation
       - optparse-applicative
       - polysemy
       - text
