@@ -4,7 +4,6 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 634ef5ad016b3df508f0c7e2e75ae963ad220b9437dd82cdf567fe399d1f48d6
 
 name:           coffer
 version:        0.1.0.0
@@ -33,6 +32,7 @@ library
       CLI.Types
       Coffer.Directory
       Coffer.Path
+      Coffer.PrettyPrint
       Coffer.Util
       Config
       Entry
