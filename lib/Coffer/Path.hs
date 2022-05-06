@@ -22,9 +22,11 @@ module Coffer.Path
   , QualifiedPath (..)
   ) where
 
-import BackendName (BackendName)
+import BackendName (BackendName, newBackendName)
 import Control.Lens
 import Control.Monad ((>=>))
+import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty((:|)))
@@ -32,7 +34,9 @@ import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Fmt (Buildable, build, pretty)
+import Fmt (Buildable, build, fmt, pretty)
+import GHC.Generics (Generic)
+import Servant (FromHttpApiData(..), ToHttpApiData(..))
 
 -- $setup
 -- >>> import Fmt (pretty, build)
@@ -44,8 +48,9 @@ import Fmt (Buildable, build, pretty)
 -- >>> unsafeMkPathSegment = isRight . mkPathSegment
 
 newtype PathSegment = UnsafeMkPathSegment { unPathSegment :: Text }
-  deriving stock (Show, Eq)
-  deriving newtype (Buildable, Hashable)
+  deriving stock (Show, Eq, Generic)
+  deriving newtype (Buildable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
@@ -60,8 +65,15 @@ pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 -- | Path to a directory or an entry.
 newtype Path = Path { unPath :: [PathSegment] }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
   deriving newtype (Semigroup, Monoid)
+  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+
+instance ToHttpApiData Path where
+  toUrlPiece = fmt . build
+
+instance FromHttpApiData Path where
+  parseUrlPiece = mkPath
 
 -- |
 -- >>> pretty @Path @String <$> mkPath "a/b/c"
@@ -100,7 +112,14 @@ mkPath path = do
 
 -- | An entry's full path (directory + entry's name).
 newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+
+instance ToHttpApiData EntryPath where
+  toUrlPiece = fmt . build
+
+instance FromHttpApiData EntryPath where
+  parseUrlPiece = mkEntryPath
 
 -- |
 -- >>> pretty @EntryPath @String <$> mkEntryPath "a/b/c"
@@ -177,13 +196,29 @@ data QualifiedPath path = QualifiedPath
   { qpBackendName :: Maybe BackendName
   , qpPath :: path
   }
-  deriving stock (Show, Eq, Functor)
+  deriving stock (Show, Eq, Functor, Generic)
+  deriving anyclass (FromJSON, ToJSON)
 
 instance (Buildable path) => Buildable (QualifiedPath path) where
   build (QualifiedPath backendNameMb path) =
     case backendNameMb of
       Just backendName -> build backendName <> "#" <> build path
       Nothing -> build path
+
+instance (FromHttpApiData path) => FromHttpApiData (QualifiedPath path) where
+  parseUrlPiece text
+    | [pathPiece] <- T.splitOn "#" text = do
+        path <- parseUrlPiece @path pathPiece
+        pure $ QualifiedPath Nothing path
+    | [backendPiece, pathPiece] <- T.splitOn "#" text = do
+        backendName <- newBackendName backendPiece
+        path <- parseUrlPiece @path pathPiece
+        pure $ QualifiedPath (Just backendName) path
+    | otherwise =
+        Left "Invalid qualified path format. Expected [BACKENDNAME#]PATH"
+
+instance (ToHttpApiData path, Buildable path) => ToHttpApiData (QualifiedPath path) where
+  toUrlPiece = pretty
 
 ----------------------------------------------------------------------------
 -- Optics

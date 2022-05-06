@@ -6,16 +6,17 @@
 
 module CLI.Parser
   ( parserInfo
+  , parseFilterDate
   ) where
 
 import BackendName (BackendName, newBackendName)
 import CLI.Types
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
+import Coffer.Util (MParser)
 import Control.Arrow ((>>>))
 import Control.Monad (guard, void)
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
-import Data.Fixed (Pico)
 import Data.Foldable (asum)
 import Data.Function ((&))
 import Data.Functor (($>), (<&>))
@@ -25,10 +26,6 @@ import Data.Map qualified as M
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Time.Calendar.Compat (fromGregorianValid)
-import Data.Time.Calendar.Month.Compat (fromYearMonthValid)
-import Data.Time.Compat (LocalTime(..), localTimeToUTC, makeTimeOfDayValid, utc)
-import Data.Void (Void)
 import Entry
   (EntryTag, FieldContents(FieldContents), FieldName, FieldVisibility(..), newEntryTag,
   newFieldName)
@@ -39,7 +36,6 @@ import Text.Interpolation.Nyan
 import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
-import Text.Megaparsec.Char.Lexer qualified as P
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -513,48 +509,6 @@ expectedFilterFormat = Pretty.vsep
 ----------------------------------------------------------------------------
 -- Megaparsec
 ----------------------------------------------------------------------------
-
-type MParser = P.Parsec Void Text
-
--- | Parses any of these formats:
---
--- * @YYYY@
--- * @YYYY-MM@
--- * @YYYY-MM-DD@
--- * @YYYY-MM-DD HH:MM:SS@
-parseFilterDate :: MParser FilterDate
-parseFilterDate = do
-  y <- P.decimal
-  optional (P.char '-') >>= \case
-    Nothing -> pure $ FDYear y
-    Just _ -> do
-      m <- twoDigits
-      optional (P.char '-') >>= \case
-        Nothing ->
-          case fromYearMonthValid y m of
-            Nothing -> fail "invalid year/month"
-            Just month -> pure $ FDMonth month
-        Just _ -> do
-          d <- twoDigits
-          case fromGregorianValid y m d of
-            Nothing -> fail "invalid year/month/day"
-            Just day ->
-              optional (P.char ' ') >>= \case
-                Nothing -> pure $ FDDay day
-                Just _ -> do
-                  hh <- twoDigits <* P.char ':'
-                  mm <- twoDigits <* P.char ':'
-                  ss <- twoDigits
-                  case makeTimeOfDayValid hh mm (fromIntegral @Int @Pico ss) of
-                    Nothing -> fail "invalid hour/minute/seconds"
-                    Just timeOfDay -> pure $ FDTime (localTimeToUTC utc $ LocalTime day timeOfDay)
-  where
-    -- | Parse a two-digit integer (e.g. day of month, hour).
-    twoDigits :: MParser Int
-    twoDigits = do
-      a <- P.digitChar
-      b <- P.digitChar
-      pure $ Char.digitToInt a * 10 + Char.digitToInt b
 
 parseFilterOp :: MParser FilterOp
 parseFilterOp =
