@@ -22,17 +22,18 @@
   outputs = { self, nixpkgs, haskell-nix, flake-utils, common-infra, serokell-nix, haskell-nix-weeder, ... }@inputs:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        src = pkgs.haskell-nix.haskellLib.cleanGit {
-          name = "coffer";
-          src = ./.;
-        };
+        inherit (nixpkgs) lib;
 
+        pkgs' = pkgs;
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ haskell-nix.overlay serokell-nix.overlay ];
         };
 
-        inherit (pkgs) lib;
+        src = pkgs.haskell-nix.haskellLib.cleanGit {
+          name = "coffer";
+          src = ./.;
+        };
 
         weeder-hacks = import haskell-nix-weeder { inherit pkgs; };
         weeder-legacy = pkgs.haskellPackages.callHackageDirect {
@@ -41,7 +42,7 @@
           sha256 = "0gfvhw7n8g2274k74g8gnv1y19alr1yig618capiyaix6i9wnmpa";
         } {};
 
-        mkProject = release: pkgs.haskell-nix.stackProject {
+        mkProject = { release ? false, pkgs ? pkgs' }: pkgs'.haskell-nix.stackProject {
           inherit src;
 
           modules = [{
@@ -58,7 +59,10 @@
       {
         defaultPackage = self.packages."${system}".coffer;
         packages = {
-          coffer = (mkProject true).coffer.components.exes.coffer;
+          coffer = (mkProject { release = true; }).coffer.components.exes.coffer;
+          coffer-static = (mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; }).coffer.components.exes.coffer // {
+            meta.artifacts = [ "/bin/coffer" ];
+          };
           nix = pkgs.nixUnstable;
         };
 
@@ -69,11 +73,35 @@
         };
 
         checks = let
-          project = mkProject false;
+          project = mkProject { release = false; };
         in {
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
 
+          stylish = pkgs.runCommand "stylish-check" {
+            buildInputs = with pkgs; [ git gnumake stylish-haskell ];
+          } ''
+            mkdir src && cd src
+            cp -a --no-preserve=mode,ownership ${src}/. .
+
+            make stylish
+
+            set +e
+            diff=$(diff -q ${src} .)
+            exitCode=$?
+            set -e
+
+            if [ "$exitCode" != 0 ]; then
+                echo "Found files that do not adhere to stylish-haskell."
+                echo "Run 'make stylish' on the repository to fix this."
+                echo ""
+                echo "Offending files:"
+                echo "$diff"
+                exit 1
+            fi
+
+            touch $out
+          '';
           hlint = pkgs.build.runCheck "cd ${src} && ${pkgs.haskellPackages.hlint}/bin/hlint";
           shellcheck = pkgs.build.runCheck "find ${src} -name '*.sh' -exec ${pkgs.shellcheck}/bin/shellcheck {} +";
 
