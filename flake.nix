@@ -42,7 +42,7 @@
           sha256 = "0gfvhw7n8g2274k74g8gnv1y19alr1yig618capiyaix6i9wnmpa";
         } {};
 
-        mkProject = { release ? false, pkgs ? pkgs' }: pkgs'.haskell-nix.stackProject {
+        mkProject = { release ? false, pkgs ? pkgs' }: pkgs.haskell-nix.stackProject {
           inherit src;
 
           modules = [{
