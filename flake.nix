@@ -58,13 +58,12 @@
       in
       {
         defaultPackage = self.packages."${system}".coffer;
-        packages = {
+        packages = ({
           coffer = (mkProject { release = true; }).coffer.components.exes.coffer;
-          coffer-static = (mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; }).coffer.components.exes.coffer // {
-            meta.artifacts = [ "/bin/coffer" ];
-          };
           nix = pkgs.nixUnstable;
-        };
+        } // (if system == "x86_64-linux" then {
+          coffer-static = (mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; }).coffer.components.exes.coffer // { meta.artifacts = [ "/bin/coffer" ]; };
+        } else {}));
 
         defaultApp = self.apps."${system}".coffer;
         apps.coffer = {
