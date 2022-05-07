@@ -32,7 +32,10 @@
 
         src = pkgs.haskell-nix.haskellLib.cleanGit {
           name = "coffer";
-          src = ./.;
+          src = pkgs.haskell-nix.haskellLib.cleanSourceWith {
+            filter = path: type: !(pkgs.lib.hasInfix "tests/golden/helpers" path);
+            src = ./.;
+          };
         };
 
         weeder-hacks = import haskell-nix-weeder { inherit pkgs; };
@@ -76,6 +79,15 @@
         in {
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
+
+
+          golden-tests = pkgs.runCommand "golden-tests" {
+            buildInputs = with pkgs; [ vault bats ];
+          } ''
+            cd ${./.}
+            bash ./scripts/run-bats-tests.sh
+            touch $out
+          '';
 
           stylish = pkgs.runCommand "stylish-check" {
             buildInputs = with pkgs; [ git gnumake stylish-haskell ];
