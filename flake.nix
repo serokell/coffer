@@ -109,9 +109,6 @@
           ];
         };
       }) // {
-        pipelineFile = (import ./pipe.nix inputs).mkPipelineFile (self // {
-          # Remove once https://github.com/serokell/common-infra/issues/4 is fixed
-          deployFromPipeline = [];
-        });
+        pipelineFile = serokell-nix.lib.pipeline.mkPipelineFile self;
       };
 }
