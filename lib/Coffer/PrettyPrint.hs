@@ -9,11 +9,11 @@ import CLI.Types
 import Coffer.Directory qualified as Dir
 import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
 import Control.Lens
+import Data.Text (Text)
+import Data.Text qualified as T
 import Entry qualified as E
 import Fmt (Buildable(build), Builder, fmt, indentF, pretty, unlinesF)
 import Text.Interpolation.Nyan
-import Data.Text (Text)
-import qualified Data.Text as T
 
 data PrettyPrintMode
   = CLI
