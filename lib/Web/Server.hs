@@ -9,7 +9,6 @@ import Control.Monad.Except
 
 import Data.ByteString.Lazy qualified as Bytes.Lazy
 import Data.Function ((&))
-import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -35,6 +34,7 @@ import Fmt (pretty)
 import Servant.API
 import Servant.Client
 import Servant.Server
+import Web.Types (NewEntry(NewEntry), NewField(NewField))
 
 url :: BaseUrl
 url = BaseUrl Http "127.0.0.1" 8200 ""
@@ -104,18 +104,22 @@ create
   -> VaultToken
   -> QualifiedPath EntryPath
   -> Bool
-  -> [EntryTag]
-  -> (HashMap FieldName Text, HashMap FieldName Text)
+  -> NewEntry
   -> Handler CreateResult
-create run token coQPath coForce coTags (fields, privateFields) =
+create run token coQPath coForce (NewEntry coFields coTags) =
   run token $ CmdCreate CreateOptions
     { coQPath
     , coEdit = False
     , coForce
     , coTags          = Set.fromList coTags
-    , coFields        = fields        & HashMap.toList <&> do \(fieldName, fieldContents) -> FieldInfo fieldName (FieldContents fieldContents)
-    , coPrivateFields = privateFields & HashMap.toList <&> do \(fieldName, fieldContents) -> FieldInfo fieldName (FieldContents fieldContents)
+    , coFields        = fst <$> (filter ((==Public) . snd) allFields)
+    , coPrivateFields = fst <$> (filter ((==Private) . snd) allFields)
     }
+  where
+    allFields :: [(FieldInfo, FieldVisibility)]
+    allFields = coFields
+      & HashMap.toList
+      <&> \(name, NewField contents visibility) -> (FieldInfo name contents, visibility)
 
 private
   :: (forall a. VaultToken -> Command a -> Handler a)

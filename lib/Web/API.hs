@@ -8,11 +8,11 @@ import Backend.Vault.Kv
 import CLI.Types
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
-import Data.HashMap.Strict
 import Data.Text (Text)
 import Entry
 import GHC.Generics (Generic)
 import Servant.API
+import Web.Types (NewEntry)
 
 type API
   = Header' [Required, Strict] "token" VaultToken
@@ -23,10 +23,9 @@ type API
       :> Get '[JSON] ViewResult
 
     :<|> "create"
-      :> RequiredParam  "path" (QualifiedPath EntryPath)
-      :> QueryFlag      "force"
-      :> OptionalParams "tag"  EntryTag
-      :> ReqBody '[JSON] (HashMap FieldName Text, HashMap FieldName Text)
+      :> RequiredParam "path" (QualifiedPath EntryPath)
+      :> QueryFlag     "force"
+      :> ReqBody '[JSON] NewEntry
       :> Post '[JSON] CreateResult
 
     :<|> "set-field"
