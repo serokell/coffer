@@ -9,7 +9,7 @@ import Polysemy
 
 runBackend :: Effects r => Sem (BackendEffect ': r) a -> Sem r a
 runBackend = interpret \case
-  WriteSecret (SomeBackend backend) entry -> _writeSecret backend entry
-  ReadSecret (SomeBackend backend) path -> _readSecret backend path
-  ListSecrets (SomeBackend backend) path -> _listSecrets backend path
-  DeleteSecret (SomeBackend backend) path -> _deleteSecret backend path
+  WriteEntry (SomeBackend backend) entry -> _writeEntry backend entry
+  ReadEntry (SomeBackend backend) path -> _readEntry backend path
+  ListDirectoryContents (SomeBackend backend) path -> _listDirectoryContents backend path
+  DeleteEntry (SomeBackend backend) path -> _deleteEntry backend path

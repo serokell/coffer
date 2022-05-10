@@ -4,7 +4,8 @@
 
 module Backend.Commands where
 
-import Backend (BackendEffect, SomeBackend, deleteSecret, listSecrets, readSecret, writeSecret)
+import Backend
+  (BackendEffect, SomeBackend, deleteEntry, listDirectoryContents, readEntry, writeEntry)
 import BackendName (BackendName)
 import CLI.Types
 import Coffer.Directory (Directory)
@@ -109,7 +110,7 @@ createCmd
   checkCreateEntry backend backendNameMb force entry >>= \case
     Failure error -> throw $ CRCreateError error
     Success entry -> do
-      void $ writeSecret backend entry
+      void $ writeEntry backend entry
       pure $ CRSuccess entry
 
 setFieldCmd
@@ -121,13 +122,13 @@ setFieldCmd
   (SetFieldOptions qEntryPath@(QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb)
     = do
   backend <- getBackend config backendNameMb
-  readSecret backend entryPath >>= \case
+  readEntry backend entryPath >>= \case
     Nothing -> do
       pure $ SFREntryNotFound qEntryPath
     Just entry -> do
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateOrInsert nowUtc entry
-      void $ writeSecret backend updatedEntry
+      void $ writeEntry backend updatedEntry
       pure $ SFRSuccess (QualifiedPath backendNameMb updatedEntry)
   where
     updateOrInsert :: UTCTime -> Entry -> Sem r Entry
@@ -160,7 +161,7 @@ deleteFieldCmd
   => Config -> DeleteFieldOptions -> Sem r DeleteFieldResult
 deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb path) fieldName) = do
   backend <- getBackend config backendNameMb
-  readSecret backend path >>= \case
+  readEntry backend path >>= \case
     Nothing -> pure $ DFREntryNotFound qPath
     Just entry -> do
       case entry ^. fields . at fieldName of
@@ -170,7 +171,7 @@ deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb pat
           let newEntry = entry
                 & fields . at fieldName .~ Nothing
                 & dateModified .~ nowUtc
-          void $ writeSecret backend newEntry
+          void $ writeEntry backend newEntry
           pure $ DFRSuccess newEntry
 
 findCmd
@@ -295,7 +296,7 @@ renameCmd
   -- then we can delete old directory/entry without delete errors.
   unless dryRun do
     forM_ pathsToDelete \(CopyOperation old _) -> do
-      deleteSecret oldBackend (qpPath old ^. path)
+      deleteEntry oldBackend (qpPath old ^. path)
 
   pure $ CPRSuccess $ getOperationPaths <$> operations
 
@@ -384,7 +385,7 @@ buildCopyOperations
 runCopyOperations :: (Member BackendEffect r) => SomeBackend -> [CopyOperation] -> Sem r ()
 runCopyOperations backend operations = do
   let newEntries = qpPath . coQNew <$> operations
-  forM_ newEntries (writeSecret backend)
+  forM_ newEntries (writeEntry backend)
 
 copyCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
@@ -415,14 +416,14 @@ deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) rec
   getEntryOrDirThrow backend DRPathNotFound qPath >>= \case
     Left entry -> do
       unless dryRun do
-        deleteSecret backend (entry ^. E.path)
+        deleteEntry backend (entry ^. E.path)
       let qEntryPath = QualifiedPath backendNameMb (entry ^. E.path)
       pure $ DRSuccess [qEntryPath]
     Right dir
       | recursive -> do
           let entries = Dir.allEntries dir
           unless dryRun do
-            forM_ entries \entry -> deleteSecret backend (entry ^. E.path)
+            forM_ entries \entry -> deleteEntry backend (entry ^. E.path)
           let qEntryPaths = entries ^.. each . E.path <&> QualifiedPath backendNameMb
           pure $ DRSuccess qEntryPaths
       | otherwise -> pure $ DRDirectoryFound qPath
@@ -433,12 +434,12 @@ tagCmd
   => Config -> TagOptions -> Sem r TagResult
 tagCmd config (TagOptions qEntryPath@(QualifiedPath backendNameMb entryPath) tag delete) = do
   backend <- getBackend config backendNameMb
-  readSecret backend entryPath >>= \case
+  readEntry backend entryPath >>= \case
     Nothing -> pure $ TREntryNotFound qEntryPath
     Just entry -> do
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateEntry nowUtc entry
-      void $ writeSecret backend updatedEntry
+      void $ writeEntry backend updatedEntry
       pure $ TRSuccess updatedEntry
   where
     updateEntry :: UTCTime -> Entry -> Sem r Entry
@@ -465,7 +466,7 @@ tagCmd config (TagOptions qEntryPath@(QualifiedPath backendNameMb entryPath) tag
 -- | Checks if the path points to an existing directory.
 pathIsDirectory :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r Bool
 pathIsDirectory backend entryPath =
-  listSecrets backend (Path.entryPathAsPath entryPath) >>= \case
+  listDirectoryContents backend (Path.entryPathAsPath entryPath) >>= \case
     Nothing -> pure False
     Just [] -> pure False
     Just _ -> pure True
@@ -473,7 +474,7 @@ pathIsDirectory backend entryPath =
 -- | Checks if the path points to an existing entry.
 pathIsEntry :: forall r. Member BackendEffect r => SomeBackend -> EntryPath -> Sem r Bool
 pathIsEntry backend entryPath =
-  readSecret backend entryPath <&> \case
+  readEntry backend entryPath <&> \case
     Nothing -> False
     Just _ -> True
 
@@ -503,7 +504,7 @@ getEntryOrDir backend path =
     tryGetEntry path =
       case Path.pathAsEntryPath path of
         Left _ -> pure Nothing
-        Right entryPath -> readSecret backend entryPath
+        Right entryPath -> readEntry backend entryPath
 
     -- | Checks if the given path points to a directory.
     -- If so, returns all entries under the given directory and subdirectories.
@@ -517,26 +518,26 @@ getEntryOrDir backend path =
       where
         go :: Path -> StateT Directory (Sem r) ()
         go rootPath = do
-          secrets <- lift $ fromMaybe [] <$> listSecrets backend rootPath
+          nodes <- lift $ fromMaybe [] <$> listDirectoryContents backend rootPath
           -- TODO: run in parallel
-          forM_ secrets \secret -> do
-            -- We need to find out whether `secret` is a directory name or an entry name.
+          forM_ nodes \node -> do
+            -- We need to find out whether `node` is a directory name or an entry name.
             --
             -- Here, we rely on the fact that Vault returns directory names suffixed by `/`.
             -- and entry names without any suffix.
             --
-            -- If `mkPathSegment` succeeds, then `secret` was not suffixed by `/`,
+            -- If `mkPathSegment` succeeds, then `node` was not suffixed by `/`,
             -- and thus it's an entry name.
             -- Otherwise, it's a directory name (and `mkPath` should succeed).
-            case (mkPathSegment secret, mkPath secret) of
+            case (mkPathSegment node, mkPath node) of
               (Right entryName, _) -> do
-                entry <- lift $ readSecret backend (Path.appendEntryName rootPath entryName)
+                entry <- lift $ readEntry backend (Path.appendEntryName rootPath entryName)
                 case entry of
                   Just entry -> modify' (Dir.insertEntry entry)
                   Nothing -> pure ()
 
               (_, Right subdir) -> go (rootPath <> subdir)
-              _ -> lift $ throw $ InternalCommandsError (InvalidEntry secret)
+              _ -> lift $ throw $ InternalCommandsError (InvalidEntry node)
 
 -- | This function gets all entries, that are exist in given entry path.
 --

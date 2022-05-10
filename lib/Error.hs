@@ -35,11 +35,11 @@ data InternalCommandsError
 
 instance Buildable InternalCommandsError where
   build = \case
-    InvalidEntry entry ->
+    InvalidEntry pathSegment ->
       [int|s|
-        Backend returned a secret that is not a valid \
+        Backend returned a path segment that is not a valid \
         entry or directory name.
-        Got: '#{entry}'.
+        Got: '#{pathSegment}'.
       |]
     EntryPathDoesntHavePrefix entryPath path ->
       [int|s|
