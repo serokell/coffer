@@ -88,7 +88,11 @@ makeServer run token
   :<|> rename      run token
   :<|> copy'       run token
   :<|> delete'     run token
-  :<|> tag         run token
+  :<|>
+    (\path tag' ->
+         tag run token path tag' False
+    :<|> tag run token path tag' True
+    )
 
 view
   :: (forall a. VaultToken -> Command a -> Handler a)

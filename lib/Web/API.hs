@@ -73,8 +73,10 @@ type API
     :<|> "tag"
       :> RequiredParam "path" (QualifiedPath EntryPath)
       :> RequiredParam "tag" EntryTag
-      :> QueryFlag     "delete"
-      :> Post '[JSON] TagResult
+      :>
+        (    Post   '[JSON] TagResult
+        :<|> Delete '[JSON] TagResult
+        )
     )
 
 newtype Token = Token { getToken :: Text }
