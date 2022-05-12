@@ -11,8 +11,9 @@ import CLI.Types
 import Coffer.Directory (Directory)
 import Coffer.Directory qualified as Dir
 import Coffer.Path
-  (EntryPath, Path, QualifiedPath(QualifiedPath, qpBackendName, qpPath), entryPathName, mkPath,
-  mkPathSegment, pathSegments, unPathSegment)
+  (DirectoryContents(DirectoryContents), EntryPath, Path(Path),
+  QualifiedPath(QualifiedPath, qpBackendName, qpPath), directoryNames, entryNames, entryPathName,
+  pathSegments, unPathSegment)
 import Coffer.Path qualified as Path
 import Coffer.Util (catchAndReturn)
 import Config (Config(backends, mainBackend))
@@ -37,7 +38,7 @@ import Entry
   (Entry, EntryTag, Field, FieldName, FieldVisibility(..), contents, dateModified, fieldContents,
   fields, newEntry, newField, path, visibility)
 import Entry qualified as E
-import Error (CofferError(..), InternalCommandsError(EntryPathDoesntHavePrefix, InvalidEntry))
+import Error (CofferError(..), InternalCommandsError(EntryPathDoesntHavePrefix))
 import GHC.Exts (Down(..), sortWith)
 import Polysemy
 import Polysemy.Error (Error, throw)
@@ -468,7 +469,7 @@ pathIsDirectory :: forall r. Member BackendEffect r => SomeBackend -> EntryPath 
 pathIsDirectory backend entryPath =
   listDirectoryContents backend (Path.entryPathAsPath entryPath) >>= \case
     Nothing -> pure False
-    Just [] -> pure False
+    Just (DirectoryContents [] []) -> pure False
     Just _ -> pure True
 
 -- | Checks if the path points to an existing entry.
@@ -518,26 +519,19 @@ getEntryOrDir backend path =
       where
         go :: Path -> StateT Directory (Sem r) ()
         go rootPath = do
-          nodes <- lift $ fromMaybe [] <$> listDirectoryContents backend rootPath
+          contents <- lift $ fromMaybe (DirectoryContents [] []) <$> listDirectoryContents backend rootPath
           -- TODO: run in parallel
-          forM_ nodes \node -> do
-            -- We need to find out whether `node` is a directory name or an entry name.
-            --
-            -- Here, we rely on the fact that Vault returns directory names suffixed by `/`.
-            -- and entry names without any suffix.
-            --
-            -- If `mkPathSegment` succeeds, then `node` was not suffixed by `/`,
-            -- and thus it's an entry name.
-            -- Otherwise, it's a directory name (and `mkPath` should succeed).
-            case (mkPathSegment node, mkPath node) of
-              (Right entryName, _) -> do
-                entry <- lift $ readEntry backend (Path.appendEntryName rootPath entryName)
-                case entry of
-                  Just entry -> modify' (Dir.insertEntry entry)
-                  Nothing -> pure ()
+          forM_ (contents ^. entryNames) \entryName -> do
+            entry <- lift $ readEntry backend (Path.appendEntryName rootPath entryName)
+            case entry of
+              Just entry -> modify' (Dir.insertEntry entry)
+              -- This entry has been concurrently deleted (e.g. by some other user) _while_ we're traversing the directory.
+              -- We should just ignore it.
+              Nothing -> pure ()
 
-              (_, Right subdir) -> go (rootPath <> subdir)
-              _ -> lift $ throw $ InternalCommandsError (InvalidEntry node)
+          forM_ (contents ^. directoryNames) \directoryName -> do
+            let subdir = Path [directoryName]
+            go (rootPath <> subdir)
 
 -- | This function gets all entries, that are exist in given entry path.
 --

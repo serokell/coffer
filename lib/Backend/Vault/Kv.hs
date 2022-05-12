@@ -10,11 +10,13 @@ module Backend.Vault.Kv
 import Backend (Backend(..), Effects)
 import Backend.Vault.Kv.Internal qualified as I
 import BackendName (BackendName, backendNameCodec)
-import Coffer.Path (EntryPath, HasPathSegments, Path, PathSegment, pathSegments, unPathSegment)
+import Coffer.Path
+  (DirectoryContents(DirectoryContents), EntryPath, HasPathSegments, Path, PathSegment,
+  directoryNames, entryNames, mkPath, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
 import Control.Exception (try)
 import Control.Lens hiding ((.=))
-import Control.Monad (void)
+import Control.Monad (foldM, void)
 import Data.Aeson qualified as A
 import Data.Aeson.Text qualified as A
 import Data.Bifunctor (first)
@@ -37,7 +39,7 @@ import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types (statusCode)
 import Polysemy
-import Polysemy.Error (Error, throw)
+import Polysemy.Error (Error, fromEither, throw)
 import Servant.Client
   (BaseUrl(BaseUrl), ClientEnv, ClientError(..), Scheme(Http, Https), mkClientEnv, parseBaseUrl,
   showBaseUrl)
@@ -61,6 +63,7 @@ data VaultError
   | FieldMetadataNotFound EntryPath FieldName
   | CofferSpecialsNotFound EntryPath
   | BadCofferSpecialsError Text
+  | InvalidPathSegment Text
 
 instance Buildable VaultError where
   build = \case
@@ -101,6 +104,12 @@ instance Buildable VaultError where
     CofferSpecialsNotFound entryPath ->
       [int|s|Could not find key '#$coffer' in the kv entry at '#{entryPath}'.|]
     BadCofferSpecialsError err -> build err
+    InvalidPathSegment pathSegment ->
+      [int|s|
+        Backend returned a path segment that is not a valid \
+        entry or directory name.
+        Got: '#{pathSegment}'.
+      |]
 
 instance BackendError VaultError
 
@@ -284,14 +293,35 @@ kvReadEntry backend path = do
               & E.visibility .~ _visibility
            )
 
-kvListDirectoryContents :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
+kvListDirectoryContents :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe DirectoryContents)
 kvListDirectoryContents backend path = do
   env <- getEnv backend
-  embedCatchClientErrorMaybe do
-    response <- listSecrets env (getPathSegments path)
-    pure $ response ^. I.ddata . I.unListSecrets
+  result <-
+    embedCatchClientErrorMaybe do
+      response <- listSecrets env (getPathSegments path)
+      let contents = response ^. I.ddata . I.unListSecrets
+      pure $ foldM makeDirectoryAndEntryNames (DirectoryContents [] []) contents
+
+  case result of
+    Nothing -> pure Nothing
+    Just e -> Just <$> fromEither e
   where
     listSecrets env = (I.routes env ^. I.listSecrets) (vbMount backend) (vbToken backend)
+
+    -- We need to find out whether `content` is a directory name or an entry name.
+    --
+    -- Here, we rely on the fact that Vault returns directory names suffixed by `/`.
+    -- and entry names without any suffix.
+    makeDirectoryAndEntryNames :: DirectoryContents -> Text -> Either CofferError DirectoryContents
+    makeDirectoryAndEntryNames contents content = do
+      case mkPath content of
+        Left _ -> Left $ BackendError (InvalidPathSegment content)
+        Right path -> do
+          let segments = path ^. pathSegments
+          if "/" `T.isSuffixOf` content
+            then pure $ contents & directoryNames <>~ segments
+            else pure $ contents & entryNames <>~ segments
+
 
 kvDeleteEntry :: Effects r => VaultKvBackend -> EntryPath -> Sem r ()
 kvDeleteEntry backend path = do

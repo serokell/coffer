@@ -15,8 +15,7 @@ module Backend
 where
 
 import BackendName (BackendName)
-import Coffer.Path (EntryPath, Path)
-import Data.Text (Text)
+import Coffer.Path (DirectoryContents, EntryPath, Path)
 import Entry (Entry)
 import Error (CofferError)
 import Polysemy
@@ -30,7 +29,7 @@ class Show a => Backend a where
   _codec :: Toml.TomlCodec a
   _writeEntry :: Effects r => a -> Entry -> Sem r ()
   _readEntry :: Effects r => a -> EntryPath -> Sem r (Maybe Entry)
-  _listDirectoryContents :: Effects r => a -> Path -> Sem r (Maybe [Text])
+  _listDirectoryContents :: Effects r => a -> Path -> Sem r (Maybe DirectoryContents)
   _deleteEntry :: Effects r => a -> EntryPath -> Sem r ()
 
 data SomeBackend where
@@ -44,10 +43,11 @@ data BackendEffect m a where
   --   It does /not overwrite/ directories.
   --   If a directory with that path already exists, you'll end up with an entry /and/ a directory sharing the same path.
   WriteEntry :: SomeBackend -> Entry -> BackendEffect m ()
-  -- | Returns path segments: if the segment is suffixed by @/@ then that indicates a directory;
-  --   otherwise it's an entry
   ReadEntry :: SomeBackend -> EntryPath -> BackendEffect m (Maybe Entry)
-  ListDirectoryContents :: SomeBackend -> Path -> BackendEffect m (Maybe [Text])
+  -- | Returns two lists of path segments:
+  -- 1. list of path segments that represent directories
+  -- 2. list of path segments that represent entries
+  ListDirectoryContents :: SomeBackend -> Path -> BackendEffect m (Maybe DirectoryContents)
   -- | Once all entries are deleted from a directory, then the directory disappears
   --   (i.e. @ListDirectoryContents@ will no longer list that directory)
   DeleteEntry :: SomeBackend -> EntryPath -> BackendEffect m ()
