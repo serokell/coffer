@@ -69,7 +69,7 @@ type API
       :> QueryFlag     "dry-run"
       :> RequiredParam "path" (QualifiedPath Path)
       :> QueryFlag     "recursive"
-      :> Post '[JSON] DeleteResult
+      :> Delete '[JSON] DeleteResult
 
     :<|> "tag"
       :> RequiredParam "path" (QualifiedPath EntryPath)
