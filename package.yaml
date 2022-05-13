@@ -88,6 +88,7 @@ library:
   source-dirs:      lib
   dependencies:
     - aeson
+    - aeson-casing
     - ansi-terminal
     - bytestring
     - containers
