@@ -186,8 +186,8 @@ getPathSegments
   => s -> [Text]
 getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
-kvWriteSecret :: Effects r => VaultKvBackend -> Entry -> Sem r ()
-kvWriteSecret backend entry = do
+kvWriteEntry :: Effects r => VaultKvBackend -> Entry -> Sem r ()
+kvWriteEntry backend entry = do
   let
     cofferSpecials = CofferSpecials
       { csMasterField =
@@ -217,8 +217,8 @@ kvWriteSecret backend entry = do
   where
     postSecret env = (I.routes env ^. I.postSecret) (vbMount backend) (vbToken backend)
 
-kvReadSecret :: forall r. Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe Entry)
-kvReadSecret backend path = do
+kvReadEntry :: forall r. Effects r => VaultKvBackend -> EntryPath -> Sem r (Maybe Entry)
+kvReadEntry backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe (readSecret env (getPathSegments path) Nothing) >>= \case
     Nothing -> pure Nothing
@@ -284,8 +284,8 @@ kvReadSecret backend path = do
               & E.visibility .~ _visibility
            )
 
-kvListSecrets :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
-kvListSecrets backend path = do
+kvListDirectoryContents :: Effects r => VaultKvBackend -> Path -> Sem r (Maybe [Text])
+kvListDirectoryContents backend path = do
   env <- getEnv backend
   embedCatchClientErrorMaybe do
     response <- listSecrets env (getPathSegments path)
@@ -293,8 +293,8 @@ kvListSecrets backend path = do
   where
     listSecrets env = (I.routes env ^. I.listSecrets) (vbMount backend) (vbToken backend)
 
-kvDeleteSecret :: Effects r => VaultKvBackend -> EntryPath -> Sem r ()
-kvDeleteSecret backend path = do
+kvDeleteEntry :: Effects r => VaultKvBackend -> EntryPath -> Sem r ()
+kvDeleteEntry backend path = do
   env <- getEnv backend
   embedCatchClientError (void $ deleteSecret env (getPathSegments path))
   where
@@ -303,7 +303,7 @@ kvDeleteSecret backend path = do
 instance Backend VaultKvBackend where
   _name kvBackend = vbName kvBackend
   _codec = vaultKvCodec
-  _writeSecret = kvWriteSecret
-  _readSecret = kvReadSecret
-  _listSecrets = kvListSecrets
-  _deleteSecret = kvDeleteSecret
+  _writeEntry = kvWriteEntry
+  _readEntry = kvReadEntry
+  _listDirectoryContents = kvListDirectoryContents
+  _deleteEntry = kvDeleteEntry
