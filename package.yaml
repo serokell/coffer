@@ -116,6 +116,7 @@ library:
     - tomland
     - unordered-containers
     - validation-selective
+    - warp
 
 executables:
   coffer:
@@ -136,10 +137,6 @@ executables:
     main:             Main.hs
     dependencies:
       - coffer
-      - servant-server
-      - text
-      - tomland
-      - warp
 
 tests:
   test:
@@ -163,3 +160,22 @@ tests:
     dependencies:
       - doctest-parallel
       - coffer
+  server-integration:
+    source-dirs:      tests/server-integration
+    main:             Main.hs
+    build-tools:      tasty-discover:tasty-discover
+    ghc-options:
+      - -threaded
+    dependencies:
+      - aeson
+      - async
+      - coffer
+      - extra
+      - lens
+      - lens-aeson
+      - process
+      - req
+      - syb
+      - tasty
+      - tasty-hunit
+      - text

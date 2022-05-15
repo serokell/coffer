@@ -22,6 +22,18 @@
 - package:
   - name: coffer
   - section:
+    - name: test:server-integration
+    - message:
+      - name: Weeds exported
+      - module:
+        - name: Tree
+        - identifier:
+          - ingredients
+          - main
+
+- package:
+  - name: coffer
+  - section:
     - name: test:doctests
     - message:
       - name: Redundant build-depends entry
