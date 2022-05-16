@@ -30,6 +30,9 @@ stylish:
 lint:
 	hlint .
 
+server-integration:
+	$(MAKEU) test PACKAGE="coffer:test:server-integration"
+
 # Usage:
 #   * make bats
 #   * make bats FILTER="test name"
