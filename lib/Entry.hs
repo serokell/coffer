@@ -33,6 +33,8 @@ where
 import Coffer.Path (EntryPath)
 import Control.Lens
 import Data.Aeson qualified as A
+import Data.Aeson.Casing
+import Data.Aeson.TH
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
@@ -129,7 +131,8 @@ data Field =
   , fContents :: FieldContents
   }
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving anyclass (Hashable)
+deriveToJSON (aesonPrefix camelCase) ''Field
 makeLensesWith abbreviatedFields ''Field
 
 newField :: UTCTime -> FieldContents -> Field
@@ -149,7 +152,8 @@ data Entry =
   , eTags :: Set EntryTag
   }
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving anyclass (Hashable)
+deriveToJSON (aesonPrefix camelCase) ''Entry
 makeLensesWith abbreviatedFields ''Entry
 
 newEntry :: EntryPath -> UTCTime -> Entry

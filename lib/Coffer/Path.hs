@@ -28,7 +28,7 @@ module Coffer.Path
 import BackendName (BackendName, newBackendName)
 import Control.Lens
 import Control.Monad ((>=>))
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (ToJSON, Value(String))
 import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
 import Data.List qualified as List
@@ -123,7 +123,10 @@ mkPath path = do
 -- | An entry's full path (directory + entry's name).
 newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving anyclass (Hashable)
+
+instance A.ToJSON EntryPath where
+  toJSON = String . pretty
 
 instance ToHttpApiData EntryPath where
   toUrlPiece = fmt . build
@@ -206,8 +209,10 @@ data QualifiedPath path = QualifiedPath
   { qpBackendName :: Maybe BackendName
   , qpPath :: path
   }
-  deriving stock (Show, Eq, Functor, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show, Eq, Functor)
+
+instance (Buildable path) => ToJSON (QualifiedPath path) where
+  toJSON = String . pretty
 
 instance (Buildable path) => Buildable (QualifiedPath path) where
   build (QualifiedPath backendNameMb path) =

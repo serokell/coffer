@@ -5,11 +5,14 @@
 module CLI.Types where
 
 import Coffer.Directory (Directory)
-import Coffer.Path (EntryPath, Path, QualifiedPath)
+import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
 import Coffer.Util (MParser)
 import Control.Applicative (Alternative(some), optional)
+import Control.Lens hiding (noneOf)
 import Control.Monad (guard, void)
 import Data.Aeson hiding ((<?>))
+import Data.Aeson.QQ (aesonQQ)
+import Data.Aeson.Types (emptyObject)
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
 import Data.Fixed (Pico)
@@ -64,35 +67,31 @@ data ViewResult
   | VRPathNotFound (QualifiedPath Path)
   | VRDirectoryNoFieldMatch (QualifiedPath Path) FieldName
   | VREntryNoFieldMatch (QualifiedPath EntryPath) FieldName
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data CreateError
   = CEParentDirectoryIsEntry (QualifiedPath EntryPath, QualifiedPath EntryPath)
   | CEDestinationIsDirectory (QualifiedPath EntryPath)
   | CEEntryAlreadyExists (QualifiedPath EntryPath)
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data CreateResult
   = CRSuccess (QualifiedPath EntryPath)
   | CRCreateError CreateError
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data SetFieldResult
   = SFRSuccess FieldName (QualifiedPath Entry)
   | SFREntryNotFound (QualifiedPath EntryPath)
   | SFRMissingFieldContents FieldName (QualifiedPath EntryPath)
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data DeleteFieldResult
   = DFRSuccess FieldName (QualifiedPath EntryPath)
   | DFREntryNotFound (QualifiedPath EntryPath)
   | DFRFieldNotFound FieldName
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 type RenameResult = CopyResult
 
@@ -102,23 +101,20 @@ data CopyResult
   | CPRMissingEntryName
   | CPRSamePath (QualifiedPath Path)
   | CPRCreateErrors [(QualifiedPath EntryPath, CreateError)]
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data DeleteResult
   = DRSuccess Bool [QualifiedPath EntryPath]
   | DRPathNotFound (QualifiedPath Path)
   | DRDirectoryFound (QualifiedPath Path)
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data TagResult
   = TRSuccess (QualifiedPath EntryPath) EntryTag Bool
   | TREntryNotFound (QualifiedPath EntryPath)
   | TRTagNotFound EntryTag
   | TRDuplicateTag EntryTag
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 ----------------------------------------------------------------------------
 -- Options
@@ -129,7 +125,7 @@ data ViewOptions = ViewOptions
   , voFieldName :: Maybe FieldName
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data CreateOptions = CreateOptions
   { coQPath :: QualifiedPath EntryPath
@@ -140,7 +136,7 @@ data CreateOptions = CreateOptions
   , coPrivateFields :: [FieldInfo]
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data SetFieldOptions = SetFieldOptions
   { sfoQPath :: QualifiedPath EntryPath
@@ -149,14 +145,14 @@ data SetFieldOptions = SetFieldOptions
   , sfoVisibility :: Maybe FieldVisibility
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data DeleteFieldOptions = DeleteFieldOptions
   { dfoQPath :: QualifiedPath EntryPath
   , dfoFieldName :: FieldName
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data FindOptions = FindOptions
   { foQPath :: Maybe (QualifiedPath Path)
@@ -165,7 +161,7 @@ data FindOptions = FindOptions
   , foFilters :: [Filter]
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data RenameOptions = RenameOptions
   { roDryRun :: Bool
@@ -174,7 +170,7 @@ data RenameOptions = RenameOptions
   , roForce :: Bool
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data CopyOptions = CopyOptions
   { cpoDryRun :: Bool
@@ -183,7 +179,7 @@ data CopyOptions = CopyOptions
   , cpoForce :: Bool
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data DeleteOptions = DeleteOptions
   { doDryRun :: Bool
@@ -191,7 +187,7 @@ data DeleteOptions = DeleteOptions
   , doRecursive :: Bool
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 data TagOptions = TagOptions
   { toQPath :: QualifiedPath EntryPath
@@ -199,7 +195,7 @@ data TagOptions = TagOptions
   , toDelete :: Bool
   }
   deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (ToJSON)
 
 ----------------------------------------------------------------------------
 -- Option arguments
@@ -326,6 +322,88 @@ instance FromHttpApiData (FieldName, FilterField) where
               date <- parseFilterDate
               return (field, FilterFieldByDate op date)
           ]
+
+-- These @ToJSON@ instances are for success results only.
+
+instance ToJSON ViewResult where
+  toJSON = \case
+    VRDirectory dir -> toJSON dir
+    VREntry entry -> toJSON entry
+    VRField fieldName field ->
+      [aesonQQ|
+        {
+          "fieldName": #{fieldName},
+          "field": #{field}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON CreateResult where
+  toJSON = \case
+    CRSuccess entryPath ->
+      [aesonQQ|
+        {
+          "path": #{entryPath}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON SetFieldResult where
+  toJSON = \case
+    SFRSuccess _ qualifiedEntry -> do
+      let entry = qpPath qualifiedEntry
+      [aesonQQ|
+        {
+          "entry": #{entry}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON DeleteFieldResult where
+  toJSON = \case
+    DFRSuccess fieldName entryPath ->
+      [aesonQQ|
+        {
+          "fieldName": #{fieldName},
+          "path": #{entryPath}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON CopyResult where
+  toJSON = \case
+    CPRSuccess dryRun fromTo -> do
+      let copyResults =
+            fromTo <&> \(from, to) -> [aesonQQ| { "from": #{from}, "to": #{to} } |]
+      [aesonQQ|
+        {
+          "dryRun": #{dryRun},
+          "copyResults": #{copyResults}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON DeleteResult where
+  toJSON = \case
+    DRSuccess dryRun deleted ->
+      [aesonQQ|
+        {
+          "dryRun": #{dryRun},
+          "deleteResults": #{deleted}
+        }
+      |]
+    _ -> emptyObject
+
+instance ToJSON TagResult where
+  toJSON = \case
+    TRSuccess entryPath tag delete ->
+      [aesonQQ|
+        {
+          "entryPath": #{entryPath},
+          "tag": #{tag}, "delete": #{delete}
+        }
+      |]
+    _ -> emptyObject
 
 ----------------------------------------------------------------------------
 -- Utils

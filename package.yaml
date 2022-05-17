@@ -89,6 +89,7 @@ library:
   dependencies:
     - aeson
     - aeson-casing
+    - aeson-qq
     - ansi-terminal
     - bytestring
     - containers
