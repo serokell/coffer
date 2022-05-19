@@ -124,8 +124,7 @@ data ViewOptions = ViewOptions
   { voQPath :: QualifiedPath Path
   , voFieldName :: Maybe FieldName
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data CreateOptions = CreateOptions
   { coQPath :: QualifiedPath EntryPath
@@ -135,8 +134,7 @@ data CreateOptions = CreateOptions
   , coFields :: [FieldInfo]
   , coPrivateFields :: [FieldInfo]
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data SetFieldOptions = SetFieldOptions
   { sfoQPath :: QualifiedPath EntryPath
@@ -144,15 +142,13 @@ data SetFieldOptions = SetFieldOptions
   , sfoFieldContents :: Maybe FieldContents
   , sfoVisibility :: Maybe FieldVisibility
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data DeleteFieldOptions = DeleteFieldOptions
   { dfoQPath :: QualifiedPath EntryPath
   , dfoFieldName :: FieldName
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data FindOptions = FindOptions
   { foQPath :: Maybe (QualifiedPath Path)
@@ -160,8 +156,7 @@ data FindOptions = FindOptions
   , foSort :: Maybe (Sort, Direction)
   , foFilters :: [Filter]
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data RenameOptions = RenameOptions
   { roDryRun :: Bool
@@ -169,8 +164,7 @@ data RenameOptions = RenameOptions
   , roQNewPath :: QualifiedPath Path
   , roForce :: Bool
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data CopyOptions = CopyOptions
   { cpoDryRun :: Bool
@@ -178,24 +172,21 @@ data CopyOptions = CopyOptions
   , cpoQNewPath :: QualifiedPath Path
   , cpoForce :: Bool
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data DeleteOptions = DeleteOptions
   { doDryRun :: Bool
   , doQPath :: QualifiedPath Path
   , doRecursive :: Bool
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 data TagOptions = TagOptions
   { toQPath :: QualifiedPath EntryPath
   , toTagName :: EntryTag
   , toDelete :: Bool
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving stock (Show)
 
 ----------------------------------------------------------------------------
 -- Option arguments
@@ -205,45 +196,38 @@ data FieldInfo = FieldInfo
   { fiName :: FieldName
   , fiContents :: FieldContents
   }
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data Direction = Asc | Desc
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data Sort
   = SortByEntryName
   | SortByEntryDate
   | SortByFieldContents FieldName
   | SortByFieldDate FieldName
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data FilterOp = OpGT | OpGTE | OpLT | OpLTE | OpEQ
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data FilterDate
   = FDYear Year
   | FDMonth Month
   | FDDay Day
   | FDTime UTCTime
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data Filter
   = FilterByDate FilterOp FilterDate
   | FilterByName Text
   | FilterByField FieldName FilterField
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 data FilterField
   = FilterFieldByDate FilterOp FilterDate
   | FilterFieldByContents Text
-  deriving stock (Show, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving stock (Show)
 
 ----------------------------------------------------------------------------
 -- Instances

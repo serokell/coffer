@@ -53,7 +53,7 @@ import Servant (FromHttpApiData(..), ToHttpApiData(..))
 newtype PathSegment = UnsafeMkPathSegment { unPathSegment :: Text }
   deriving stock (Show, Eq, Generic)
   deriving newtype (Buildable, ToHttpApiData, FromHttpApiData)
-  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving newtype (Hashable, A.ToJSON, A.ToJSONKey)
 
 data DirectoryContents = DirectoryContents
   { dcDirectoryNames :: [PathSegment]
@@ -77,7 +77,7 @@ pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 newtype Path = Path { unPath :: [PathSegment] }
   deriving stock (Show, Eq, Generic)
   deriving newtype (Semigroup, Monoid)
-  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving newtype (Hashable, A.ToJSON, A.ToJSONKey)
 
 instance ToHttpApiData Path where
   toUrlPiece = fmt . build
