@@ -5,14 +5,11 @@
 module CLI.Types where
 
 import Coffer.Directory (Directory)
-import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
+import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Coffer.Util (MParser)
 import Control.Applicative (Alternative(some), optional)
-import Control.Lens hiding (noneOf)
 import Control.Monad (guard, void)
 import Data.Aeson hiding ((<?>))
-import Data.Aeson.QQ (aesonQQ)
-import Data.Aeson.Types (emptyObject)
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
 import Data.Fixed (Pico)
@@ -77,7 +74,7 @@ data CreateError
   deriving anyclass (ToJSON)
 
 data CreateResult
-  = CRSuccess (QualifiedPath EntryPath)
+  = CRSuccess (QualifiedPath Entry)
   | CRCreateError CreateError
   deriving stock (Show)
 
@@ -88,7 +85,7 @@ data SetFieldResult
   deriving stock (Show)
 
 data DeleteFieldResult
-  = DFRSuccess FieldName (QualifiedPath EntryPath)
+  = DFRSuccess FieldName (QualifiedPath Entry)
   | DFREntryNotFound (QualifiedPath EntryPath)
   | DFRFieldNotFound FieldName
   deriving stock (Show)
@@ -110,7 +107,7 @@ data DeleteResult
   deriving stock (Show)
 
 data TagResult
-  = TRSuccess (QualifiedPath EntryPath) EntryTag Bool
+  = TRSuccess (QualifiedPath Entry) EntryTag Bool
   | TREntryNotFound (QualifiedPath EntryPath)
   | TRTagNotFound EntryTag
   | TRDuplicateTag EntryTag
@@ -306,88 +303,6 @@ instance FromHttpApiData (FieldName, FilterField) where
               date <- parseFilterDate
               return (field, FilterFieldByDate op date)
           ]
-
--- These @ToJSON@ instances are for success results only.
-
-instance ToJSON ViewResult where
-  toJSON = \case
-    VRDirectory dir -> toJSON dir
-    VREntry entry -> toJSON entry
-    VRField fieldName field ->
-      [aesonQQ|
-        {
-          "fieldName": #{fieldName},
-          "field": #{field}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON CreateResult where
-  toJSON = \case
-    CRSuccess entryPath ->
-      [aesonQQ|
-        {
-          "path": #{entryPath}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON SetFieldResult where
-  toJSON = \case
-    SFRSuccess _ qualifiedEntry -> do
-      let entry = qpPath qualifiedEntry
-      [aesonQQ|
-        {
-          "entry": #{entry}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON DeleteFieldResult where
-  toJSON = \case
-    DFRSuccess fieldName entryPath ->
-      [aesonQQ|
-        {
-          "fieldName": #{fieldName},
-          "path": #{entryPath}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON CopyResult where
-  toJSON = \case
-    CPRSuccess dryRun fromTo -> do
-      let copyResults =
-            fromTo <&> \(from, to) -> [aesonQQ| { "from": #{from}, "to": #{to} } |]
-      [aesonQQ|
-        {
-          "dryRun": #{dryRun},
-          "copyResults": #{copyResults}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON DeleteResult where
-  toJSON = \case
-    DRSuccess dryRun deleted ->
-      [aesonQQ|
-        {
-          "dryRun": #{dryRun},
-          "deleteResults": #{deleted}
-        }
-      |]
-    _ -> emptyObject
-
-instance ToJSON TagResult where
-  toJSON = \case
-    TRSuccess entryPath tag delete ->
-      [aesonQQ|
-        {
-          "entryPath": #{entryPath},
-          "tag": #{tag}, "delete": #{delete}
-        }
-      |]
-    _ -> emptyObject
 
 ----------------------------------------------------------------------------
 -- Utils

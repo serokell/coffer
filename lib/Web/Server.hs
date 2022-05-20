@@ -22,14 +22,15 @@ import Error
 import Web.API
 
 import Backend.Interpreter (runBackend)
-import Coffer.Directory (Directory)
-import Coffer.Path (EntryPath, Path, QualifiedPath)
+import Coffer.Directory (Directory, singleton)
+import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
 import Coffer.PrettyPrint
   (PrettyPrintMode(WebAPI), buildCopyOrRenameResult, buildCreateError, buildDeleteFieldResult,
   buildDeleteResult, buildSetFieldResult, buildTagResult, buildViewResult)
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
+import Data.Bifunctor (bimap)
 import Data.Functor ((<&>))
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -60,9 +61,9 @@ throwCofferServerErrors err codesAndMsgs = do
     , errHeaders = ("Content-Type", "application/json;charset=utf-8") : errHeaders err
     }
 
-handleSetFieldResult :: SetFieldResult -> Handler SetFieldResult
+handleSetFieldResult :: SetFieldResult -> Handler Entry
 handleSetFieldResult = \case
-  res@SFRSuccess{} -> pure res
+  SFRSuccess _ qEntry -> pure $ qpPath qEntry
   res@SFREntryNotFound{} ->
     throwCofferServerError err404 300 (pretty res)
   res@SFRMissingFieldContents{} ->
@@ -70,9 +71,9 @@ handleSetFieldResult = \case
   where
     pretty = resultToText buildSetFieldResult
 
-handleCopyOrRenameResult :: Bool -> CopyResult -> Handler CopyResult
+handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [(EntryPath, EntryPath)]
 handleCopyOrRenameResult rename = \case
-  res@CPRSuccess{} -> pure res
+  CPRSuccess _ paths -> pure (paths <&> bimap qpPath qpPath)
   res@CPRPathNotFound{} ->
     throwCofferServerError err404 500 (prettySingleMessage res)
   res@CPRMissingEntryName{} ->
@@ -96,10 +97,10 @@ handleCopyOrRenameResult rename = \case
       CEDestinationIsDirectory{} -> 504
       CEEntryAlreadyExists{} -> 505
 
-handleCopyResult :: CopyResult -> Handler CopyResult
+handleCopyResult :: CopyResult -> Handler [(EntryPath, EntryPath)]
 handleCopyResult = handleCopyOrRenameResult False
 
-handleRenameResult :: RenameResult -> Handler RenameResult
+handleRenameResult :: RenameResult -> Handler [(EntryPath, EntryPath)]
 handleRenameResult = handleCopyOrRenameResult True
 
 runBackendIO' :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO] a -> IO (Either CofferError a)
@@ -151,13 +152,13 @@ view
   :: (forall a. VaultToken -> Command a -> Handler a)
   -> VaultToken
   -> QualifiedPath Path
-  -> Maybe FieldName
-  -> Handler ViewResult
-view run token voQPath voFieldName = do
-  run token (CmdView ViewOptions {voQPath, voFieldName}) >>= \case
-    res@VRDirectory{} -> pure res
-    res@VREntry{} -> pure res
-    res@VRField{} -> pure res
+  -> Handler Directory
+view run token voQPath = do
+  run token (CmdView ViewOptions {voQPath, voFieldName = Nothing}) >>= \case
+    VRDirectory dir -> pure dir
+    VREntry entry -> pure $ singleton entry
+    VRField{} ->
+      throwCofferServerError err500 0 "Unexpected VRField"
     res@VRPathNotFound{} ->
       throwCofferServerError err404 100 (pretty res)
     res@VRDirectoryNoFieldMatch{} ->
@@ -173,7 +174,7 @@ create
   -> QualifiedPath EntryPath
   -> Bool
   -> NewEntry
-  -> Handler CreateResult
+  -> Handler Entry
 create run token coQPath coForce (NewEntry coFields coTags) =
   run token (CmdCreate CreateOptions
     { coQPath
@@ -183,7 +184,7 @@ create run token coQPath coForce (NewEntry coFields coTags) =
     , coFields        = fst <$> (filter ((==Public) . snd) allFields)
     , coPrivateFields = fst <$> (filter ((==Private) . snd) allFields)
     }) >>= \case
-      res@CRSuccess{} -> pure res
+      CRSuccess qEntry -> pure $ qpPath qEntry
       CRCreateError createError ->
         case createError of
           res@CEParentDirectoryIsEntry{} ->
@@ -205,7 +206,7 @@ private
   -> VaultToken
   -> QualifiedPath EntryPath
   -> FieldName
-  -> Handler SetFieldResult
+  -> Handler Entry
 private run token sfoQPath sfoFieldName  = do
   run token (CmdSetField SetFieldOptions
     { sfoQPath
@@ -219,7 +220,7 @@ public
   -> VaultToken
   -> QualifiedPath EntryPath
   -> FieldName
-  -> Handler SetFieldResult
+  -> Handler Entry
 public run token sfoQPath sfoFieldName  =
   run token (CmdSetField SetFieldOptions
     { sfoQPath
@@ -234,7 +235,7 @@ set
   -> QualifiedPath EntryPath
   -> FieldName
   -> Maybe FieldContents
-  -> Handler SetFieldResult
+  -> Handler Entry
 set run token sfoQPath sfoFieldName sfoFieldContents =
   run token (CmdSetField SetFieldOptions
     { sfoQPath
@@ -248,13 +249,13 @@ deleteField
   -> VaultToken
   -> QualifiedPath EntryPath
   -> FieldName
-  -> Handler DeleteFieldResult
+  -> Handler Entry
 deleteField run token dfoQPath dfoFieldName =
   run token (CmdDeleteField DeleteFieldOptions
     { dfoQPath
     , dfoFieldName
     }) >>= \case
-      res@DFRSuccess{} -> pure res
+      DFRSuccess _ qEntry -> pure $ qpPath qEntry
       res@DFREntryNotFound{} ->
         throwCofferServerError err404 400 (pretty res)
       res@DFRFieldNotFound{} ->
@@ -285,7 +286,7 @@ rename
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
-  -> Handler RenameResult
+  -> Handler [(EntryPath, EntryPath)]
 rename run token roDryRun roQOldPath roQNewPath roForce =
   run token (CmdRename RenameOptions
     { roDryRun
@@ -301,7 +302,7 @@ copy'
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
-  -> Handler CopyResult
+  -> Handler [(EntryPath, EntryPath)]
 copy' run token cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
   run token (CmdCopy CopyOptions
     { cpoDryRun
@@ -316,14 +317,14 @@ delete'
   -> Bool
   -> QualifiedPath Path
   -> Bool
-  -> Handler DeleteResult
+  -> Handler NoContent
 delete' run token doDryRun doQPath doRecursive =
   run token (CmdDelete DeleteOptions
     { doDryRun
     , doQPath
     , doRecursive
     }) >>= \case
-      res@DRSuccess{} -> pure res
+      DRSuccess{} -> pure NoContent
       res@DRPathNotFound{} ->
         throwCofferServerError err404 600 (pretty res)
       res@DRDirectoryFound{} ->
@@ -337,14 +338,14 @@ tag
   -> QualifiedPath EntryPath
   -> EntryTag
   -> Bool
-  -> Handler TagResult
+  -> Handler Entry
 tag run token toQPath toTagName toDelete =
   run token (CmdTag TagOptions
     { toQPath
     , toTagName
     , toDelete
     }) >>= \case
-      res@TRSuccess{} -> pure res
+      TRSuccess qEntry _ _ -> pure $ qpPath qEntry
       res@TREntryNotFound{} ->
         throwCofferServerError err404 700 (pretty res)
       res@TRTagNotFound{} ->

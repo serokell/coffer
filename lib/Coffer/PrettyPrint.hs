@@ -11,6 +11,7 @@ import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
 import Control.Lens
 import Data.Text (Text)
 import Data.Text qualified as T
+import Entry (path)
 import Entry qualified as E
 import Fmt (Buildable(build), Builder, fmt, indentF, pretty, unlinesF)
 import Text.Interpolation.Nyan
@@ -59,7 +60,7 @@ buildCreateError mode = \case
 
 buildCreateResult :: PrettyPrintMode -> CreateResult -> Builder
 buildCreateResult mode = \case
-  CRSuccess path -> [int|s|Entry created at '#{path}'.|]
+  CRSuccess entry -> [int|s|Entry created at '#{view path <$> entry}'.|]
   CRCreateError error -> [int|s|
       The entry cannot be created:
 
@@ -94,8 +95,8 @@ buildDeleteFieldResult _ = \case
   DFRFieldNotFound fieldName -> [int|s|
       Entry does not have a field with name '#{fieldName}'.
     |]
-  DFRSuccess fieldName path -> [int|s|
-      Deleted field '#{fieldName}' from '#{path}'.
+  DFRSuccess fieldName entry -> [int|s|
+      Deleted field '#{fieldName}' from '#{view path <$> entry}'.
     |]
 
 getEntryFromCreateError :: CreateError -> QualifiedPath EntryPath
@@ -166,10 +167,10 @@ buildDeleteResult mode = \case
 buildTagResult :: PrettyPrintMode -> TagResult -> Builder
 buildTagResult _ = \case
   TREntryNotFound path -> buildEntryNotFound path
-  TRSuccess path tagName delete ->
+  TRSuccess entry tagName delete ->
     if delete
-      then [int|s|Removed tag '#{tagName}' from '#{path}'.|]
-      else [int|s|Added tag '#{tagName}' to '#{path}'.|]
+      then [int|s|Removed tag '#{tagName}' from '#{view path <$> entry}'.|]
+      else [int|s|Added tag '#{tagName}' to '#{view path <$> entry}'.|]
   TRTagNotFound tag ->
     [int|s|Entry does not have the tag '#{tag}'.|]
   TRDuplicateTag tag ->

@@ -99,7 +99,6 @@ library
   build-depends:
       aeson
     , aeson-casing
-    , aeson-qq
     , ansi-terminal
     , base >=4.14.3.0 && <5
     , bytestring
