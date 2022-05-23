@@ -7,12 +7,13 @@ module CLI.Types where
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Coffer.Util (MParser)
+import Control.Lens hiding (noneOf)
 import Control.Monad (guard, void)
-import Data.Aeson hiding ((<?>))
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
 import Data.Fixed (Pico)
 import Data.Functor (($>))
+import Data.OpenApi
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -71,7 +72,6 @@ data CreateError
   | CEDestinationIsDirectory (QualifiedPath EntryPath)
   | CEEntryAlreadyExists (QualifiedPath EntryPath)
   deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
 
 data CreateResult
   = CRSuccess (QualifiedPath Entry)
@@ -249,6 +249,31 @@ parseFilterOp =
     , P.char '<' $> OpLT
     , P.char '=' $> OpEQ
     ]
+
+instance ToParamSchema (Sort, Direction) where
+  toParamSchema _ =
+    mempty
+      & format ?~ sortDirectionFormat
+      & example ?~ "name:asc"
+    where
+      sortDirectionFormat = T.unlines
+        [ "name:<direction>"
+        , "date:<direction>"
+        , "<direction>=[asc, desc]"
+        ]
+
+instance ToParamSchema Filter where
+  toParamSchema _ =
+    mempty
+      & format ?~ filterFormat
+      & example ?~ "name~google"
+    where
+      filterFormat = T.unlines
+        [ "name~<substring>"
+        , "date<op><date>"
+        , "<op>=[>=, <=, >, <, =]"
+        , "<date>=['YYYY', 'YYYY-MM', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS']"
+        ]
 
 parseFilter :: MParser Filter
 parseFilter =

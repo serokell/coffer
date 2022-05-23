@@ -19,12 +19,15 @@ module Coffer.Directory
 
 import Coffer.Path (PathSegment, entryPathParentDir, pathSegments)
 import Control.Lens
+import Data.Aeson (toJSON)
 import Data.Aeson.Casing
 import Data.Aeson.TH
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Maybe qualified as Maybe
-import Entry (Entry)
+import Data.OpenApi
+import Data.OpenApi.Lens qualified as Schema
+import Entry (Entry, exampleEntry)
 import Entry qualified as E
 import GHC.Generics (Generic)
 
@@ -40,6 +43,11 @@ data Directory = Directory
 deriveToJSON (aesonPrefix camelCase) ''Directory
 
 makeLensesWith abbreviatedFields 'Directory
+
+instance ToSchema Directory where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema (fromAesonOptions (aesonPrefix camelCase)) proxy
+      & mapped . Schema.schema . example ?~ toJSON (insertEntry exampleEntry emptyDir)
 
 emptyDir :: Directory
 emptyDir = Directory mempty mempty

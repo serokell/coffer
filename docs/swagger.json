@@ -1,0 +1,1378 @@
+{
+    "servers": [
+        {
+            "url": "http://localhost:8081"
+        }
+    ],
+    "info": {
+        "title": "Coffer Web API",
+        "version": "1.0"
+    },
+    "components": {
+        "schemas": {
+            "EntryPath": {
+                "type": "string",
+                "example": "/accounts/sre/gmail",
+                "pattern": "(/[^#]+)+"
+            },
+            "Directory": {
+                "type": "object",
+                "required": [
+                    "entries",
+                    "subdirs"
+                ],
+                "example": {
+                    "subdirs": {
+                        "accounts": {
+                            "subdirs": {
+                                "sre": {
+                                    "subdirs": {},
+                                    "entries": [
+                                        {
+                                            "tags": [
+                                                "some-tag"
+                                            ],
+                                            "masterField": null,
+                                            "path": "/accounts/sre/gmail",
+                                            "fields": {
+                                                "password": {
+                                                    "contents": "some-password",
+                                                    "visibility": "private",
+                                                    "dateModified": "2016-07-22T00:00:00Z"
+                                                },
+                                                "username": {
+                                                    "contents": "some-username",
+                                                    "visibility": "public",
+                                                    "dateModified": "2016-07-22T00:00:00Z"
+                                                }
+                                            },
+                                            "dateModified": "2016-07-22T00:00:00Z"
+                                        }
+                                    ]
+                                }
+                            },
+                            "entries": []
+                        }
+                    },
+                    "entries": []
+                },
+                "properties": {
+                    "subdirs": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Directory"
+                        }
+                    },
+                    "entries": {
+                        "items": {
+                            "$ref": "#/components/schemas/Entry"
+                        },
+                        "type": "array"
+                    }
+                }
+            },
+            "CopiedEntry": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to"
+                ],
+                "example": {
+                    "from": "/accounts/sre/gmail",
+                    "to": "/accounts/sre-backup/gmail"
+                },
+                "properties": {
+                    "from": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    },
+                    "to": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    }
+                }
+            },
+            "UTCTime": {
+                "type": "string",
+                "format": "yyyy-mm-ddThh:MM:ssZ",
+                "example": "2016-07-22T00:00:00Z"
+            },
+            "FieldName": {
+                "type": "string",
+                "example": "password",
+                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+            },
+            "Field": {
+                "type": "object",
+                "required": [
+                    "dateModified",
+                    "visibility",
+                    "contents"
+                ],
+                "properties": {
+                    "contents": {
+                        "type": "string",
+                        "example": "some-password"
+                    },
+                    "visibility": {
+                        "$ref": "#/components/schemas/FieldVisibility"
+                    },
+                    "dateModified": {
+                        "$ref": "#/components/schemas/UTCTime"
+                    }
+                }
+            },
+            "NewEntry": {
+                "type": "object",
+                "required": [
+                    "fields",
+                    "tags"
+                ],
+                "example": {
+                    "tags": [
+                        "some-tag"
+                    ],
+                    "fields": {
+                        "password": {
+                            "contents": "some-password",
+                            "visibility": "private"
+                        },
+                        "username": {
+                            "contents": "some-username",
+                            "visibility": "public"
+                        }
+                    }
+                },
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/EntryTag"
+                        },
+                        "type": "array"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/NewField"
+                        }
+                    }
+                }
+            },
+            "EntryTag": {
+                "type": "string",
+                "example": "some-tag",
+                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+            },
+            "NewField": {
+                "type": "object",
+                "required": [
+                    "contents",
+                    "visibility"
+                ],
+                "properties": {
+                    "contents": {
+                        "type": "string",
+                        "example": "some-password"
+                    },
+                    "visibility": {
+                        "$ref": "#/components/schemas/FieldVisibility"
+                    }
+                }
+            },
+            "FieldVisibility": {
+                "type": "string",
+                "enum": [
+                    "public",
+                    "private"
+                ]
+            },
+            "Entry": {
+                "type": "object",
+                "required": [
+                    "path",
+                    "dateModified",
+                    "fields",
+                    "tags"
+                ],
+                "example": {
+                    "tags": [
+                        "some-tag"
+                    ],
+                    "masterField": null,
+                    "path": "/accounts/sre/gmail",
+                    "fields": {
+                        "password": {
+                            "contents": "some-password",
+                            "visibility": "private",
+                            "dateModified": "2016-07-22T00:00:00Z"
+                        },
+                        "username": {
+                            "contents": "some-username",
+                            "visibility": "public",
+                            "dateModified": "2016-07-22T00:00:00Z"
+                        }
+                    },
+                    "dateModified": "2016-07-22T00:00:00Z"
+                },
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/EntryTag"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                    },
+                    "masterField": {
+                        "$ref": "#/components/schemas/FieldName"
+                    },
+                    "path": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Field"
+                        }
+                    },
+                    "dateModified": {
+                        "$ref": "#/components/schemas/UTCTime"
+                    }
+                }
+            }
+        }
+    },
+    "paths": {
+        "/api/v1/content/find": {
+            "get": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `filter` or `sort-field` or `text` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Directory"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": false,
+                        "description": "If specified, only show entries within this path (use `/` to find everything).",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "text",
+                        "required": false,
+                        "description": "The text to search for in the paths and tags of entries.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort-field",
+                        "required": false,
+                        "description": "Sort the entries inside each directory.",
+                        "in": "query",
+                        "schema": {
+                            "format": "name:<direction>\ndate:<direction>\n<direction>=[asc, desc]\n",
+                            "example": "name:asc"
+                        }
+                    },
+                    {
+                        "name": "filter",
+                        "in": "query",
+                        "schema": {
+                            "items": {
+                                "format": "name~<substring>\ndate<op><date>\n<op>=[>=, <=, >, <, =]\n<date>=['YYYY', 'YYYY-MM', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS']\n",
+                                "example": "name~google"
+                            },
+                            "type": "array"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/view": {
+            "get": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Directory"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "A path to either a directory or an entry.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `body` or `field` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to be modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "description": "The field to be added/modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "password",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "type": "string",
+                                "example": "some-password"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/content/delete": {
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `recursive` or `path` or `dry-run` or `Coffer-Backend`"
+                    },
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry or directory to delete.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "recursive",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/copy": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `force` or `new-path` or `old-path` or `dry-run` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/CopiedEntry"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "old-path",
+                        "required": true,
+                        "description": "The path of the directory or entry to be copied.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "new-path",
+                        "required": true,
+                        "description": "The path to copy the directory or entry to.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/rename": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `force` or `new-path` or `old-path` or `dry-run` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/CopiedEntry"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "old-path",
+                        "required": true,
+                        "description": "The path of the directory or entry to be moved.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "new-path",
+                        "required": true,
+                        "description": "The path to move the directory or entry to.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre",
+                            "pattern": "(/[^#]+)*"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field/public": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to be modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "description": "The field to be added/modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "password",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/tag": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `tag` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to add a tag to.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "required": true,
+                        "description": "The name of the tag to add.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "some-tag",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ]
+            },
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `tag` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to delete a tag from.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "required": true,
+                        "description": "The name of the tag to delete.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "some-tag",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field/private": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to be modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "description": "The field to be added/modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "password",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/delete-field": {
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the entry to be modified.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "description": "The field to be deleted",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "password",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]+"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/create": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `body` or `force` or `path` or `Coffer-Backend`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "Coffer-Backend",
+                        "required": true,
+                        "description": "Details about the backend to connect to.",
+                        "in": "header",
+                        "schema": {
+                            "example": {
+                                "name": "vault-local",
+                                "type": "vault-kv",
+                                "mount": "secret",
+                                "address": "http://localhost:8200",
+                                "token": "root"
+                            },
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "address",
+                                        "mount",
+                                        "token"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "vault-kv"
+                                            ]
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "description": "The path of the new entry. This must not already be a directory or an entry. If it is an entry, `force` can be used to overwrite it.",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "/accounts/sre/gmail",
+                            "pattern": "(/[^#]+)+"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NewEntry"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "openapi": "3.0.0"
+}

@@ -104,6 +104,7 @@ library:
     - megaparsec
     - mtl
     - nyan-interpolation
+    - openapi3
     - optparse-applicative
     - polysemy
     - servant
@@ -138,6 +139,17 @@ executables:
     main:             Main.hs
     dependencies:
       - coffer
+
+  coffer-swagger-api:
+    source-dirs:      app/swagger-api
+    main:             Main.hs
+    dependencies:
+      - aeson-pretty
+      - bytestring
+      - coffer
+      - lens
+      - openapi3
+      - servant-openapi3
 
 tests:
   test:

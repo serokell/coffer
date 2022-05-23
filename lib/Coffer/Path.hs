@@ -24,23 +24,28 @@ module Coffer.Path
   , replacePathPrefix
   , QualifiedPath (..)
   , getPathSegments
+
+  -- * Swagger examples
+  , exampleEntryPath
   ) where
 
 import BackendName (BackendName, newBackendName)
 import Control.Lens
 import Control.Monad ((>=>))
-import Data.Aeson (ToJSON, Value(String))
+import Data.Aeson (ToJSON, Value(String), toJSON)
 import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
+import Data.OpenApi
+import Data.OpenApi.Lens qualified as Schema
 import Data.Text (Text)
 import Data.Text qualified as T
-import Fmt (Buildable, build, fmt, pretty)
+import Fmt (Buildable, build, pretty)
 import GHC.Generics (Generic)
-import Servant (FromHttpApiData(..), ToHttpApiData(..))
+import Servant (FromHttpApiData(..), Proxy(..), ToHttpApiData(..))
 import Text.Interpolation.Nyan
 
 -- $setup
@@ -59,6 +64,15 @@ newtype PathSegment = UnsafeMkPathSegment { unPathSegment :: Text }
 
 instance FromHttpApiData PathSegment where
   parseUrlPiece = mkPathSegment
+
+instance ToSchema PathSegment where
+  declareNamedSchema _ = pure $ NamedSchema (Just "PathSegment") $
+    toSchema @Text Proxy
+      & Schema.pattern ?~ pathSegmentPattern
+      & Schema.example ?~ "accounts"
+
+pathSegmentPattern :: Pattern
+pathSegmentPattern = "[^#]+"
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
@@ -79,10 +93,19 @@ makeLensesWith abbreviatedFields ''DirectoryContents
 newtype Path = Path { unPath :: [PathSegment] }
   deriving stock (Show, Eq, Generic)
   deriving newtype (Semigroup, Monoid)
-  deriving newtype (Hashable, A.ToJSON, A.ToJSONKey)
+  deriving newtype (Hashable)
+
+instance ToParamSchema Path where
+  toParamSchema _ =
+    toSchema @Text Proxy
+      & Schema.pattern ?~ [int|s|(/#{pathSegmentPattern})*|]
+      & example ?~ String (toUrlPiece examplePath)
+
+examplePath :: Path
+examplePath = either (error . T.unpack) id $ mkPath "/accounts/sre"
 
 instance ToHttpApiData Path where
-  toUrlPiece = fmt . build
+  toUrlPiece = pretty
 
 instance FromHttpApiData Path where
   parseUrlPiece = mkPath
@@ -127,11 +150,23 @@ newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
+exampleEntryPath :: EntryPath
+exampleEntryPath = either (error . T.unpack) id $ mkEntryPath "/accounts/sre/gmail"
+
 instance A.ToJSON EntryPath where
   toJSON = String . pretty
 
+instance ToParamSchema EntryPath where
+  toParamSchema _ =
+    toSchema @Text Proxy
+      & Schema.pattern ?~ [int|s|(/#{pathSegmentPattern})+|]
+      & example ?~ toJSON exampleEntryPath
+
+instance ToSchema EntryPath where
+  declareNamedSchema proxy = pure $ NamedSchema (Just "EntryPath") (toParamSchema proxy)
+
 instance ToHttpApiData EntryPath where
-  toUrlPiece = fmt . build
+  toUrlPiece = pretty
 
 instance FromHttpApiData EntryPath where
   parseUrlPiece = mkEntryPath
