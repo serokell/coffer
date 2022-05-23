@@ -131,6 +131,54 @@ EOF
     a - [2000-01-01 01:01:01]
       sortfield: c [2000-01-01 01:01:01]
 EOF
+
+
+}
+
+@test "sort on field with name 'date' and 'name'" {
+
+  coffer create /secrets/a
+  coffer create /secrets/c
+  coffer create /secrets/b
+
+  coffer set-field /secrets/a name name1
+  coffer set-field /secrets/c name name2
+  coffer set-field /secrets/b name name3
+
+  run cleanOutput coffer find / --sort name:contents:desc
+
+  assert_success
+  assert_output - <<EOF
+/
+  secrets/
+    b - [2000-01-01 01:01:01]
+      name: name3 [2000-01-01 01:01:01]
+    c - [2000-01-01 01:01:01]
+      name: name2 [2000-01-01 01:01:01]
+    a - [2000-01-01 01:01:01]
+      name: name1 [2000-01-01 01:01:01]
+EOF
+
+  coffer set-field /secrets/a date date1
+  coffer set-field /secrets/c date date2
+  coffer set-field /secrets/b date date3
+
+  run cleanOutput coffer find / --sort date:contents:desc
+
+  assert_success
+  assert_output - <<EOF
+/
+  secrets/
+    b - [2000-01-01 01:01:01]
+      name: name3 [2000-01-01 01:01:01]
+      date: date3 [2000-01-01 01:01:01]
+    c - [2000-01-01 01:01:01]
+      name: name2 [2000-01-01 01:01:01]
+      date: date2 [2000-01-01 01:01:01]
+    a - [2000-01-01 01:01:01]
+      name: name1 [2000-01-01 01:01:01]
+      date: date1 [2000-01-01 01:01:01]
+EOF
 }
 
 @test "filter entries names" {

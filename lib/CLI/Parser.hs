@@ -13,7 +13,6 @@ import BackendName (BackendName, newBackendName)
 import CLI.Types
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
 import Coffer.Util (MParser)
-import Control.Arrow ((>>>))
 import Control.Monad (guard, void)
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
@@ -421,33 +420,13 @@ readFieldInfo = do
 readSort :: ReadM (Sort, Direction)
 readSort = do
   eitherReader \input ->
-    case T.splitOn ":" (T.pack input) of
-      [means, direction] -> do
-        direction' <- readDirection direction
-        case means of
-          "name" -> pure (SortByEntryName, direction')
-          "date" -> pure (SortByEntryDate, direction')
-          _ -> Left [int|s|
-            Invalid sort: #{show means}.
-            Choose one of: 'name', 'date'.
-
-            #{show expectedSortFormat}
-          |]
-      [fieldName, means, direction] -> do
-        fieldName' <- readFieldName' fieldName
-        direction' <- readDirection direction
-        case means of
-          "contents" -> pure (SortByFieldContents fieldName', direction')
-          "date" -> pure (SortByFieldDate fieldName', direction')
-          _ -> Left [int|s|
-            Invalid sort: #{show means}.
-            Choose one of: 'contents', 'date'.
-
-            #{show expectedSortFormat}
-          |]
-      _ -> Left [int|s|
+    P.parse (parseSort <* P.eof) "" (T.pack input) & first \err ->
+      [int|s|
         Invalid sort format: #{show input}.
         #{show expectedSortFormat}
+
+        Parser error:
+        #{P.errorBundlePretty err}
       |]
 
 expectedSortFormat :: Pretty.Doc
@@ -460,13 +439,6 @@ expectedSortFormat = Pretty.vsep
   , "Direction can be 'asc' or 'desc'."
   , "Examples: 'name:desc', 'password:date:asc'."
   ]
-
-readDirection :: Text -> Either String Direction
-readDirection =
-  T.unpack >>> readSum "direction"
-    [ ("asc", Asc)
-    , ("desc", Desc)
-    ]
 
 readFilter :: ReadM Filter
 readFilter = do
@@ -567,6 +539,38 @@ parseFieldNameWhile whileCond = do
 -- | Parse the rest of the input as a field content.
 parseFieldContentsEof :: MParser FieldContents
 parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
+
+parseSort :: MParser (Sort, Direction)
+parseSort = do
+  sort <- parseSortMeans
+  void $ P.char ':'
+  direction <- parseSortDirection
+  return (sort, direction)
+
+parseSortDirection :: MParser Direction
+parseSortDirection =
+      P.string "asc" $> Asc
+  <|> P.string "desc" $> Desc
+
+parseSortMeans :: MParser Sort
+parseSortMeans =
+  try parseSortMeansByFieldContentsOrDate
+  <|> parseSortMeansByNameOrDate
+
+parseSortMeansByFieldContentsOrDate :: MParser Sort
+parseSortMeansByFieldContentsOrDate = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  P.choice @[] $
+    [ (SortByFieldDate fieldName)     <$ (P.string "date")
+    , (SortByFieldContents fieldName) <$ (P.string "contents")
+    ]
+
+parseSortMeansByNameOrDate :: MParser Sort
+parseSortMeansByNameOrDate = P.choice @[] $
+  [ SortByEntryName <$ P.string "name"
+  , SortByEntryDate <$ (P.string "date")
+  ]
 
 ----------------------------------------------------------------------------
 -- Utils
