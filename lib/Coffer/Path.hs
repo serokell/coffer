@@ -30,11 +30,13 @@ import Control.Lens
 import Control.Monad ((>=>))
 import Data.Aeson (ToJSON, Value(String))
 import Data.Aeson qualified as A
+import Data.Data (Typeable)
 import Data.Hashable (Hashable)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
+import Data.OpenApi
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fmt (Buildable, build, fmt, pretty)
@@ -61,6 +63,13 @@ data DirectoryContents = DirectoryContents
   }
   deriving stock (Show)
 makeLensesWith abbreviatedFields ''DirectoryContents
+
+instance ToSchema PathSegment where
+  declareNamedSchema _ = pure $ NamedSchema (Just "PathSegment")
+    mempty { _schemaPattern = Just pathSegmentPattern }
+      & type_ ?~ OpenApiString
+    where
+      pathSegmentPattern = "[" <> T.pack pathSegmentAllowedCharacters <> "]*"
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
@@ -127,6 +136,13 @@ newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
 
 instance A.ToJSON EntryPath where
   toJSON = String . pretty
+
+instance ToSchema EntryPath where
+  declareNamedSchema proxy = do
+    namedSchema <- genericDeclareNamedSchema defaultSchemaOptions proxy
+    pure
+      $ namedSchema
+      & schema %~ \s -> s { _schemaPattern = Just "(/${pathSegment})+" }
 
 instance ToHttpApiData EntryPath where
   toUrlPiece = fmt . build
@@ -234,6 +250,13 @@ instance (FromHttpApiData path) => FromHttpApiData (QualifiedPath path) where
 
 instance (ToHttpApiData path, Buildable path) => ToHttpApiData (QualifiedPath path) where
   toUrlPiece = pretty
+
+-- | These instances are redundant due to https://github.com/serokell/coffer/issues/113
+instance (Typeable path) => ToSchema (QualifiedPath path) where
+  declareNamedSchema _ = pure $ NamedSchema Nothing mempty
+
+instance ToParamSchema (QualifiedPath path) where
+  toParamSchema = mempty
 
 ----------------------------------------------------------------------------
 -- Optics

@@ -44,6 +44,7 @@ import Data.Aeson
 import Data.Aeson.Types qualified as AT
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
+import Data.OpenApi
 import Data.Text (Text)
 import Servant.API
 import Servant.API.Generic
@@ -231,8 +232,10 @@ instance ReflectMethod 'LIST where
 -- TODO - A place holder, for a perhaps more complicated type. One with pinned memory which is
 --        overwritten many times or something like that
 newtype VaultToken = VaultToken Text
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Show, Generic)
   deriving newtype (FromHttpApiData)
+
+instance ToParamSchema VaultToken
 
 -- Could this be somehow automated? newtypes are just meaningless wrapper anyways, at least to GHC.
 instance ToHttpApiData VaultToken where

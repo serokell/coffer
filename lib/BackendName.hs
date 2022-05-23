@@ -12,6 +12,7 @@ module BackendName
 
 import Coffer.Util (didimatch)
 import Data.Hashable (Hashable)
+import Data.OpenApi
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fmt (Buildable)
@@ -20,6 +21,13 @@ import Toml qualified
 newtype BackendName = UnsafeBackendName Text
   deriving stock (Show, Eq)
   deriving newtype (Hashable, Buildable)
+
+-- | These instances are redundant due to https://github.com/serokell/coffer/issues/113
+instance ToSchema BackendName where
+  declareNamedSchema _ = pure $ NamedSchema Nothing mempty
+
+instance ToParamSchema BackendName where
+  toParamSchema _ = mempty
 
 backendNameCharSet :: [Char]
 backendNameCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
