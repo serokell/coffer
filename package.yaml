@@ -171,10 +171,14 @@ tests:
       - async
       - coffer
       - extra
+      - http-client
+      - http-types
       - lens
+      - lens-aeson
       - process
       - req
       - syb
       - tasty
       - tasty-hunit
       - text
+      - time
