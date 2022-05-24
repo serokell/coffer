@@ -7,6 +7,9 @@ module Coffer.Path
   , unPathSegment
   , mkPathSegment
   , pathSegmentAllowedCharacters
+  , DirectoryContents(..)
+  , directoryNames
+  , entryNames
   , HasPathSegments(..)
   , Path(..)
   , mkPath
@@ -51,6 +54,13 @@ newtype PathSegment = UnsafeMkPathSegment { unPathSegment :: Text }
   deriving stock (Show, Eq, Generic)
   deriving newtype (Buildable, ToHttpApiData, FromHttpApiData)
   deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+
+data DirectoryContents = DirectoryContents
+  { dcDirectoryNames :: [PathSegment]
+  , dcEntryNames :: [PathSegment]
+  }
+  deriving stock (Show)
+makeLensesWith abbreviatedFields ''DirectoryContents
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment

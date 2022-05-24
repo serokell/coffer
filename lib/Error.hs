@@ -30,17 +30,10 @@ class (Buildable err) => BackendError err
 
 -- | Internal errors that can be thrown if backend is in illegal state.
 data InternalCommandsError
-  = InvalidEntry Text
-  | EntryPathDoesntHavePrefix EntryPath Path
+  = EntryPathDoesntHavePrefix EntryPath Path
 
 instance Buildable InternalCommandsError where
   build = \case
-    InvalidEntry pathSegment ->
-      [int|s|
-        Backend returned a path segment that is not a valid \
-        entry or directory name.
-        Got: '#{pathSegment}'.
-      |]
     EntryPathDoesntHavePrefix entryPath path ->
       [int|s|
         Expected path: '#{entryPath}'
