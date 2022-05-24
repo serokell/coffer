@@ -37,7 +37,9 @@ rec {
 
   lib = project.coffer.components.library;
   cli = project.coffer.components.exes.coffer;
+  server = project.coffer.components.exes.coffer-server;
   tests = project.coffer.components.tests.test;
+  server-integration = project.coffer.components.tests.server-integration;
   doctests = project.coffer.components.tests.doctests;
   haddock = project.coffer.components.library.haddock;
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eef391a53881124afd5eff5d82574448d5138f54f006e5a613282c960bf8972c
+-- hash: 634ef5ad016b3df508f0c7e2e75ae963ad220b9437dd82cdf567fe399d1f48d6
 
 name:           coffer
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       Entry.Json
       Error
       Web.API
+      Web.Main
       Web.Server
       Web.Types
   other-modules:
@@ -127,6 +128,7 @@ library
     , tomland
     , unordered-containers
     , validation-selective
+    , warp
   default-language: Haskell2010
 
 executable coffer
@@ -258,10 +260,6 @@ executable coffer-server
   build-depends:
       base >=4.14.3.0 && <5
     , coffer
-    , servant-server
-    , text
-    , tomland
-    , warp
   default-language: Haskell2010
 
 test-suite doctests
@@ -326,6 +324,85 @@ test-suite doctests
       base >=4.14.3.0 && <5
     , coffer
     , doctest-parallel
+  default-language: Haskell2010
+
+test-suite server-integration
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Integration
+      Tree
+      Utils
+      Paths_coffer
+  hs-source-dirs:
+      tests/server-integration
+  default-extensions:
+      AllowAmbiguousTypes
+      ApplicativeDo
+      BangPatterns
+      BlockArguments
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveAnyClass
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      EmptyCase
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NegativeLiterals
+      NumDecimals
+      NumericUnderscores
+      OverloadedLabels
+      OverloadedStrings
+      PatternSynonyms
+      PolyKinds
+      QuantifiedConstraints
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      RecursiveDo
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      UndecidableInstances
+      UndecidableSuperClasses
+      ViewPatterns
+  ghc-options: -Weverything -Wno-implicit-prelude -Wno-name-shadowing -Wno-missing-import-lists -Wno-missing-export-lists -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-monomorphism-restriction -Wno-missed-specialisations -Wno-all-missed-specialisations -threaded
+  build-tool-depends:
+      tasty-discover:tasty-discover
+  build-depends:
+      aeson
+    , async
+    , base >=4.14.3.0 && <5
+    , coffer
+    , extra
+    , lens
+    , lens-aeson
+    , process
+    , req
+    , syb
+    , tasty
+    , tasty-hunit
+    , text
   default-language: Haskell2010
 
 test-suite test
