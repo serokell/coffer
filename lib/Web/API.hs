@@ -19,29 +19,28 @@ type API
   :> "api" :> "v1" :> "content" :>
     ( "view"
       :> RequiredParam "path"  (QualifiedPath Path)
-      :> OptionalParam "field" FieldName
-      :> Get '[JSON] ViewResult
+      :> Get '[JSON] Directory
 
     :<|> "create"
       :> RequiredParam "path" (QualifiedPath EntryPath)
       :> QueryFlag     "force"
       :> ReqBody '[JSON] NewEntry
-      :> Post '[JSON] CreateResult
+      :> Post '[JSON] Entry
 
     :<|> "set-field"
       :> RequiredParam "path" (QualifiedPath EntryPath)
       :> RequiredParam "field" FieldName
       :>
-        (    "private" :> Post '[JSON] SetFieldResult
-        :<|> "public"  :> Post '[JSON] SetFieldResult
+        (    "private" :> Post '[JSON] Entry
+        :<|> "public"  :> Post '[JSON] Entry
         :<|> ReqBody '[JSON] (Maybe FieldContents)
-          :> Post '[JSON] SetFieldResult
+          :> Post '[JSON] Entry
         )
 
     :<|> "delete-field"
       :> RequiredParam "path" (QualifiedPath EntryPath)
       :> RequiredParam "field" FieldName
-      :> Delete '[JSON] DeleteFieldResult
+      :> Delete '[JSON] Entry
 
     :<|> "find"
       :> OptionalParam  "path" (QualifiedPath Path)
@@ -55,27 +54,27 @@ type API
       :> RequiredParam "old-path" (QualifiedPath Path)
       :> RequiredParam "new-path" (QualifiedPath Path)
       :> QueryFlag     "force"
-      :> Post '[JSON] RenameResult
+      :> Post '[JSON] [(EntryPath, EntryPath)]
 
     :<|> "copy"
       :> QueryFlag     "dry-run"
       :> RequiredParam "old-path" (QualifiedPath Path)
       :> RequiredParam "new-path" (QualifiedPath Path)
       :> QueryFlag     "force"
-      :> Post '[JSON] CopyResult
+      :> Post '[JSON] [(EntryPath, EntryPath)]
 
     :<|> "delete"
       :> QueryFlag     "dry-run"
       :> RequiredParam "path" (QualifiedPath Path)
       :> QueryFlag     "recursive"
-      :> Delete '[JSON] DeleteResult
+      :> DeleteNoContent
 
     :<|> "tag"
       :> RequiredParam "path" (QualifiedPath EntryPath)
       :> RequiredParam "tag" EntryTag
       :>
-        (    Post   '[JSON] TagResult
-        :<|> Delete '[JSON] TagResult
+        (    Post   '[JSON] Entry
+        :<|> Delete '[JSON] Entry
         )
     )
 

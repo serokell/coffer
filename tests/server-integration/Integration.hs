@@ -28,7 +28,32 @@ unit_create_an_entry = cofferTest do
             ]
         )
 
-  responseBody response @?= [aesonQQ| { "path": "/entry" } |]
+  scrubDates (responseBody response) @?= expected
+  where
+    expected =
+      [aesonQQ|
+        {
+          "path": "/entry",
+          "dateModified": "",
+          "masterField": null,
+          "fields": {
+              "public-field": {
+                  "dateModified": "",
+                  "visibility": "public",
+                  "contents": "field1"
+              },
+              "private-field": {
+                  "dateModified": "",
+                  "visibility": "private",
+                  "contents": "multiline\nfield"
+              }
+          },
+          "tags": [
+              "first-tag",
+              "second-tag"
+          ]
+        }
+      |]
 
 unit_view_an_entry :: IO ()
 unit_view_an_entry = cofferTest do
@@ -63,24 +88,29 @@ unit_view_an_entry = cofferTest do
     expected =
       [aesonQQ|
         {
-          "tags": [
-              "first-tag",
-              "second-tag"
-          ],
-          "masterField": null,
-          "path": "/entry",
-          "fields": {
-              "public-field": {
-                  "contents": "field1",
-                  "visibility": "public",
-                  "dateModified": ""
-              },
-              "private-field": {
-                  "contents": "multiline\nfield",
-                  "visibility": "private",
-                  "dateModified": ""
+          "entries": [
+              {
+                "path": "/entry",
+                "dateModified": "",
+                "masterField": null,
+                "fields": {
+                    "public-field": {
+                        "dateModified": "",
+                        "visibility": "public",
+                        "contents": "field1"
+                    },
+                    "private-field": {
+                        "dateModified": "",
+                        "visibility": "private",
+                        "contents": "multiline\nfield"
+                    }
+                },
+                "tags": [
+                    "first-tag",
+                    "second-tag"
+                ]
               }
-          },
-          "dateModified": ""
+          ],
+          "subdirs": {}
         }
       |]

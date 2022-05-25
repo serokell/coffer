@@ -112,7 +112,7 @@ createCmd
     Failure error -> throw $ CRCreateError error
     Success entry -> do
       void $ writeEntry backend entry
-      pure $ CRSuccess qEntryPath
+      pure $ CRSuccess qEntryPath { qpPath = entry }
 
 setFieldCmd
   :: forall r
@@ -173,7 +173,7 @@ deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb pat
                 & fields . at fieldName .~ Nothing
                 & dateModified .~ nowUtc
           void $ writeEntry backend newEntry
-          pure $ DFRSuccess fieldName qPath
+          pure $ DFRSuccess fieldName qPath { qpPath = newEntry }
 
 findCmd
   :: (Members '[BackendEffect, Error CofferError] r)
@@ -419,6 +419,7 @@ deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) rec
       unless dryRun do
         deleteEntry backend (entry ^. E.path)
       let qEntryPath = QualifiedPath backendNameMb (entry ^. E.path)
+
       pure $ DRSuccess dryRun [qEntryPath]
     Right dir
       | recursive -> do
@@ -441,7 +442,7 @@ tagCmd config (TagOptions qEntryPath@(QualifiedPath backendNameMb entryPath) tag
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateEntry nowUtc entry
       void $ writeEntry backend updatedEntry
-      pure $ TRSuccess qEntryPath tag delete
+      pure $ TRSuccess (qEntryPath { qpPath = updatedEntry }) tag delete
   where
     updateEntry :: UTCTime -> Entry -> Sem r Entry
     updateEntry nowUtc entry =
