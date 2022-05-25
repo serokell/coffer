@@ -484,7 +484,7 @@ expectedFilterFormat = Pretty.vsep
 
 parseFilterOp :: MParser FilterOp
 parseFilterOp =
-  asum @[]
+  P.choice @[]
     [ P.string ">=" $> OpGTE
     , P.string "<=" $> OpLTE
     , P.char '>' $> OpGT
