@@ -11,6 +11,7 @@ module Utils
   , exampleEntry
   ) where
 
+import Control.Exception (try)
 import Control.Lens
 import Control.Monad (void)
 import Data.Aeson (Object, Value)
@@ -45,9 +46,9 @@ baseUrl :: Url 'Http
 baseUrl = http "localhost" /: "api" /: "v1" /: "content"
 
 deleteRecords :: IO ()
-deleteRecords = runReq defaultHttpConfig do
-  void
-    $ req
+deleteRecords = void $ try @HttpException do
+  runReq defaultHttpConfig do
+    req
       DELETE
       (baseUrl /: "delete")
       NoReqBody
