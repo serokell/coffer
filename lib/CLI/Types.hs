@@ -75,20 +75,20 @@ data CreateError
   deriving anyclass (FromJSON, ToJSON)
 
 data CreateResult
-  = CRSuccess Entry
+  = CRSuccess (QualifiedPath EntryPath)
   | CRCreateError CreateError
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
 data SetFieldResult
-  = SFRSuccess (QualifiedPath Entry)
+  = SFRSuccess FieldName (QualifiedPath Entry)
   | SFREntryNotFound (QualifiedPath EntryPath)
-  | SFRMissingFieldContents (QualifiedPath EntryPath)
+  | SFRMissingFieldContents FieldName (QualifiedPath EntryPath)
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
 data DeleteFieldResult
-  = DFRSuccess Entry
+  = DFRSuccess FieldName (QualifiedPath EntryPath)
   | DFREntryNotFound (QualifiedPath EntryPath)
   | DFRFieldNotFound FieldName
   deriving stock (Show, Generic)
@@ -97,7 +97,7 @@ data DeleteFieldResult
 type RenameResult = CopyResult
 
 data CopyResult
-  = CPRSuccess [(QualifiedPath EntryPath, QualifiedPath EntryPath)]
+  = CPRSuccess Bool [(QualifiedPath EntryPath, QualifiedPath EntryPath)]
   | CPRPathNotFound (QualifiedPath Path)
   | CPRMissingEntryName
   | CPRSamePath (QualifiedPath Path)
@@ -106,14 +106,14 @@ data CopyResult
   deriving anyclass (FromJSON, ToJSON)
 
 data DeleteResult
-  = DRSuccess [QualifiedPath EntryPath]
+  = DRSuccess Bool [QualifiedPath EntryPath]
   | DRPathNotFound (QualifiedPath Path)
   | DRDirectoryFound (QualifiedPath Path)
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
 data TagResult
-  = TRSuccess Entry
+  = TRSuccess (QualifiedPath EntryPath) EntryTag Bool
   | TREntryNotFound (QualifiedPath EntryPath)
   | TRTagNotFound EntryTag
   | TRDuplicateTag EntryTag

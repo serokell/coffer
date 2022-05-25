@@ -10,15 +10,14 @@ import Backend.Interpreter
 import CLI.Parser
 import CLI.PrettyPrint
 import CLI.Types
-import Coffer.Directory qualified as Dir
-import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
+import Coffer.PrettyPrint
+  (PrettyPrintMode(CLI), buildCopyResult, buildCreateResult, buildDeleteFieldResult,
+  buildDeleteResult, buildRenameResult, buildSetFieldResult, buildTagResult, buildViewResult)
 import Config (Config(..), configCodec)
 import Control.Lens
-import Control.Monad (forM_, when)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Data.Text.IO qualified as TIO
-import Entry qualified as E
 import Error
 import Fmt
 import Options.Applicative (execParser)
@@ -71,128 +70,79 @@ main = do
     case someCommand of
       SomeCommand cmd@CmdView{} -> do
         runCommand config cmd >>= \case
-          VRDirectory dir -> pprint $ buildDirectory dir
-          VREntry entry -> pprint $ buildDirectory $ Dir.singleton entry
-          VRField _ field -> pprint $ build $ field ^. E.contents
-          VRPathNotFound path -> pathNotFound path
-          VRDirectoryNoFieldMatch path fieldName -> printError [int|s|
-              There are no entries at path '#{path}' with the field '#{fieldName}'.
-            |]
+          res@VRDirectory{} -> pprintLn $ buildViewResult CLI res
+          res@VREntry{} -> pprintLn $ buildViewResult CLI res
+          res@VRField{} -> pprintLn $ buildViewResult CLI res
+          res@VRPathNotFound{} -> printError $ buildViewResult CLI res
+          res@VRDirectoryNoFieldMatch{} -> printError $ buildViewResult CLI res
+          res@VREntryNoFieldMatch{} -> printError $ buildViewResult CLI res
 
-          VREntryNoFieldMatch path fieldName -> printError [int|s|
-              The entry at '#{path}' does not have a field '#{fieldName}'.
-            |]
-
-      SomeCommand cmd@(CmdCreate opts) -> do
+      SomeCommand cmd@CmdCreate{} -> do
         runCommand config cmd >>= \case
-          CRSuccess _ -> printSuccess [int|s|Entry created at '#{coQPath opts}'.|]
-          CRCreateError error -> do
-            let errorMsg = createErrorToBuilder error
-            printError [int|s|
-              The entry cannot be created:
+          res@CRSuccess{} -> printSuccess $ buildCreateResult CLI res
+          res@CRCreateError{} -> printError $ buildCreateResult CLI res
 
-              #{errorMsg}
-            |]
-
-      SomeCommand cmd@(CmdSetField opts) -> do
-        let fieldName = sfoFieldName opts
+      SomeCommand cmd@CmdSetField{} -> do
         runCommand config cmd >>= \case
-          SFREntryNotFound path -> entryNotFound path
-          SFRMissingFieldContents path -> printError [int|s|
-              The entry at '#{path}' does not yet have a field '#{fieldName}'.
-              In order to create a new field, please include the 'FIELDCONTENTS' argument.
-            |]
-          SFRSuccess qEntry -> do
-            let entry = qpPath qEntry
-            let qPath = view E.path <$> qEntry
-            let field = entry ^?! E.fields . ix fieldName
-            printSuccess [int|s|
-              Set field '#{fieldName}' (#{field ^. E.visibility}) \
-              at '#{qPath}' to:
-              #{field ^. E.contents}
-            |]
+          res@SFREntryNotFound{} -> printError $ buildSetFieldResult CLI res
+          res@SFRMissingFieldContents{} -> printError $ buildSetFieldResult CLI res
+          res@SFRSuccess{} -> printSuccess $ buildSetFieldResult CLI res
 
-      SomeCommand cmd@(CmdDeleteField opts) -> do
+      SomeCommand cmd@CmdDeleteField{} -> do
         runCommand config cmd >>= \case
-          DFREntryNotFound path -> entryNotFound path
-          DFRFieldNotFound fieldName -> printError [int|s|
-              Entry does not have a field with name '#{fieldName}'.
-            |]
-          DFRSuccess _ -> printSuccess [int|s|
-              Deleted field '#{dfoFieldName opts}' from '#{dfoQPath opts}'.
-            |]
+          res@DFREntryNotFound{} -> printError $ buildDeleteFieldResult CLI res
+          res@DFRFieldNotFound{} -> printError $ buildDeleteFieldResult CLI res
+          res@DFRSuccess{} -> printSuccess $ buildDeleteFieldResult CLI res
 
       SomeCommand cmd@CmdFind{} -> do
         runCommand config cmd >>= \case
-          Just dir -> pprint $ buildDirectory dir
+          Just dir -> pprintLn $ buildDirectory dir
           Nothing -> printError "No match found."
 
-      SomeCommand cmd@(CmdRename opts) -> do
+      SomeCommand cmd@CmdRename{} -> do
         runCommand config cmd >>= \case
-          CPRSuccess copiedPaths -> do
-            when (roDryRun opts) do
-              pprint "These actions would be done:"
-            forM_ copiedPaths \(from, to) ->
-              printSuccess [int|s|Renamed '#{from}' to '#{to}'.|]
-          CPRPathNotFound path -> pathNotFound path
-          CPRMissingEntryName -> printError
-            "The destination path is not a valid entry path. Please specify the new name of the entry."
-          CPRCreateErrors errors -> do
-            let errorMsgs = buildErrorMessages errors
+          res@CPRSuccess{} -> pprintLn $ mconcat $ buildRenameResult CLI res
+          res@CPRPathNotFound{} -> printError $ mconcat $ buildRenameResult CLI res
+          res@CPRMissingEntryName{} -> printError $ mconcat $ buildRenameResult CLI res
+          res@CPRCreateErrors{} -> do
+            let errorMsgs = buildRenameResult CLI res
             printError [int|s|
               The following entries cannot be renamed:
 
               #{unlinesF errorMsgs}
             |]
-          CPRSamePath path -> samePaths path
+          res@CPRSamePath{} -> printError $ mconcat $ buildRenameResult CLI res
 
-      SomeCommand cmd@(CmdCopy opts) -> do
+      SomeCommand cmd@CmdCopy{} -> do
         runCommand config cmd >>= \case
-          CPRSuccess copiedPaths -> do
-            when (cpoDryRun opts) do
-              pprint "These actions would be done:"
-            forM_ copiedPaths \(from, to) ->
-              printSuccess [int|s|Copied '#{from}' to '#{to}'.|]
-          CPRPathNotFound path -> pathNotFound path
-          CPRMissingEntryName -> printError
-            "The destination path is not a valid entry path. Please specify the new name of the entry."
-          CPRCreateErrors errors -> do
-            let errorMsgs = buildErrorMessages errors
+          res@CPRSuccess{} -> pprintLn $ mconcat $ buildCopyResult CLI res
+          res@CPRPathNotFound{} -> printError $ mconcat $ buildCopyResult CLI res
+          res@CPRMissingEntryName{} -> printError $ mconcat $ buildCopyResult CLI res
+          res@CPRCreateErrors{} -> do
+            let errorMsgs = buildCopyResult CLI res
             printError [int|s|
               The following entries cannot be copied:
 
               #{unlinesF errorMsgs}
             |]
-          CPRSamePath path -> samePaths path
+          res@CPRSamePath{} -> printError $ mconcat $ buildCopyResult CLI res
 
-      SomeCommand cmd@(CmdDelete opts) -> do
+      SomeCommand cmd@CmdDelete{} -> do
         runCommand config cmd >>= \case
-          DRPathNotFound path -> pathNotFound path
-          DRDirectoryFound path -> printError [int|s|
-              The path '#{path}' is a directory.
-              Use '--recursive' or '-r' to recursively delete all entries.
-          |]
-          DRSuccess paths -> do
-            when (doDryRun opts) do
-              pprint "These actions would be done:"
-            forM_ paths \path ->
-              printSuccess [int|s|Deleted '#{path}'.|]
+          res@DRPathNotFound{} -> printError $ buildDeleteResult CLI res
+          res@DRDirectoryFound{} -> printError $ buildDeleteResult CLI res
+          res@DRSuccess{} -> pprintLn $ buildDeleteResult CLI res
 
-      SomeCommand cmd@(CmdTag opts) -> do
+      SomeCommand cmd@CmdTag{} -> do
         runCommand config cmd >>= \case
-          TREntryNotFound path -> entryNotFound path
-          TRSuccess _ ->
-            if toDelete opts
-              then printSuccess [int|s|Removed tag '#{toTagName opts}' from '#{toQPath opts}'.|]
-              else printSuccess [int|s|Added tag '#{toTagName opts}' to '#{toQPath opts}'.|]
-          TRTagNotFound tag -> printError
-            [int|s|Entry does not have the tag '#{tag}'.|]
-          TRDuplicateTag tag -> printError
-            [int|s|Entry already has the tag '#{tag}'.|]
+          res@(TREntryNotFound _) -> printError $ buildTagResult CLI res
+          res@TRSuccess{} -> printSuccess $ buildTagResult CLI res
+          res@TRTagNotFound{} -> printError $ buildTagResult CLI res
+          res@TRDuplicateTag{} -> printError $ buildTagResult CLI res
     where
       -- | Pretty-print a message.
-      pprint :: Member (Embed IO) r => Builder -> Sem r ()
-      pprint = embed . putStrLn . fmt
+      pprintLn :: Member (Embed IO) r => Builder -> Sem r ()
+      pprintLn = embed . putStrLn . fmt
 
       -- | Print a message indicating a successful operation.
       printSuccess :: Member (Embed IO) r => Builder -> Sem r ()
@@ -201,38 +151,3 @@ main = do
       -- | Print a message and exit with `exitFailure`.
       printError :: Member (Embed IO) r => Builder -> Sem r ()
       printError msg = embed $ die $ "[ERROR] " <> fmt msg
-
-      entryNotFound :: Member (Embed IO) r => QualifiedPath EntryPath -> Sem r ()
-      entryNotFound path = printError [int|s|Entry not found at '#{path}'.|]
-
-      pathNotFound :: Member (Embed IO) r => QualifiedPath Path -> Sem r ()
-      pathNotFound path = printError [int|s|Entry or directory not found at '#{path}'.|]
-
-      samePaths :: Member (Embed IO) r => QualifiedPath Path -> Sem r ()
-      samePaths path =
-        printError [int|s|'#{path}' and '#{path}' are the same path.|]
-
-      createErrorToBuilder :: CreateError -> Builder
-      createErrorToBuilder = \case
-        CEEntryAlreadyExists entryPath -> [int|s|
-            An entry already exists at '#{entryPath}'.
-            Use '--force' or '-f' to overwrite existing entries.
-          |]
-        CEDestinationIsDirectory entryPath -> [int|s|'#{entryPath}' is a directory.|]
-        CEParentDirectoryIsEntry (_, clashed) ->
-          [int|s|Attempted to create the directory '#{clashed}' but an entry exists at that path.|]
-
-      getEntryFromCreateError :: CreateError -> QualifiedPath EntryPath
-      getEntryFromCreateError = \case
-        CEParentDirectoryIsEntry (entryPath, _) -> entryPath
-        CEDestinationIsDirectory entryPath -> entryPath
-        CEEntryAlreadyExists entryPath -> entryPath
-
-      buildErrorMessages :: [(QualifiedPath EntryPath, CreateError)] -> [Builder]
-      buildErrorMessages =
-        fmap \(from, err) ->
-          let
-            entryPath = getEntryFromCreateError err
-            header = [int|s|'#{from}' to '#{entryPath}':|]
-            errorMsg = createErrorToBuilder err
-          in unlinesF @_ @Builder $ header : [indentF 2 errorMsg]

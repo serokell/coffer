@@ -94,7 +94,7 @@ createCmd
   => Config -> CreateOptions -> Sem r CreateResult
 createCmd
   config
-  (CreateOptions (QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields)
+  (CreateOptions qEntryPath@(QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields)
     = do
   backend <- getBackend config backendNameMb
   nowUtc <- embed getCurrentTime
@@ -112,7 +112,7 @@ createCmd
     Failure error -> throw $ CRCreateError error
     Success entry -> do
       void $ writeEntry backend entry
-      pure $ CRSuccess entry
+      pure $ CRSuccess qEntryPath
 
 setFieldCmd
   :: forall r
@@ -130,7 +130,7 @@ setFieldCmd
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateOrInsert nowUtc entry
       void $ writeEntry backend updatedEntry
-      pure $ SFRSuccess (QualifiedPath backendNameMb updatedEntry)
+      pure $ SFRSuccess fieldName (QualifiedPath backendNameMb updatedEntry)
   where
     updateOrInsert :: UTCTime -> Entry -> Sem r Entry
     updateOrInsert nowUtc entry =
@@ -155,7 +155,7 @@ setFieldCmd
           -- what the field contents should be, return an error.
           Nothing -> do
             let qEntryPath = QualifiedPath backendNameMb entryPath
-            throw $ SFRMissingFieldContents qEntryPath
+            throw $ SFRMissingFieldContents fieldName qEntryPath
 
 deleteFieldCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError] r)
@@ -173,7 +173,7 @@ deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb pat
                 & fields . at fieldName .~ Nothing
                 & dateModified .~ nowUtc
           void $ writeEntry backend newEntry
-          pure $ DFRSuccess newEntry
+          pure $ DFRSuccess fieldName qPath
 
 findCmd
   :: (Members '[BackendEffect, Error CofferError] r)
@@ -299,7 +299,7 @@ renameCmd
     forM_ pathsToDelete \(CopyOperation old _) -> do
       deleteEntry oldBackend (qpPath old ^. path)
 
-  pure $ CPRSuccess $ getOperationPaths <$> operations
+  pure $ CPRSuccess dryRun $ getOperationPaths <$> operations
 
 data CopyOperation = CopyOperation
   { coQOld :: QualifiedPath Entry
@@ -407,7 +407,7 @@ copyCmd
   unless dryRun do
     runCopyOperations newBackend operations
 
-  pure $ CPRSuccess $ getOperationPaths <$> operations
+  pure $ CPRSuccess dryRun $ getOperationPaths <$> operations
 
 deleteCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult] r)
@@ -419,14 +419,14 @@ deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) rec
       unless dryRun do
         deleteEntry backend (entry ^. E.path)
       let qEntryPath = QualifiedPath backendNameMb (entry ^. E.path)
-      pure $ DRSuccess [qEntryPath]
+      pure $ DRSuccess dryRun [qEntryPath]
     Right dir
       | recursive -> do
           let entries = Dir.allEntries dir
           unless dryRun do
             forM_ entries \entry -> deleteEntry backend (entry ^. E.path)
           let qEntryPaths = entries ^.. each . E.path <&> QualifiedPath backendNameMb
-          pure $ DRSuccess qEntryPaths
+          pure $ DRSuccess dryRun qEntryPaths
       | otherwise -> pure $ DRDirectoryFound qPath
 
 tagCmd
@@ -441,7 +441,7 @@ tagCmd config (TagOptions qEntryPath@(QualifiedPath backendNameMb entryPath) tag
       nowUtc <- embed getCurrentTime
       updatedEntry <- updateEntry nowUtc entry
       void $ writeEntry backend updatedEntry
-      pure $ TRSuccess updatedEntry
+      pure $ TRSuccess qEntryPath tag delete
   where
     updateEntry :: UTCTime -> Entry -> Sem r Entry
     updateEntry nowUtc entry =
