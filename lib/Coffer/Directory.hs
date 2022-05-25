@@ -19,7 +19,8 @@ module Coffer.Directory
 
 import Coffer.Path (PathSegment, entryPathParentDir, pathSegments)
 import Control.Lens
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson.Casing
+import Data.Aeson.TH
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Maybe qualified as Maybe
@@ -36,7 +37,7 @@ data Directory = Directory
   , dSubdirs :: HashMap PathSegment Directory
   }
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+deriveToJSON (aesonPrefix camelCase) ''Directory
 
 makeLensesWith abbreviatedFields 'Directory
 

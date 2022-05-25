@@ -4,7 +4,6 @@
 
 module Utils
   ( scrubDates
-  , getValueContents
   , cofferTest
   , runVault
   , baseUrl
@@ -15,7 +14,6 @@ import Control.Exception (try)
 import Control.Lens
 import Control.Monad (void)
 import Data.Aeson (Object, Value)
-import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
 import Data.Generics
 import Data.Text (Text)
@@ -23,7 +21,6 @@ import GHC.IO.Handle (Handle)
 import Network.HTTP.Req
 import System.Process
   (CreateProcess(std_err, std_out), ProcessHandle, StdStream(NoStream), createProcess, proc)
-import Test.Tasty.HUnit (assertFailure)
 
 procWithoutOutput :: CreateProcess -> CreateProcess
 procWithoutOutput cp = cp
@@ -65,14 +62,7 @@ scrubDates :: Value -> Value
 scrubDates =
   everywhere $ mkT @_ @Object \val ->
     val
-      & ix "eDateModified" .~ ""
-      & ix "fDateModified" .~ ""
-
-getValueContents :: Value -> IO Value
-getValueContents value = do
-  case value ^? key "contents" of
-    Just res -> pure res
-    Nothing -> assertFailure $ "Expected field \"contents\", but don't get it: " <> show value
+      & ix "dateModified" .~ ""
 
 -- | This function setups @vault@ for test.
 cofferTest :: IO () -> IO ()

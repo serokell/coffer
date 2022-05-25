@@ -89,6 +89,7 @@ library:
   dependencies:
     - aeson
     - aeson-casing
+    - aeson-qq
     - ansi-terminal
     - bytestring
     - containers
@@ -172,7 +173,6 @@ tests:
       - coffer
       - extra
       - lens
-      - lens-aeson
       - process
       - req
       - syb
