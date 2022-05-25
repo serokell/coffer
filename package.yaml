@@ -173,7 +173,6 @@ tests:
       - coffer
       - extra
       - lens
-      - lens-aeson
       - process
       - req
       - syb

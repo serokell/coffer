@@ -5,10 +5,8 @@
 module Integration where
 
 import Control.Monad (void)
-import Data.Aeson (Value(Object), (.:))
+import Data.Aeson (Value)
 import Data.Aeson.QQ.Simple (aesonQQ)
-import Data.Aeson.Types (parseEither)
-import Data.Functor ((<&>))
 import Data.Text (Text)
 import Network.HTTP.Req
 import Test.Tasty.HUnit
@@ -30,12 +28,7 @@ unit_create_an_entry = cofferTest do
             ]
         )
 
-  case responseBody response of
-    Object obj -> do
-      case parseEither (\o -> o .: "tag") obj of
-        Left err -> assertFailure err
-        Right (res :: Text) -> res @?= "CRSuccess"
-    notObj -> assertFailure $ "Expected object, got: " <> show notObj
+  responseBody response @?= [aesonQQ| { "path": "/entry" } |]
 
 unit_view_an_entry :: IO ()
 unit_view_an_entry = cofferTest do
@@ -65,34 +58,29 @@ unit_view_an_entry = cofferTest do
             ]
         )
 
-  actual <- getValueContents (responseBody response) <&> scrubDates
-  actual @?= expected
+  scrubDates (responseBody response) @?= expected
   where
     expected =
       [aesonQQ|
         {
-          "ePath": {
-              "unEntryPath": [
-                  "entry"
-              ]
-          },
-          "eFields": {
-              "public-field": {
-                  "fVisibility": "public",
-                  "fDateModified": "",
-                  "fContents": "field1"
-              },
-              "private-field": {
-                  "fVisibility": "private",
-                  "fDateModified": "",
-                  "fContents": "multiline\nfield"
-              }
-          },
-          "eDateModified": "",
-          "eMasterField": null,
-          "eTags": [
+          "tags": [
               "first-tag",
               "second-tag"
-          ]
+          ],
+          "masterField": null,
+          "path": "/entry",
+          "fields": {
+              "public-field": {
+                  "contents": "field1",
+                  "visibility": "public",
+                  "dateModified": ""
+              },
+              "private-field": {
+                  "contents": "multiline\nfield",
+                  "visibility": "private",
+                  "dateModified": ""
+              }
+          },
+          "dateModified": ""
         }
       |]
