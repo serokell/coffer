@@ -25,8 +25,6 @@ import Fmt (pretty)
 import GHC.Generics (Generic)
 import Options.Applicative
 import Servant (FromHttpApiData(parseUrlPiece))
-import Text.Megaparsec
-  (MonadParsec(eof, try), choice, errorBundlePretty, match, noneOf, parse, takeRest)
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as P
@@ -237,27 +235,27 @@ instance FromHttpApiData Filter where
 
 instance FromHttpApiData (Sort, Direction) where
   parseUrlPiece = toServantParser do
-    choice
-      [ try do
-          means <- choice [SortByEntryName <$ "name", SortByEntryDate <$ "date"]
+    P.choice
+      [ P.try do
+          means <- P.choice [SortByEntryName <$ "name", SortByEntryDate <$ "date"]
           void ":"
-          direction <- choice [Asc <$ "asc", Desc <$ "desc"]
-          eof
+          direction <- P.choice [Asc <$ "asc", Desc <$ "desc"]
+          P.eof
           return (means, direction)
 
       , do
-          (field, _) <- match $ some $ noneOf [':']
+          (field, _) <- P.match $ some $ P.noneOf [':']
           case newFieldName field of
             Left _ -> fail "field name is incorrect"
             Right field -> do
               void ":"
-              means <- choice
+              means <- P.choice
                 [ SortByFieldContents field <$ "contents"
                 , SortByFieldDate  field <$ "date"
                 ]
               void ":"
-              direction <- choice [Asc <$ "asc", Desc <$ "desc"]
-              eof
+              direction <- P.choice [Asc <$ "asc", Desc <$ "desc"]
+              P.eof
               return (means, direction)
       ]
 
@@ -277,7 +275,7 @@ parseFilterOp =
 
 parseFilter :: MParser Filter
 parseFilter =
-  try parseFilterByName <|> try parseFilterByDate <|> parseFilterByField
+  P.try parseFilterByName <|> P.try parseFilterByDate <|> parseFilterByField
   where
     parseFilterByName = do
       void $ P.string "name" >> P.char '~'
@@ -323,6 +321,38 @@ parseFieldNameWhile whileCond = do
 parseFieldContentsEof :: MParser FieldContents
 parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
 
+parseSort :: MParser (Sort, Direction)
+parseSort = do
+  sort <- parseSortMeans
+  void $ P.char ':'
+  direction <- parseSortDirection
+  return (sort, direction)
+
+parseSortDirection :: MParser Direction
+parseSortDirection =
+      P.string "asc" $> Asc
+  <|> P.string "desc" $> Desc
+
+parseSortMeans :: MParser Sort
+parseSortMeans =
+  P.try parseSortMeansByFieldContentsOrDate
+  <|> parseSortMeansByNameOrDate
+
+parseSortMeansByFieldContentsOrDate :: MParser Sort
+parseSortMeansByFieldContentsOrDate = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  P.choice @[] $
+    [ (SortByFieldDate fieldName)     <$ (P.string "date")
+    , (SortByFieldContents fieldName) <$ (P.string "contents")
+    ]
+
+parseSortMeansByNameOrDate :: MParser Sort
+parseSortMeansByNameOrDate = P.choice @[] $
+  [ SortByEntryName <$ P.string "name"
+  , SortByEntryDate <$ (P.string "date")
+  ]
+
 
 ----------------------------------------------------------------------------
 -- Common
@@ -348,7 +378,7 @@ toReader :: Either String a -> ReadM a
 toReader = either readerError pure
 
 toServantParser :: MParser a -> Text -> Either Text a
-toServantParser p = first (T.pack . errorBundlePretty) . parse p "<url>"
+toServantParser p = first (T.pack . P.errorBundlePretty) . P.parse p "<url>"
 
 -- | Parses any of these formats:
 --
@@ -391,4 +421,4 @@ parseFilterDate = do
       pure $ Char.digitToInt a * 10 + Char.digitToInt b
 
 fieldName :: MParser Text
-fieldName = fst <$> match (some $ noneOf [':'])
+fieldName = fst <$> P.match (some $ P.noneOf [':'])

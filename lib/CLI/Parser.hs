@@ -12,11 +12,9 @@ module CLI.Parser
 import BackendName (BackendName, newBackendName)
 import CLI.Types
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
-import Coffer.Util (MParser)
-import Control.Monad (void)
 import Data.Bifunctor (first)
 import Data.Function ((&))
-import Data.Functor (($>), (<&>))
+import Data.Functor ((<&>))
 import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as M
@@ -28,9 +26,7 @@ import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Interpolation.Nyan
-import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
-import Text.Megaparsec.Char qualified as P
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -460,42 +456,6 @@ expectedFilterFormat = Pretty.vsep
   , "<op> can be '<=', '>=', '<', '>', or '='."
   , "<date> can be 'YYYY', 'YYYY-MM', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM:SS'."
   , "Examples: 'name~vault', 'date<2020-02', 'url:contents~google.com', 'pw:date<2020-02'."
-  ]
-
-----------------------------------------------------------------------------
--- Megaparsec
-----------------------------------------------------------------------------
-
-parseSort :: MParser (Sort, Direction)
-parseSort = do
-  sort <- parseSortMeans
-  void $ P.char ':'
-  direction <- parseSortDirection
-  return (sort, direction)
-
-parseSortDirection :: MParser Direction
-parseSortDirection =
-      P.string "asc" $> Asc
-  <|> P.string "desc" $> Desc
-
-parseSortMeans :: MParser Sort
-parseSortMeans =
-  try parseSortMeansByFieldContentsOrDate
-  <|> parseSortMeansByNameOrDate
-
-parseSortMeansByFieldContentsOrDate :: MParser Sort
-parseSortMeansByFieldContentsOrDate = do
-  fieldName <- parseFieldNameWhile (/= ':')
-  void $ P.char ':'
-  P.choice @[] $
-    [ (SortByFieldDate fieldName)     <$ (P.string "date")
-    , (SortByFieldContents fieldName) <$ (P.string "contents")
-    ]
-
-parseSortMeansByNameOrDate :: MParser Sort
-parseSortMeansByNameOrDate = P.choice @[] $
-  [ SortByEntryName <$ P.string "name"
-  , SortByEntryDate <$ (P.string "date")
   ]
 
 ----------------------------------------------------------------------------
