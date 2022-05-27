@@ -234,30 +234,7 @@ instance FromHttpApiData Filter where
   parseUrlPiece = toServantParser parseFilter
 
 instance FromHttpApiData (Sort, Direction) where
-  parseUrlPiece = toServantParser do
-    P.choice
-      [ P.try do
-          means <- P.choice [SortByEntryName <$ "name", SortByEntryDate <$ "date"]
-          void ":"
-          direction <- P.choice [Asc <$ "asc", Desc <$ "desc"]
-          P.eof
-          return (means, direction)
-
-      , do
-          (field, _) <- P.match $ some $ P.noneOf [':']
-          case newFieldName field of
-            Left _ -> fail "field name is incorrect"
-            Right field -> do
-              void ":"
-              means <- P.choice
-                [ SortByFieldContents field <$ "contents"
-                , SortByFieldDate  field <$ "date"
-                ]
-              void ":"
-              direction <- P.choice [Asc <$ "asc", Desc <$ "desc"]
-              P.eof
-              return (means, direction)
-      ]
+  parseUrlPiece = toServantParser parseSort
 
 ----------------------------------------------------------------------------
 -- Megaparsec
