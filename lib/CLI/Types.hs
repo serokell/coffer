@@ -252,7 +252,7 @@ instance FromHttpApiData (Sort, Direction) where
             Right field -> do
               void ":"
               means <- choice
-                [ SortByFieldContents field <$ "value"
+                [ SortByFieldContents field <$ "contents"
                 , SortByFieldDate  field <$ "date"
                 ]
               void ":"
