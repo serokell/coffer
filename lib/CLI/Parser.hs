@@ -13,10 +13,8 @@ import BackendName (BackendName, newBackendName)
 import CLI.Types
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
 import Coffer.Util (MParser)
-import Control.Monad (guard, void)
+import Control.Monad (void)
 import Data.Bifunctor (first)
-import Data.Char qualified as Char
-import Data.Foldable (asum)
 import Data.Function ((&))
 import Data.Functor (($>), (<&>))
 import Data.List qualified as List
@@ -26,8 +24,6 @@ import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Entry
-  (EntryTag, FieldContents(FieldContents), FieldName, FieldVisibility(..), newEntryTag,
-  newFieldName)
 import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
@@ -357,18 +353,6 @@ readFieldVisibility =
     , ("private", Private)
     ]
 
-readFieldName :: ReadM FieldName
-readFieldName = str >>= toReader . readFieldName'
-
-readFieldName' :: Text -> Either String FieldName
-readFieldName' input = do
-  case newFieldName input of
-    Right tag -> pure tag
-    Left err -> Left $ unlines
-      [ "Invalid field name: " <> show input <> "."
-      , pretty err
-      ]
-
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
 readQualifiedEntryPath = do
   eitherReader \input ->
@@ -482,64 +466,6 @@ expectedFilterFormat = Pretty.vsep
 -- Megaparsec
 ----------------------------------------------------------------------------
 
-parseFilterOp :: MParser FilterOp
-parseFilterOp =
-  P.choice @[]
-    [ P.string ">=" $> OpGTE
-    , P.string "<=" $> OpLTE
-    , P.char '>' $> OpGT
-    , P.char '<' $> OpLT
-    , P.char '=' $> OpEQ
-    ]
-
-parseFilter :: MParser Filter
-parseFilter =
-  try parseFilterByName <|> try parseFilterByDate <|> parseFilterByField
-  where
-    parseFilterByName = do
-      void $ P.string "name" >> P.char '~'
-      rest <- P.takeRest
-      guard (not $ T.null rest)
-      pure $ FilterByName rest
-    parseFilterByDate = do
-      void $ P.string "date"
-      op <- parseFilterOp
-      localTime <- parseFilterDate
-      pure $ FilterByDate op localTime
-
-parseFilterByField :: MParser Filter
-parseFilterByField = do
-  fieldName <- parseFieldNameWhile (/= ':')
-  void $ P.char ':'
-  filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
-  pure $ FilterByField fieldName filterField
-  where
-    parseFilterFieldByContents = do
-      void $ P.string "contents" >> P.char '~'
-      rest <- P.takeRest
-      guard (not $ T.null rest)
-      pure $ FilterFieldByContents rest
-    parseFilterFieldByDate = do
-      op <- P.string "date" >> parseFilterOp
-      localTime <- parseFilterDate
-      pure $ FilterFieldByDate op localTime
-
-parseFieldInfo :: MParser FieldInfo
-parseFieldInfo = do
-  fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
-  P.hspace >> P.char '=' >> P.hspace
-  fieldContents <- parseFieldContentsEof
-  pure $ FieldInfo fieldName fieldContents
-
-parseFieldNameWhile :: (Char -> Bool) -> MParser FieldName
-parseFieldNameWhile whileCond = do
-  fieldName <- P.takeWhile1P (Just "fieldname") whileCond
-  either fail pure $ readFieldName' fieldName
-
--- | Parse the rest of the input as a field content.
-parseFieldContentsEof :: MParser FieldContents
-parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
-
 parseSort :: MParser (Sort, Direction)
 parseSort = do
   sort <- parseSortMeans
@@ -575,9 +501,6 @@ parseSortMeansByNameOrDate = P.choice @[] $
 ----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
-
-toReader :: Either String a -> ReadM a
-toReader = either readerError pure
 
 readSum ::  String -> Map String a -> String -> Either String a
 readSum sumDescription constructors input =

@@ -7,7 +7,6 @@ module CLI.Types where
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Coffer.Util (MParser)
-import Control.Applicative (Alternative(some), optional)
 import Control.Monad (guard, void)
 import Data.Aeson hiding ((<?>))
 import Data.Bifunctor (first)
@@ -21,11 +20,14 @@ import Data.Time.Calendar.Month.Compat (Month, fromYearMonthValid)
 import Data.Time.Compat
   (Day, LocalTime(LocalTime), UTCTime, Year, fromGregorianValid, localTimeToUTC, makeTimeOfDayValid,
   utc)
-import Entry (Entry, EntryTag, Field, FieldContents, FieldName, FieldVisibility, newFieldName)
+import Entry (Entry, EntryTag, Field, FieldContents(..), FieldName, FieldVisibility, newFieldName)
+import Fmt (pretty)
 import GHC.Generics (Generic)
+import Options.Applicative
 import Servant (FromHttpApiData(parseUrlPiece))
 import Text.Megaparsec
   (MonadParsec(eof, try), choice, errorBundlePretty, match, noneOf, parse, takeRest)
+import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as P
 
@@ -304,9 +306,92 @@ instance FromHttpApiData (FieldName, FilterField) where
               return (field, FilterFieldByDate op date)
           ]
 
+
+----------------------------------------------------------------------------
+-- Megaparsec
+----------------------------------------------------------------------------
+
+parseFilterOp :: MParser FilterOp
+parseFilterOp =
+  P.choice @[]
+    [ P.string ">=" $> OpGTE
+    , P.string "<=" $> OpLTE
+    , P.char '>' $> OpGT
+    , P.char '<' $> OpLT
+    , P.char '=' $> OpEQ
+    ]
+
+parseFilter :: MParser Filter
+parseFilter =
+  try parseFilterByName <|> try parseFilterByDate <|> parseFilterByField
+  where
+    parseFilterByName = do
+      void $ P.string "name" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterByName rest
+    parseFilterByDate = do
+      void $ P.string "date"
+      op <- parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterByDate op localTime
+
+parseFilterByField :: MParser Filter
+parseFilterByField = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
+  pure $ FilterByField fieldName filterField
+  where
+    parseFilterFieldByContents = do
+      void $ P.string "contents" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterFieldByContents rest
+    parseFilterFieldByDate = do
+      op <- P.string "date" >> parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterFieldByDate op localTime
+
+parseFieldInfo :: MParser FieldInfo
+parseFieldInfo = do
+  fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
+  P.hspace >> P.char '=' >> P.hspace
+  fieldContents <- parseFieldContentsEof
+  pure $ FieldInfo fieldName fieldContents
+
+parseFieldNameWhile :: (Char -> Bool) -> MParser FieldName
+parseFieldNameWhile whileCond = do
+  fieldName <- P.takeWhile1P (Just "fieldname") whileCond
+  either fail pure $ readFieldName' fieldName
+
+-- | Parse the rest of the input as a field content.
+parseFieldContentsEof :: MParser FieldContents
+parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
+
+
+----------------------------------------------------------------------------
+-- Common
+----------------------------------------------------------------------------
+
+readFieldName :: ReadM FieldName
+readFieldName = str >>= toReader . readFieldName'
+
+readFieldName' :: Text -> Either String FieldName
+readFieldName' input = do
+  case newFieldName input of
+    Right tag -> pure tag
+    Left err -> Left $ unlines
+      [ "Invalid field name: " <> show input <> "."
+      , pretty err
+      ]
+
 ----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
+
+toReader :: Either String a -> ReadM a
+toReader = either readerError pure
 
 toServantParser :: MParser a -> Text -> Either Text a
 toServantParser p = first (T.pack . errorBundlePretty) . parse p "<url>"
