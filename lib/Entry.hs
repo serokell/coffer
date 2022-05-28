@@ -38,6 +38,7 @@ import Data.Aeson.TH
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
+import Data.OpenApi
 import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Text (Text)
@@ -52,6 +53,16 @@ import System.Console.ANSI.Codes (csi)
 newtype FieldName = UnsafeFieldName Text
   deriving stock (Show, Eq)
   deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable, ToHttpApiData, FromHttpApiData)
+
+instance ToSchema FieldName where
+  declareNamedSchema proxy = pure $ NamedSchema (Just "FieldName") (toParamSchema proxy)
+
+instance ToParamSchema FieldName where
+  toParamSchema _ =
+    mempty { _schemaPattern = Just fieldNamePattern }
+      & type_ ?~ OpenApiString
+    where
+      fieldNamePattern = "[" <> T.pack allowedCharSet <> "]*"
 
 allowedCharSet :: [Char]
 allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
@@ -74,6 +85,16 @@ newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
   deriving newtype (A.ToJSON, A.FromJSON, Buildable, Hashable, ToHttpApiData, FromHttpApiData)
 
+instance ToSchema EntryTag where
+  declareNamedSchema proxy = pure $ NamedSchema (Just "EntryTag") (toParamSchema proxy)
+
+instance ToParamSchema EntryTag where
+  toParamSchema _ =
+    mempty { _schemaPattern = Just entryTagPattern }
+      & type_ ?~ OpenApiString
+    where
+      entryTagPattern = "[" <> T.pack allowedCharSet <> "]*"
+
 newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
   deriving newtype Buildable
 
@@ -91,6 +112,11 @@ getEntryTag (UnsafeEntryTag t) = t
 data FieldVisibility = Public | Private
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
+
+instance ToSchema FieldVisibility where
+  declareNamedSchema _ = pure $ NamedSchema (Just "FieldVisibility") $ mempty
+    & type_ ?~ OpenApiString
+    & enum_ ?~ ["public", "private"]
 
 instance Buildable FieldVisibility where
   build = \case
@@ -110,7 +136,7 @@ instance A.FromJSON FieldVisibility where
 
 newtype FieldContents = FieldContents { unFieldContents :: Text }
   deriving stock (Show, Eq, Ord)
-  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
+  deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey, ToSchema)
 makeLensesFor [("unFieldContents", "fieldContents")] ''FieldContents
 
 -- | User can use ANSI control sequences in field contents.
@@ -135,6 +161,9 @@ data Field =
 deriveToJSON (aesonPrefix camelCase) ''Field
 makeLensesWith abbreviatedFields ''Field
 
+instance ToSchema Field where
+  declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
+
 newField :: UTCTime -> FieldContents -> Field
 newField time contents =
   Field
@@ -155,6 +184,9 @@ data Entry =
   deriving anyclass (Hashable)
 deriveToJSON (aesonPrefix camelCase) ''Entry
 makeLensesWith abbreviatedFields ''Entry
+
+instance ToSchema Entry where
+  declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
 
 newEntry :: EntryPath -> UTCTime -> Entry
 newEntry path time =

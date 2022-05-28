@@ -8,12 +8,13 @@ import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Coffer.Util (MParser)
 import Control.Applicative (Alternative(some), optional)
+import Control.Lens hiding (noneOf)
 import Control.Monad (guard, void)
-import Data.Aeson hiding ((<?>))
 import Data.Bifunctor (first)
 import Data.Char qualified as Char
 import Data.Fixed (Pico)
 import Data.Functor (($>))
+import Data.OpenApi
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -57,6 +58,8 @@ deriving stock instance Show SomeCommand
 -- Command results
 ----------------------------------------------------------------------------
 
+-- | All these @ToSchema@ instances for results are redundant due to https://github.com/serokell/coffer/issues/111
+
 data ViewResult
   = VRDirectory Directory
   | VREntry Entry
@@ -71,7 +74,6 @@ data CreateError
   | CEDestinationIsDirectory (QualifiedPath EntryPath)
   | CEEntryAlreadyExists (QualifiedPath EntryPath)
   deriving stock (Show, Generic)
-  deriving anyclass (ToJSON)
 
 data CreateResult
   = CRSuccess (QualifiedPath Entry)
@@ -303,6 +305,29 @@ instance FromHttpApiData (FieldName, FilterField) where
               date <- parseFilterDate
               return (field, FilterFieldByDate op date)
           ]
+
+instance ToParamSchema (Sort, Direction) where
+  toParamSchema _ =
+    mempty
+      & format ?~ sortDirectionFormat
+    where
+      sortDirectionFormat = T.unlines
+        [ "name:<direction>"
+        , "date:<direction>"
+        , "<direction>=[asc, desc]"
+        ]
+
+instance ToParamSchema Filter where
+  toParamSchema _ =
+    mempty
+      & format ?~ filterFormat
+    where
+      filterFormat = T.unlines
+        [ "name~<substring>"
+        , "date<op><date>"
+        , "<op>=[>=, <=, >, <, =]"
+        , "<date>=['YYYY', 'YYYY-MM', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS']"
+        ]
 
 ----------------------------------------------------------------------------
 -- Utils

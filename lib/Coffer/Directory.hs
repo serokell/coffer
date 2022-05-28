@@ -24,6 +24,7 @@ import Data.Aeson.TH
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Maybe qualified as Maybe
+import Data.OpenApi
 import Entry (Entry)
 import Entry qualified as E
 import GHC.Generics (Generic)
@@ -40,6 +41,9 @@ data Directory = Directory
 deriveToJSON (aesonPrefix camelCase) ''Directory
 
 makeLensesWith abbreviatedFields 'Directory
+
+instance ToSchema Directory where
+  declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
 
 emptyDir :: Directory
 emptyDir = Directory mempty mempty
