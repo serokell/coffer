@@ -232,27 +232,8 @@ data FilterField
 -- Instances
 ----------------------------------------------------------------------------
 
--- TODO: don't forget to parse @FilterByField@.
--- Probably would be resolved after fixing (https://github.com/serokell/coffer/issues/89)
 instance FromHttpApiData Filter where
-  parseUrlPiece = toServantParser do
-    choice
-      [ do
-          void "name~"
-          name <- takeRest
-          guard $ not $ T.null name
-          return $ FilterByName name
-      , do
-          void "date"
-          op <- choice
-            [ ">=" $> OpGTE
-            , "<=" $> OpLTE
-            , ">"  $> OpGT
-            , "<"  $> OpLT
-            , "="  $> OpEQ
-            ]
-          FilterByDate op <$> parseFilterDate
-      ]
+  parseUrlPiece = toServantParser parseFilter
 
 instance FromHttpApiData (Sort, Direction) where
   parseUrlPiece = toServantParser do
