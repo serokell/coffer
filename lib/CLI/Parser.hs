@@ -9,9 +9,8 @@ module CLI.Parser
   , parseFilterDate
   ) where
 
-import BackendName (BackendName, newBackendName)
 import CLI.Types
-import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
+import Coffer.Path (EntryPath, Path, QualifiedPath, mkEntryPath, mkPath, mkQualifiedPath)
 import Data.Bifunctor (first)
 import Data.Function ((&))
 import Data.Functor ((<&>))
@@ -310,9 +309,9 @@ tagOptions =
 -- Common
 ----------------------------------------------------------------------------
 
-readPath' :: Text -> Either String Path
+readPath' :: Text -> Either Text Path
 readPath' input =
-  mkPath input & first \err -> unlines
+  mkPath input & first \err -> T.pack $ unlines
     [ "Invalid path: " <> show input <> "."
     , T.unpack err
     ]
@@ -335,13 +334,6 @@ readEntryTag = do
       ,  pretty err
       ]
 
-readBackendName' :: Text -> Either String BackendName
-readBackendName' input =
-  newBackendName input & first \err -> unlines
-    [ "Invalid backend name: " <> show input <> "."
-    , T.unpack err
-    ]
-
 readFieldVisibility :: ReadM FieldVisibility
 readFieldVisibility =
   eitherReader $ readSum "visibility"
@@ -350,37 +342,20 @@ readFieldVisibility =
     ]
 
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
-readQualifiedEntryPath = do
-  eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, entryPathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath (Just backendName) entryPath
-      [entryPathStr] -> do
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath Nothing entryPath
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified entry path format: " <> show input <> "."
-                , show expectedQualifiedEntryPathFormat
-                ]
+readQualifiedEntryPath = eitherTextReader $ mkQualifiedPath
+  (\text -> [int|s|
+    Invalid qualified entry path format: #{show text}.
+    #{show expectedQualifiedEntryPathFormat}
+  |])
+  $ (first T.pack) . readEntryPath'
 
 readQualifiedPath :: ReadM (QualifiedPath Path)
-readQualifiedPath = do
-  eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, pathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        path <- readPath' pathStr
-        pure $ QualifiedPath (Just backendName) path
-      [pathStr] -> do
-        path <- readPath' pathStr
-        pure $ QualifiedPath Nothing path
-      _ -> Left [int|s|
-        Invalid qualified path format: #{show input}.
-        #{show expectedQualifiedPathFormat}
-      |]
+readQualifiedPath = eitherTextReader $ mkQualifiedPath
+  (\text -> [int|s|
+    Invalid qualified path format: #{show text}.
+    #{show expectedQualifiedPathFormat}
+  |])
+  readPath'
 
 readFieldContents :: ReadM FieldContents
 readFieldContents = str <&> FieldContents
@@ -461,6 +436,9 @@ expectedFilterFormat = Pretty.vsep
 ----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
+
+eitherTextReader :: (Text -> Either Text a) -> ReadM a
+eitherTextReader eitherR = eitherReader $ (first T.unpack ) . eitherR . T.pack
 
 readSum ::  String -> Map String a -> String -> Either String a
 readSum sumDescription constructors input =
