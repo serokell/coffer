@@ -261,33 +261,6 @@ instance FromHttpApiData (Sort, Direction) where
               return (means, direction)
       ]
 
-instance FromHttpApiData (FieldName, FilterField) where
-  parseUrlPiece = toServantParser do
-    field <- fieldName
-    void ":"
-    case newFieldName field of
-      Left _ -> fail "field name is incorrect"
-      Right field -> do
-        choice
-          [ do
-              void "value~"
-              value <- takeRest
-              guard $ not $ T.null value
-              return (field, FilterFieldByContents value)
-          , do
-              void "date"
-              op <- choice
-                [ ">=" $> OpGTE
-                , "<=" $> OpLTE
-                , ">"  $> OpGT
-                , "<"  $> OpLT
-                , "="  $> OpEQ
-                ]
-              date <- parseFilterDate
-              return (field, FilterFieldByDate op date)
-          ]
-
-
 ----------------------------------------------------------------------------
 -- Megaparsec
 ----------------------------------------------------------------------------
