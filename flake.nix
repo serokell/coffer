@@ -53,7 +53,7 @@
               # strip executable to reduce closure size
               dontStrip = !release;
               doHaddock = !release;
-              ghcOptions = lib.optionals (!release) ["-ddump-to-file" "-ddump-hi"];
+              ghcOptions = lib.optionals (!release) [ "-O0" "-ddump-to-file" "-ddump-hi" ];
               postInstall = if release then null else weeder-hacks.collect-dump-hi-files;
             };
           }];
@@ -125,7 +125,7 @@
                   subdirectory = ".";
               }];
             };
-          in pkgs.build.runCheck script;
+          in pkgs.build.runCheck "cp -a --no-preserve=mode,ownership ${src}/. . && ${script}";
 
           test = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.test}/bin/test";
           doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
