@@ -128,7 +128,7 @@
           in pkgs.build.runCheck "cp -a --no-preserve=mode,ownership ${src}/. . && ${script}";
 
           test = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.test}/bin/test";
-          doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
+          # doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
           lib = project.coffer.components.library;
           haddock = project.coffer.components.library.haddock;
         };
