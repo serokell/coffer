@@ -31,7 +31,6 @@ import Control.Lens
 import Control.Monad ((>=>))
 import Data.Aeson (ToJSON, Value(String))
 import Data.Aeson qualified as A
-import Data.Bifunctor (first)
 import Data.Hashable (Hashable)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty((:|)))
@@ -224,31 +223,23 @@ instance (Buildable path) => Buildable (QualifiedPath path) where
       Nothing -> build path
 
 instance (FromHttpApiData path) => FromHttpApiData (QualifiedPath path) where
-  parseUrlPiece = mkQualifiedPath
-    (\_ -> "Invalid qualified path format. Expected [BACKENDNAME#]PATH")
-    parseUrlPiece
+  parseUrlPiece = mkQualifiedPath parseUrlPiece
 
 mkQualifiedPath
-  :: (Text -> Text)
-  -> (Text -> Either Text path)
+  :: (Text -> Either Text path)
   -> (Text -> Either Text (QualifiedPath path))
-mkQualifiedPath errorMessage mkPath text = case T.splitOn "#" text of
+mkQualifiedPath mkPath text = case T.splitOn "#" text of
   [backendNameStr, pathStr] -> do
-    backendName <- readBackendName' backendNameStr
+    backendName <- newBackendName backendNameStr
     path <- mkPath pathStr
     pure $ QualifiedPath (Just backendName) path
   [pathStr] -> do
     path <- mkPath pathStr
     pure $ QualifiedPath Nothing path
-  _ -> Left $ errorMessage text
-
-readBackendName' :: Text -> Either Text BackendName
-readBackendName' input =
-  newBackendName input & first \err -> T.pack
-    [int|s|
-      Invalid backend name: #{show input}.
-      #{T.unpack err}
-    |]
+  _ -> Left [int|s|
+    Too many \# literals.
+    Expected format is: [<backend-name>\#]<path>.
+  |]
 
 instance (ToHttpApiData path, Buildable path) => ToHttpApiData (QualifiedPath path) where
   toUrlPiece = pretty

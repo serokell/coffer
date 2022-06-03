@@ -316,15 +316,12 @@ readPath' input =
     , T.unpack err
     ]
 
-readEntryPath' :: Text -> Either String EntryPath
+readEntryPath' :: Text -> Either Text EntryPath
 readEntryPath' input =
-  mkEntryPath input & first \err -> unlines
+  mkEntryPath input & first \err -> T.pack $ unlines
     [ "Invalid entry path: " <> show input <> "."
     , T.unpack err
     ]
-
-_readEntryPath :: ReadM EntryPath
-_readEntryPath = str >>= toReader . readEntryPath'
 
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
@@ -342,20 +339,26 @@ readFieldVisibility =
     ]
 
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
-readQualifiedEntryPath = eitherTextReader $ mkQualifiedPath
-  (\text -> [int|s|
-    Invalid qualified entry path format: #{show text}.
-    #{show expectedQualifiedEntryPathFormat}
-  |])
-  $ (first T.pack) . readEntryPath'
+readQualifiedEntryPath = eitherTextReader \input ->
+   mkQualifiedPath readEntryPath' input & first \err ->
+    [int|s|
+      Invalid qualified entry path format: #{show input}.
+      #{show expectedQualifiedEntryPathFormat}
+
+      Parser error:
+      #{err}
+    |]
 
 readQualifiedPath :: ReadM (QualifiedPath Path)
-readQualifiedPath = eitherTextReader $ mkQualifiedPath
-  (\text -> [int|s|
-    Invalid qualified path format: #{show text}.
-    #{show expectedQualifiedPathFormat}
-  |])
-  readPath'
+readQualifiedPath = eitherTextReader \input ->
+  mkQualifiedPath readPath' input & first \err ->
+    [int|s|
+      Invalid qualified path format: #{show input}.
+      #{show expectedQualifiedPathFormat}
+
+      Parser error:
+      #{err}
+    |]
 
 readFieldContents :: ReadM FieldContents
 readFieldContents = str <&> FieldContents
