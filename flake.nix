@@ -27,6 +27,7 @@
                     cabal-install
                     haskell-language-server
                     haskellPackages.implicit-hie
+                    stack
                   ];
                 buildInputs = with pkgs;
                   [ zlib
