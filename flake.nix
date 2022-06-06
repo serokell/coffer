@@ -133,7 +133,21 @@
           haddock = project.coffer.components.library.haddock;
         };
 
-        devShell = pkgs.mkShell {
+        impureChecks = {
+          validate-cabal = {
+            packages = with pkgs; [
+              (haskell.lib.overrideCabal haskellPackages.stack2cabal (drv: {
+                jailbreak = true;
+                broken = false;
+              }))
+              diffutils
+            ];
+            command = "./scripts/validate-cabal-files.sh";
+          };
+        };
+
+        devShell = self.devShells.${system}.default;
+        devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             ghc
             cabal-install
@@ -149,5 +163,6 @@
         };
       }) // {
         pipelineFile = serokell-nix.lib.pipeline.mkPipelineFile self;
+        validatesWithoutBuild = false;
       };
 }
