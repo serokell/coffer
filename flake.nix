@@ -176,5 +176,6 @@
       }) // {
         pipelineFile = serokell-nix.lib.pipeline.mkPipelineFile self;
         validatesWithoutBuild = false;
+        nixArgs = [ "--impure" ];
       };
 }
