@@ -6,6 +6,8 @@
   };
 
   inputs = {
+    serokell-nix.url = "github:serokell/serokell.nix/notgne2/impure-checks";
+
     flake-utils.url = "github:numtide/flake-utils";
 
     # Remove once registry-pinned haskell.nix is repinned

@@ -684,16 +684,18 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1651884062,
-        "narHash": "sha256-gr3BGy0yJL4Qx2NdbzEUAI3+Hi558AAVUAczaz6423w=",
+        "lastModified": 1654609383,
+        "narHash": "sha256-mwjRQJGXysyNejUdiuPdqOu2D8f+IVfP6WvV/iHn/lc=",
         "owner": "serokell",
         "repo": "serokell.nix",
-        "rev": "3d533eb5b37142d6a3a8dea5ea3c159ad6595eb7",
+        "rev": "772b156e5bd5cafe7ee54d953cc411014df66655",
         "type": "github"
       },
       "original": {
-        "id": "serokell-nix",
-        "type": "indirect"
+        "owner": "serokell",
+        "ref": "notgne2/impure-checks",
+        "repo": "serokell.nix",
+        "type": "github"
       }
     },
     "stackage": {
