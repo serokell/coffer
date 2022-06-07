@@ -670,7 +670,8 @@
         "haskell-nix": "haskell-nix",
         "haskell-nix-weeder": "haskell-nix-weeder",
         "nixpkgs": "nixpkgs_3",
-        "serokell-nix": "serokell-nix"
+        "serokell-nix": "serokell-nix",
+        "xrefcheck": "xrefcheck"
       }
     },
     "serokell-nix": {
@@ -738,6 +739,22 @@
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "xrefcheck": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1636470756,
+        "narHash": "sha256-GVONa7vl96ML1bdDGlEM7VeHwkc6xY8Ni24+q80cE7o=",
+        "owner": "serokell",
+        "repo": "xrefcheck",
+        "rev": "f69d74e13dc0b4123dfde520f274d13adf0ed423",
+        "type": "github"
+      },
+      "original": {
+        "owner": "serokell",
+        "repo": "xrefcheck",
         "type": "github"
       }
     }

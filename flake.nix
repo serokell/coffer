@@ -13,13 +13,16 @@
 
     haskell-nix-weeder.flake = false;
 
+    xrefcheck.url = "github:serokell/xrefcheck";
+    xrefcheck.flake = false;
+
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, haskell-nix, flake-utils, common-infra, serokell-nix, haskell-nix-weeder, ... }@inputs:
+  outputs = { self, nixpkgs, haskell-nix, flake-utils, common-infra, serokell-nix, haskell-nix-weeder, xrefcheck, ... }@inputs:
     flake-utils.lib.eachDefaultSystem (system:
       let
         inherit (nixpkgs) lib;
@@ -134,16 +137,23 @@
         };
 
         impureChecks = {
-          validate-cabal = {
-            packages = with pkgs; [
+          validate-cabal = let
+            runtimeInputs = with pkgs; [
               (haskell.lib.overrideCabal haskellPackages.stack2cabal (drv: {
                 jailbreak = true;
                 broken = false;
               }))
               diffutils
             ];
-            command = "./scripts/validate-cabal-files.sh";
-          };
+          in pkgs.writeShellScript "validate-cabal" ''
+            export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+            ./scripts/validate-cabal-files.sh
+          '';
+
+          xrefcheck = pkgs.writeShellScript "xrefcheck-check" ''
+            export PATH="${import xrefcheck {}}:$PATH"
+            xrefcheck --no-progress -m full --ignored tests/golden/helpers
+          '';
         };
 
         devShell = self.devShells.${system}.default;
