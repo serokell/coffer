@@ -153,7 +153,7 @@
           '';
 
           xrefcheck = pkgs.writeShellScript "xrefcheck-check" ''
-            export PATH="${import xrefcheck {}}:$PATH"
+            export PATH="${import xrefcheck {}}/bin:$PATH"
             xrefcheck --no-progress -m full --ignored tests/golden/helpers
           '';
         };
