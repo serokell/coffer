@@ -68,6 +68,7 @@
         defaultPackage = self.packages."${system}".coffer;
         packages = ({
           coffer = (mkProject { release = true; }).coffer.components.exes.coffer;
+          coffer-server = (mkProject { release = true; }).coffer.components.exes.coffer-server;
           nix = pkgs.nixUnstable;
         } // (if system == "x86_64-linux" then {
           coffer-static = (mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; }).coffer.components.exes.coffer // { meta.artifacts = [ "/bin/coffer" ]; };
@@ -84,7 +85,6 @@
         in {
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
-
 
           golden-tests = pkgs.runCommand "golden-tests" {
             buildInputs = with pkgs; [ vault bats ];
@@ -136,6 +136,8 @@
           # doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
           lib = project.coffer.components.library;
           haddock = project.coffer.components.library.haddock;
+
+          server-integration = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.server-integration}/bin/server-integration";
         };
 
         impureChecks = {
