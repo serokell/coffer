@@ -63,15 +63,19 @@
             };
           }];
         };
+
+        checkProject = mkProject { release = false; };
+        releaseProject = mkProject { release = true; };
+        staticProject = mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; };
       in
       {
         defaultPackage = self.packages."${system}".coffer;
         packages = ({
-          coffer = (mkProject { release = true; }).coffer.components.exes.coffer;
-          coffer-server = (mkProject { release = true; }).coffer.components.exes.coffer-server;
+          coffer = releaseProject.coffer.components.exes.coffer;
+          coffer-server = releaseProject.coffer.components.exes.coffer-server;
           nix = pkgs.nixUnstable;
         } // (if system == "x86_64-linux" then {
-          coffer-static = (mkProject { release = true; pkgs = pkgs.pkgsCross.musl64; }).coffer.components.exes.coffer // { meta.artifacts = [ "/bin/coffer" ]; };
+          coffer-static = staticProject.coffer.components.exes.coffer // { meta.artifacts = [ "/bin/coffer" ]; };
         } else {}));
 
         defaultApp = self.apps."${system}".coffer;
@@ -80,9 +84,7 @@
           program = "${self.defaultPackage."${system}"}/bin/coffer";
         };
 
-        checks = let
-          project = mkProject { release = false; };
-        in {
+        checks = {
           reuse = pkgs.build.reuseLint src;
           trailingWhitespace = pkgs.build.checkTrailingWhitespace src;
 
@@ -124,7 +126,7 @@
           weeder = let
             script = weeder-hacks.weeder-script {
               weeder = weeder-legacy;
-              hs-pkgs = project;
+              hs-pkgs = checkProject;
               local-packages = [{
                   name = "coffer";
                   subdirectory = ".";
@@ -132,18 +134,10 @@
             };
           in pkgs.build.runCheck "cp -a --no-preserve=mode,ownership ${src}/. . && ${script}";
 
-          test = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.test}/bin/test";
-          # doctests = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.doctests}/bin/doctests";
-          lib = project.coffer.components.library;
-          haddock = project.coffer.components.library.haddock;
-
-          server-integration = pkgs.runCommand "server-integration" {
-            buildInputs = with pkgs; [ vault ];
-          } ''
-            cd ${./.}
-            ${project.coffer.components.tests.server-integration}/bin/server-integration
-            touch $out
-          '';
+          test = pkgs.build.runCheck "cd ${src} && ${checkProject.coffer.components.tests.test}/bin/test";
+          # doctests = pkgs.build.runCheck "cd ${src} && ${checkProject.coffer.components.tests.doctests}/bin/doctests";
+          lib = checkProject.coffer.components.library;
+          haddock = checkProject.coffer.components.library.haddock;
         };
 
         impureChecks = {
@@ -163,6 +157,11 @@
           xrefcheck = pkgs.writeShellScript "xrefcheck-check" ''
             export PATH="${import xrefcheck {}}/bin:$PATH"
             xrefcheck --no-progress -m full --ignored tests/golden/helpers
+          '';
+
+          server-integration = pkgs.writeShellScript "server-integration" ''
+            export PATH="${pkgs.vault}/bin:$PATH"
+            ${checkProject.coffer.components.tests.server-integration}/bin/server-integration
           '';
         };
 
