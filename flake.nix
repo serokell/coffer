@@ -137,7 +137,13 @@
           lib = project.coffer.components.library;
           haddock = project.coffer.components.library.haddock;
 
-          server-integration = pkgs.build.runCheck "cd ${src} && ${project.coffer.components.tests.server-integration}/bin/server-integration";
+          server-integration = pkgs.runCommand "server-integration" {
+            buildInputs = with pkgs; [ vault ];
+          } ''
+            cd ${./.}
+            ${project.coffer.components.tests.server-integration}/bin/server-integration
+            touch $out
+          '';
         };
 
         impureChecks = {
