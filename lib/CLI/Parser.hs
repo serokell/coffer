@@ -9,16 +9,11 @@ module CLI.Parser
   , parseFilterDate
   ) where
 
-import BackendName (BackendName, newBackendName)
 import CLI.Types
-import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath), mkEntryPath, mkPath)
-import Coffer.Util (MParser)
-import Control.Monad (guard, void)
+import Coffer.Path (EntryPath, Path, QualifiedPath, mkEntryPath, mkPath, mkQualifiedPath)
 import Data.Bifunctor (first)
-import Data.Char qualified as Char
-import Data.Foldable (asum)
 import Data.Function ((&))
-import Data.Functor (($>), (<&>))
+import Data.Functor ((<&>))
 import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as M
@@ -26,15 +21,11 @@ import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Entry
-  (EntryTag, FieldContents(FieldContents), FieldName, FieldVisibility(..), newEntryTag,
-  newFieldName)
 import Fmt (pretty)
 import Options.Applicative
 import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Interpolation.Nyan
-import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
-import Text.Megaparsec.Char qualified as P
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -318,22 +309,19 @@ tagOptions =
 -- Common
 ----------------------------------------------------------------------------
 
-readPath' :: Text -> Either String Path
+readPath' :: Text -> Either Text Path
 readPath' input =
-  mkPath input & first \err -> unlines
+  mkPath input & first \err -> T.pack $ unlines
     [ "Invalid path: " <> show input <> "."
     , T.unpack err
     ]
 
-readEntryPath' :: Text -> Either String EntryPath
+readEntryPath' :: Text -> Either Text EntryPath
 readEntryPath' input =
-  mkEntryPath input & first \err -> unlines
+  mkEntryPath input & first \err -> T.pack $ unlines
     [ "Invalid entry path: " <> show input <> "."
     , T.unpack err
     ]
-
-_readEntryPath :: ReadM EntryPath
-_readEntryPath = str >>= toReader . readEntryPath'
 
 readEntryTag :: ReadM EntryTag
 readEntryTag = do
@@ -343,13 +331,6 @@ readEntryTag = do
       ,  pretty err
       ]
 
-readBackendName' :: Text -> Either String BackendName
-readBackendName' input =
-  newBackendName input & first \err -> unlines
-    [ "Invalid backend name: " <> show input <> "."
-    , T.unpack err
-    ]
-
 readFieldVisibility :: ReadM FieldVisibility
 readFieldVisibility =
   eitherReader $ readSum "visibility"
@@ -357,50 +338,27 @@ readFieldVisibility =
     , ("private", Private)
     ]
 
-readFieldName :: ReadM FieldName
-readFieldName = str >>= toReader . readFieldName'
-
-readFieldName' :: Text -> Either String FieldName
-readFieldName' input = do
-  case newFieldName input of
-    Right tag -> pure tag
-    Left err -> Left $ unlines
-      [ "Invalid field name: " <> show input <> "."
-      , pretty err
-      ]
-
 readQualifiedEntryPath :: ReadM (QualifiedPath EntryPath)
-readQualifiedEntryPath = do
-  eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, entryPathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath (Just backendName) entryPath
-      [entryPathStr] -> do
-        entryPath <- readEntryPath' entryPathStr
-        pure $ QualifiedPath Nothing entryPath
-      _ ->
-        Left $ unlines
-                [ "Invalid qualified entry path format: " <> show input <> "."
-                , show expectedQualifiedEntryPathFormat
-                ]
+readQualifiedEntryPath = eitherTextReader \input ->
+   mkQualifiedPath readEntryPath' input & first \err ->
+    [int|s|
+      Invalid qualified entry path format: #{show input}.
+      #{show expectedQualifiedEntryPathFormat}
+
+      Parser error:
+      #{err}
+    |]
 
 readQualifiedPath :: ReadM (QualifiedPath Path)
-readQualifiedPath = do
-  eitherReader \input ->
-    case T.splitOn "#" (T.pack input) of
-      [backendNameStr, pathStr] -> do
-        backendName <- readBackendName' backendNameStr
-        path <- readPath' pathStr
-        pure $ QualifiedPath (Just backendName) path
-      [pathStr] -> do
-        path <- readPath' pathStr
-        pure $ QualifiedPath Nothing path
-      _ -> Left [int|s|
-        Invalid qualified path format: #{show input}.
-        #{show expectedQualifiedPathFormat}
-      |]
+readQualifiedPath = eitherTextReader \input ->
+  mkQualifiedPath readPath' input & first \err ->
+    [int|s|
+      Invalid qualified path format: #{show input}.
+      #{show expectedQualifiedPathFormat}
+
+      Parser error:
+      #{err}
+    |]
 
 readFieldContents :: ReadM FieldContents
 readFieldContents = str <&> FieldContents
@@ -479,105 +437,11 @@ expectedFilterFormat = Pretty.vsep
   ]
 
 ----------------------------------------------------------------------------
--- Megaparsec
-----------------------------------------------------------------------------
-
-parseFilterOp :: MParser FilterOp
-parseFilterOp =
-  asum @[]
-    [ P.string ">=" $> OpGTE
-    , P.string "<=" $> OpLTE
-    , P.char '>' $> OpGT
-    , P.char '<' $> OpLT
-    , P.char '=' $> OpEQ
-    ]
-
-parseFilter :: MParser Filter
-parseFilter =
-  try parseFilterByName <|> try parseFilterByDate <|> parseFilterByField
-  where
-    parseFilterByName = do
-      void $ P.string "name" >> P.char '~'
-      rest <- P.takeRest
-      guard (not $ T.null rest)
-      pure $ FilterByName rest
-    parseFilterByDate = do
-      void $ P.string "date"
-      op <- parseFilterOp
-      localTime <- parseFilterDate
-      pure $ FilterByDate op localTime
-
-parseFilterByField :: MParser Filter
-parseFilterByField = do
-  fieldName <- parseFieldNameWhile (/= ':')
-  void $ P.char ':'
-  filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
-  pure $ FilterByField fieldName filterField
-  where
-    parseFilterFieldByContents = do
-      void $ P.string "contents" >> P.char '~'
-      rest <- P.takeRest
-      guard (not $ T.null rest)
-      pure $ FilterFieldByContents rest
-    parseFilterFieldByDate = do
-      op <- P.string "date" >> parseFilterOp
-      localTime <- parseFilterDate
-      pure $ FilterFieldByDate op localTime
-
-parseFieldInfo :: MParser FieldInfo
-parseFieldInfo = do
-  fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
-  P.hspace >> P.char '=' >> P.hspace
-  fieldContents <- parseFieldContentsEof
-  pure $ FieldInfo fieldName fieldContents
-
-parseFieldNameWhile :: (Char -> Bool) -> MParser FieldName
-parseFieldNameWhile whileCond = do
-  fieldName <- P.takeWhile1P (Just "fieldname") whileCond
-  either fail pure $ readFieldName' fieldName
-
--- | Parse the rest of the input as a field content.
-parseFieldContentsEof :: MParser FieldContents
-parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
-
-parseSort :: MParser (Sort, Direction)
-parseSort = do
-  sort <- parseSortMeans
-  void $ P.char ':'
-  direction <- parseSortDirection
-  return (sort, direction)
-
-parseSortDirection :: MParser Direction
-parseSortDirection =
-      P.string "asc" $> Asc
-  <|> P.string "desc" $> Desc
-
-parseSortMeans :: MParser Sort
-parseSortMeans =
-  try parseSortMeansByFieldContentsOrDate
-  <|> parseSortMeansByNameOrDate
-
-parseSortMeansByFieldContentsOrDate :: MParser Sort
-parseSortMeansByFieldContentsOrDate = do
-  fieldName <- parseFieldNameWhile (/= ':')
-  void $ P.char ':'
-  P.choice @[] $
-    [ (SortByFieldDate fieldName)     <$ (P.string "date")
-    , (SortByFieldContents fieldName) <$ (P.string "contents")
-    ]
-
-parseSortMeansByNameOrDate :: MParser Sort
-parseSortMeansByNameOrDate = P.choice @[] $
-  [ SortByEntryName <$ P.string "name"
-  , SortByEntryDate <$ (P.string "date")
-  ]
-
-----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
 
-toReader :: Either String a -> ReadM a
-toReader = either readerError pure
+eitherTextReader :: (Text -> Either Text a) -> ReadM a
+eitherTextReader eitherR = eitherReader $ (first T.unpack ) . eitherR . T.pack
 
 readSum ::  String -> Map String a -> String -> Either String a
 readSum sumDescription constructors input =

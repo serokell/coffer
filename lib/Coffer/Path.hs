@@ -15,6 +15,7 @@ module Coffer.Path
   , mkPath
   , EntryPath(..)
   , mkEntryPath
+  , mkQualifiedPath
   , entryPathName
   , entryPathParentDir
   , entryPathParentDirs
@@ -40,6 +41,7 @@ import Data.Text qualified as T
 import Fmt (Buildable, build, fmt, pretty)
 import GHC.Generics (Generic)
 import Servant (FromHttpApiData(..), ToHttpApiData(..))
+import Text.Interpolation.Nyan
 
 -- $setup
 -- >>> import Fmt (pretty, build)
@@ -221,16 +223,23 @@ instance (Buildable path) => Buildable (QualifiedPath path) where
       Nothing -> build path
 
 instance (FromHttpApiData path) => FromHttpApiData (QualifiedPath path) where
-  parseUrlPiece text
-    | [pathPiece] <- T.splitOn "#" text = do
-        path <- parseUrlPiece @path pathPiece
-        pure $ QualifiedPath Nothing path
-    | [backendPiece, pathPiece] <- T.splitOn "#" text = do
-        backendName <- newBackendName backendPiece
-        path <- parseUrlPiece @path pathPiece
-        pure $ QualifiedPath (Just backendName) path
-    | otherwise =
-        Left "Invalid qualified path format. Expected [BACKENDNAME#]PATH"
+  parseUrlPiece = mkQualifiedPath parseUrlPiece
+
+mkQualifiedPath
+  :: (Text -> Either Text path)
+  -> (Text -> Either Text (QualifiedPath path))
+mkQualifiedPath mkPath text = case T.splitOn "#" text of
+  [backendNameStr, pathStr] -> do
+    backendName <- newBackendName backendNameStr
+    path <- mkPath pathStr
+    pure $ QualifiedPath (Just backendName) path
+  [pathStr] -> do
+    path <- mkPath pathStr
+    pure $ QualifiedPath Nothing path
+  _ -> Left [int|s|
+    Too many \# literals.
+    Expected format is: [<backend-name>\#]<path>.
+  |]
 
 instance (ToHttpApiData path, Buildable path) => ToHttpApiData (QualifiedPath path) where
   toUrlPiece = pretty

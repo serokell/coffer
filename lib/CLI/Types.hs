@@ -7,7 +7,6 @@ module CLI.Types where
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
 import Coffer.Util (MParser)
-import Control.Applicative (Alternative(some), optional)
 import Control.Monad (guard, void)
 import Data.Aeson hiding ((<?>))
 import Data.Bifunctor (first)
@@ -21,11 +20,12 @@ import Data.Time.Calendar.Month.Compat (Month, fromYearMonthValid)
 import Data.Time.Compat
   (Day, LocalTime(LocalTime), UTCTime, Year, fromGregorianValid, localTimeToUTC, makeTimeOfDayValid,
   utc)
-import Entry (Entry, EntryTag, Field, FieldContents, FieldName, FieldVisibility, newFieldName)
+import Entry (Entry, EntryTag, Field, FieldContents(..), FieldName, FieldVisibility, newFieldName)
+import Fmt (pretty)
 import GHC.Generics (Generic)
+import Options.Applicative
 import Servant (FromHttpApiData(parseUrlPiece))
-import Text.Megaparsec
-  (MonadParsec(eof, try), choice, errorBundlePretty, match, noneOf, parse, takeRest)
+import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as P
 
@@ -230,86 +230,132 @@ data FilterField
 -- Instances
 ----------------------------------------------------------------------------
 
--- TODO: don't forget to parse @FilterByField@.
--- Probably would be resolved after fixing (https://github.com/serokell/coffer/issues/89)
 instance FromHttpApiData Filter where
-  parseUrlPiece = toServantParser do
-    choice
-      [ do
-          void "name~"
-          name <- takeRest
-          guard $ not $ T.null name
-          return $ FilterByName name
-      , do
-          void "date"
-          op <- choice
-            [ ">=" $> OpGTE
-            , "<=" $> OpLTE
-            , ">"  $> OpGT
-            , "<"  $> OpLT
-            , "="  $> OpEQ
-            ]
-          FilterByDate op <$> parseFilterDate
-      ]
+  parseUrlPiece = toServantParser parseFilter
 
 instance FromHttpApiData (Sort, Direction) where
-  parseUrlPiece = toServantParser do
-    choice
-      [ try do
-          means <- choice [SortByEntryName <$ "name", SortByEntryDate <$ "date"]
-          void ":"
-          direction <- choice [Asc <$ "asc", Desc <$ "desc"]
-          eof
-          return (means, direction)
+  parseUrlPiece = toServantParser parseSort
 
-      , do
-          (field, _) <- match $ some $ noneOf [':']
-          case newFieldName field of
-            Left _ -> fail "field name is incorrect"
-            Right field -> do
-              void ":"
-              means <- choice
-                [ SortByFieldContents field <$ "value"
-                , SortByFieldDate  field <$ "date"
-                ]
-              void ":"
-              direction <- choice [Asc <$ "asc", Desc <$ "desc"]
-              eof
-              return (means, direction)
+----------------------------------------------------------------------------
+-- Megaparsec
+----------------------------------------------------------------------------
+
+parseFilterOp :: MParser FilterOp
+parseFilterOp =
+  P.choice @[]
+    [ P.string ">=" $> OpGTE
+    , P.string "<=" $> OpLTE
+    , P.char '>' $> OpGT
+    , P.char '<' $> OpLT
+    , P.char '=' $> OpEQ
+    ]
+
+parseFilter :: MParser Filter
+parseFilter =
+  P.try parseFilterByName <|> P.try parseFilterByDate <|> parseFilterByField
+  where
+    parseFilterByName = do
+      void $ P.string "name" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterByName rest
+    parseFilterByDate = do
+      void $ P.string "date"
+      op <- parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterByDate op localTime
+
+parseFilterByField :: MParser Filter
+parseFilterByField = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  filterField <- parseFilterFieldByContents <|> parseFilterFieldByDate
+  pure $ FilterByField fieldName filterField
+  where
+    parseFilterFieldByContents = do
+      void $ P.string "contents" >> P.char '~'
+      rest <- P.takeRest
+      guard (not $ T.null rest)
+      pure $ FilterFieldByContents rest
+    parseFilterFieldByDate = do
+      op <- P.string "date" >> parseFilterOp
+      localTime <- parseFilterDate
+      pure $ FilterFieldByDate op localTime
+
+parseFieldInfo :: MParser FieldInfo
+parseFieldInfo = do
+  fieldName <- parseFieldNameWhile \c -> c /= '=' && not (Char.isSpace c)
+  P.hspace >> P.char '=' >> P.hspace
+  fieldContents <- parseFieldContentsEof
+  pure $ FieldInfo fieldName fieldContents
+
+parseFieldNameWhile :: (Char -> Bool) -> MParser FieldName
+parseFieldNameWhile whileCond = do
+  fieldName <- P.takeWhile1P (Just "fieldname") whileCond
+  either fail pure $ readFieldName' fieldName
+
+-- | Parse the rest of the input as a field content.
+parseFieldContentsEof :: MParser FieldContents
+parseFieldContentsEof = FieldContents . T.pack <$> P.manyTill P.anySingle P.eof
+
+parseSort :: MParser (Sort, Direction)
+parseSort = do
+  sort <- parseSortMeans
+  void $ P.char ':'
+  direction <- parseSortDirection
+  return (sort, direction)
+
+parseSortDirection :: MParser Direction
+parseSortDirection =
+      P.string "asc" $> Asc
+  <|> P.string "desc" $> Desc
+
+parseSortMeans :: MParser Sort
+parseSortMeans =
+  P.try parseSortMeansByFieldContentsOrDate
+  <|> parseSortMeansByNameOrDate
+
+parseSortMeansByFieldContentsOrDate :: MParser Sort
+parseSortMeansByFieldContentsOrDate = do
+  fieldName <- parseFieldNameWhile (/= ':')
+  void $ P.char ':'
+  P.choice @[] $
+    [ (SortByFieldDate fieldName)     <$ (P.string "date")
+    , (SortByFieldContents fieldName) <$ (P.string "contents")
+    ]
+
+parseSortMeansByNameOrDate :: MParser Sort
+parseSortMeansByNameOrDate = P.choice @[] $
+  [ SortByEntryName <$ P.string "name"
+  , SortByEntryDate <$ (P.string "date")
+  ]
+
+
+----------------------------------------------------------------------------
+-- Common
+----------------------------------------------------------------------------
+
+readFieldName :: ReadM FieldName
+readFieldName = str >>= toReader . readFieldName'
+
+readFieldName' :: Text -> Either String FieldName
+readFieldName' input = do
+  case newFieldName input of
+    Right tag -> pure tag
+    Left err -> Left $ unlines
+      [ "Invalid field name: " <> show input <> "."
+      , pretty err
       ]
-
-instance FromHttpApiData (FieldName, FilterField) where
-  parseUrlPiece = toServantParser do
-    field <- fieldName
-    void ":"
-    case newFieldName field of
-      Left _ -> fail "field name is incorrect"
-      Right field -> do
-        choice
-          [ do
-              void "value~"
-              value <- takeRest
-              guard $ not $ T.null value
-              return (field, FilterFieldByContents value)
-          , do
-              void "date"
-              op <- choice
-                [ ">=" $> OpGTE
-                , "<=" $> OpLTE
-                , ">"  $> OpGT
-                , "<"  $> OpLT
-                , "="  $> OpEQ
-                ]
-              date <- parseFilterDate
-              return (field, FilterFieldByDate op date)
-          ]
 
 ----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
 
+toReader :: Either String a -> ReadM a
+toReader = either readerError pure
+
 toServantParser :: MParser a -> Text -> Either Text a
-toServantParser p = first (T.pack . errorBundlePretty) . parse p "<url>"
+toServantParser p = first (T.pack . P.errorBundlePretty) . P.parse p "<url>"
 
 -- | Parses any of these formats:
 --
@@ -352,4 +398,4 @@ parseFilterDate = do
       pure $ Char.digitToInt a * 10 + Char.digitToInt b
 
 fieldName :: MParser Text
-fieldName = fst <$> match (some $ noneOf [':'])
+fieldName = fst <$> P.match (some $ P.noneOf [':'])
