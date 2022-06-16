@@ -329,9 +329,18 @@ test-suite server-integration
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Integration
+      CopyAndRename.Common
+      CopyAndRename.CopyTest
+      CopyAndRename.RenameTest
+      Create.CreateTest
+      Delete.DeleteTest
+      DeleteField.DeleteFieldTest
+      Find.FindTest
+      SetField.SetFieldTest
+      Tag.TagTest
       Tree
       Utils
+      View.ViewTest
       Paths_coffer
   hs-source-dirs:
       tests/server-integration
@@ -394,13 +403,17 @@ test-suite server-integration
     , base >=4.14.3.0 && <5
     , coffer
     , extra
+    , http-client
+    , http-types
     , lens
+    , lens-aeson
     , process
     , req
     , syb
     , tasty
     , tasty-hunit
     , text
+    , time
   default-language: Haskell2010
 
 test-suite test
