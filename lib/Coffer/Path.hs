@@ -71,7 +71,7 @@ mkPathSegment segment
   | otherwise = Right $ UnsafeMkPathSegment segment
 
 pathSegmentAllowedCharacters :: [Char]
-pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'8'] ++ "-_"
+pathSegmentAllowedCharacters = []
 
 -- | Path to a directory or an entry.
 newtype Path = Path { unPath :: [PathSegment] }
