@@ -311,7 +311,6 @@ getOperationPaths :: CopyOperation -> (QualifiedPath EntryPath, QualifiedPath En
 getOperationPaths (CopyOperation old new) =
   (view E.path <$> old, view E.path <$> new)
 
-{-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: Text) #-}
 buildCopyOperations
   :: forall r
    . (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)

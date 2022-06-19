@@ -34,7 +34,8 @@ import Options.Applicative.Help.Pretty qualified as Pretty
 import Text.Interpolation.Nyan
 import Text.Megaparsec (try)
 import Text.Megaparsec qualified as P
-import Text.Megaparsec.Char qualified as P
+
+import qualified Text.Megaparsec.Char as P
 
 {-# ANN module ("HLint: ignore Use <$>" :: Text) #-}
 
@@ -595,4 +596,9 @@ readSum sumDescription constructors input =
         & M.keys
         <&> (\name -> "'" <> name <> "'")
         & List.intersperse ", "
-        & mconcat
+
+        & mconcat     
+
+
+
+

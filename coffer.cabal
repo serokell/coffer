@@ -22,9 +22,9 @@ library
       Backend
       Backend.Commands
       Backend.Interpreter
-      Backend.Vault.Kv
       Backend.Vault.Kv.Internal
       BackendName
+      Backend.Vault.Kv
       Backends
       CLI.Parser
       CLI.PrettyPrint
