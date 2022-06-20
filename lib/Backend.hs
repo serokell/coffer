@@ -21,10 +21,11 @@ import Error (CofferError)
 import Polysemy
 import Polysemy.Error (Error)
 import Toml qualified
+import Data.Aeson qualified as A
 
 type Effects r = (Member (Embed IO) r, Member (Error CofferError) r)
 
-class Show a => Backend a where
+class (Show a, A.FromJSON a) => Backend a where
   _name :: a -> BackendName
   _codec :: Toml.TomlCodec a
   _writeEntry :: Effects r => a -> Entry -> Sem r ()
