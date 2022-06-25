@@ -39,8 +39,3 @@ server-integration:
 bats:
 	git submodule update --init --recursive
 	./scripts/run-bats-tests.sh $(if $(FILTER),"$(FILTER)",)
-
-all:
-	$(MAKEU) PACKAGE=""
-test-all:
-	$(MAKEU) test PACKAGE=""
