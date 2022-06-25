@@ -54,5 +54,6 @@ server-integration:
 #   * make bats
 #   * make bats BATSFILTER="test name"
 bats:
+	stack install --fast coffer:exe:coffer
 	git submodule update --init --recursive
 	./scripts/run-bats-tests.sh $(if $(BATSFILTER),"$(BATSFILTER)",)
