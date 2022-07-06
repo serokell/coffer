@@ -53,7 +53,7 @@ EOF
   assert_failure
   assert_output --partial - <<EOF
 Invalid field name: "bad\nfieldname".
-Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
+Field name can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'
 EOF
 }
 
