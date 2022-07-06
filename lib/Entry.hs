@@ -62,9 +62,9 @@ newtype BadFieldName = BadFieldName { unBadFieldName :: Text }
 newFieldName :: Text -> Either BadFieldName FieldName
 newFieldName t
   | T.null t =
-      Left $ BadFieldName "Tags must contain at least 1 character"
+      Left $ BadFieldName "Field name must contain at least 1 character"
   | T.any (`notElem` allowedCharSet) t =
-      Left $ BadFieldName ("Tags can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
+      Left $ BadFieldName ("Field name can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
   | otherwise = Right $ UnsafeFieldName t
 
 getFieldName :: FieldName -> Text
