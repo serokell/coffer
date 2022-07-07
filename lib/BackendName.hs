@@ -11,6 +11,7 @@ module BackendName
   ) where
 
 import Coffer.Util (didimatch)
+import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -20,6 +21,12 @@ import Toml qualified
 newtype BackendName = UnsafeBackendName Text
   deriving stock (Show, Eq)
   deriving newtype (Hashable, Buildable)
+
+instance A.FromJSON BackendName where
+  parseJSON = A.withText "BackendName" \text ->
+    case newBackendName text of
+      Right fieldName -> return fieldName
+      Left err -> fail $ T.unpack err
 
 backendNameCharSet :: [Char]
 backendNameCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
