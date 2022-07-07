@@ -232,7 +232,7 @@ instance ReflectMethod 'LIST where
 --        overwritten many times or something like that
 newtype VaultToken = VaultToken Text
   deriving stock (Eq, Show)
-  deriving newtype (FromHttpApiData)
+  deriving newtype (FromHttpApiData, FromJSON)
 
 -- Could this be somehow automated? newtypes are just meaningless wrapper anyways, at least to GHC.
 instance ToHttpApiData VaultToken where
