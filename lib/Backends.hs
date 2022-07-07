@@ -12,8 +12,12 @@ import Backend (Backend(..), SomeBackend(..))
 import Backend.Vault.Kv (VaultKvBackend)
 import Data.Aeson ((.:))
 import Data.Aeson qualified as A
+import Data.Bifunctor (Bifunctor(first))
 import Data.HashMap.Strict qualified as HS
 import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
+import Servant.API (FromHttpApiData(..))
 import Toml (TomlCodec)
 import Toml qualified
 import Validation (Validation(Failure))
@@ -25,6 +29,10 @@ instance A.FromJSON SomeBackend where
       case bType of
         "vault-kv" -> fmap SomeBackend $ A.parseJSON @VaultKvBackend original
         _ -> fail "Unknown backend type") original
+
+instance FromHttpApiData SomeBackend where
+  parseHeader = first T.pack . A.eitherDecodeStrict'
+  parseQueryParam t = parseHeader . TE.encodeUtf8 $ t
 
 backendPackedCodec :: TomlCodec SomeBackend
 backendPackedCodec = Toml.Codec input output
