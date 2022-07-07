@@ -195,29 +195,31 @@ zlib
 
 ## Testing
 
-### `Golden` Tests
-Before you run `golden` tests you need to obtain a `coffer` executable. You can get it in two ways:
-1. Cabal
-```shell
-$ cabal install
-```
-2. Stack
-```shell
-$ stack install
-```
-These commands would build the project and add a symblink for a `coffer` executable.
+The package contains 4 test suites:
+1. A unit tests suite for the coffer library, `coffer:test:test`.
+1. An integration test suite for the Web API, `coffer:test:server-integration`.
+1. A set of golden tests written in `bats` for the coffer executable.
+1. A Haskell doctest suite, `coffer:test:doctests`.
 
-Now you can run `golden` tests with next command:
-```shell
-$ make bats
-```
+Use `make test` to run all test suites:
 
-### Haskell Tests
-These test suites are easier to run than `golden` tests. You can run all tests with this command:
-```shell
+```sh
 $ make test
+
+$ make test \
+    TEST_ARGUMENTS='--pattern "test name"' \
+    BATSFILTER='test name' \
+    DOCTEST_ARGUMENTS='--verbose'
 ```
-Also we have a special task in `Makefile` which runs only `server-integration` test suite (this test suite is included in `test` task).
-```shell
-$ make server-integration
+
+You can also run an individual test suite:
+
+```sh
+$ make test-unit TEST_ARGUMENTS='--pattern "test name"'
+
+$ make server-integration TEST_ARGUMENTS='--pattern "test name"'
+
+$ make bats BATSFILTER='test name'
+
+$ make doctest DOCTEST_ARGUMENTS='--verbose'
 ```

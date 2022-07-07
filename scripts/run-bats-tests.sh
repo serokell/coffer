@@ -7,7 +7,7 @@
 # This script runs two vault instances,
 # then runs bats tests and finally kills the vault instances.
 
-FILTER=$1
+BATSFILTER=$1
 
 vault server -dev -dev-root-token-id="root" -dev-listen-address="localhost:8209" > /dev/null 2>&1 &
 vault1_pid=$!
@@ -15,10 +15,10 @@ vault1_pid=$!
 vault server -dev -dev-root-token-id="second" -dev-listen-address="localhost:8211" > /dev/null 2>&1 &
 vault2_pid=$!
 
-if [ -z "$FILTER" ]; then
+if [ -z "$BATSFILTER" ]; then
   ./tests/golden/helpers/bats/bin/bats ./tests/golden/**
 else
-  ./tests/golden/helpers/bats/bin/bats ./tests/golden/** -f "$FILTER"
+  ./tests/golden/helpers/bats/bin/bats ./tests/golden/** -f "$BATSFILTER"
 fi
 
 kill $vault1_pid > /dev/null 2>&1

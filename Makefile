@@ -11,8 +11,16 @@ MAKE_PACKAGE = $(MAKEU) PACKAGE=coffer
 
 coffer:
 	$(MAKE_PACKAGE) dev
+
+# Runs all tests.
+# Usage:
+#  * make test
+#  * make test BATSFILTER='test name' TEST_ARGUMENTS='--pattern "test name"' DOCTEST_ARGUMENTS='--verbose'
 test:
-	$(MAKE_PACKAGE) test
+	make doctest
+	make test-unit
+	make server-integration
+	make bats
 test-dumb-term:
 	$(MAKE_PACKAGE) test-dumb-term
 test-hide-successes:
@@ -30,17 +38,22 @@ stylish:
 lint:
 	hlint .
 
+####################################
+# Individual test suites
+
+doctest:
+	stack test --fast coffer:test:doctests --test-arguments "$(DOCTEST_ARGUMENTS)"
+
+test-unit:
+	$(MAKEU) test PACKAGE="coffer:test:test"
+
 server-integration:
 	$(MAKEU) test PACKAGE="coffer:test:server-integration"
 
 # Usage:
 #   * make bats
-#   * make bats FILTER="test name"
+#   * make bats BATSFILTER="test name"
 bats:
+	stack install --fast coffer:exe:coffer
 	git submodule update --init --recursive
-	./scripts/run-bats-tests.sh $(if $(FILTER),"$(FILTER)",)
-
-all:
-	$(MAKEU) PACKAGE=""
-test-all:
-	$(MAKEU) test PACKAGE=""
+	./scripts/run-bats-tests.sh $(if $(BATSFILTER),"$(BATSFILTER)",)
