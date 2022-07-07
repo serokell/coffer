@@ -1,6 +1,7 @@
 -- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
 --
 -- SPDX-License-Identifier: MPL-2.0
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Backends
   ( supportedBackends
@@ -9,11 +10,21 @@ module Backends
 
 import Backend (Backend(..), SomeBackend(..))
 import Backend.Vault.Kv (VaultKvBackend)
+import Data.Aeson ((.:))
+import Data.Aeson qualified as A
 import Data.HashMap.Strict qualified as HS
 import Data.Text (Text)
 import Toml (TomlCodec)
 import Toml qualified
 import Validation (Validation(Failure))
+
+instance A.FromJSON SomeBackend where
+  parseJSON original = A.withObject "SomeBackend" (\obj ->
+    do
+      bType :: String <- obj .: "type"
+      case bType of
+        "vault-kv" -> fmap SomeBackend $ A.parseJSON @VaultKvBackend original
+        _ -> fail "Unknown backend type") original
 
 backendPackedCodec :: TomlCodec SomeBackend
 backendPackedCodec = Toml.Codec input output
