@@ -4,9 +4,9 @@
 
 module Config where
 
-import Backend (Backend(..), SomeBackend(..))
+import Backend (Backend(..))
 import BackendName (BackendName, backendNameCodec)
-import Backends (backendPackedCodec)
+import Backends (SomeBackend(..), backendPackedCodec)
 import Data.Foldable (toList)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
@@ -20,6 +20,8 @@ data Config =
   }
   deriving stock (Show)
 
+makeSingleBackendConfig :: SomeBackend -> Config
+makeSingleBackendConfig (SomeBackend backend) = Config (HS.singleton (_name backend) (SomeBackend backend)) (_name backend)
 
 configCodec :: TomlCodec Config
 configCodec = Config

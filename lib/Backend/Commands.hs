@@ -4,9 +4,9 @@
 
 module Backend.Commands where
 
-import Backend
-  (BackendEffect, SomeBackend, deleteEntry, listDirectoryContents, readEntry, writeEntry)
+import BackendEffect (BackendEffect, deleteEntry, listDirectoryContents, readEntry, writeEntry)
 import BackendName (BackendName)
+import Backends (SomeBackend)
 import CLI.Types
 import Coffer.Directory (Directory)
 import Coffer.Directory qualified as Dir

@@ -1,14 +1,14 @@
 -- SPDX-FileCopyrightText: 2022 Serokell <https://serokell.io>
 --
 -- SPDX-License-Identifier: MPL-2.0
-{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Backends
-  ( supportedBackends
+  ( SomeBackend (..)
+  , supportedBackends
   , backendPackedCodec
   ) where
 
-import Backend (Backend(..), SomeBackend(..))
+import Backend (Backend(..))
 import Backend.Vault.Kv (VaultKvBackend)
 import Data.Aeson ((.:))
 import Data.Aeson qualified as A
@@ -21,6 +21,12 @@ import Servant.API (FromHttpApiData(..))
 import Toml (TomlCodec)
 import Toml qualified
 import Validation (Validation(Failure))
+
+data SomeBackend where
+  SomeBackend :: Backend a => a -> SomeBackend
+
+instance Show SomeBackend where
+  show (SomeBackend a) = show a
 
 instance A.FromJSON SomeBackend where
   parseJSON original = A.withObject "SomeBackend" (\obj ->

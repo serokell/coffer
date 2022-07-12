@@ -4,7 +4,9 @@
 
 module Backend.Interpreter where
 
-import Backend (Backend(..), BackendEffect(..), Effects, SomeBackend(..))
+import Backend (Backend(..), Effects)
+import BackendEffect (BackendEffect(..))
+import Backends (SomeBackend(..))
 import Polysemy
 
 runBackend :: Effects r => Sem (BackendEffect ': r) a -> Sem r a

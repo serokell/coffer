@@ -43,4 +43,4 @@ runServer = do
   config <- readConfig configPath
   run 8081 do
     serve (Proxy :: Proxy API) do
-      makeServer \_token -> reportErrors . runBackendIO' . runCommand config
+      makeServer \someBackend -> reportErrors . runBackendIO' . runCommand (makeSingleBackendConfig  someBackend)
