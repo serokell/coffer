@@ -16,12 +16,12 @@ where
 
 import BackendName (BackendName)
 import Coffer.Path (DirectoryContents, EntryPath, Path)
+import Data.Aeson qualified as A
 import Entry (Entry)
 import Error (CofferError)
 import Polysemy
 import Polysemy.Error (Error)
 import Toml qualified
-import Data.Aeson qualified as A
 
 type Effects r = (Member (Embed IO) r, Member (Error CofferError) r)
 
