@@ -73,13 +73,17 @@ $ stack run coffer-server
 Documentation for Web API endpoints and their return types could be generated via `servant-openapi3`. (TODO: write something about docs generation after [#114](https://github.com/serokell/coffer/issues/114) is resolved).
 
 #### Configuration
-(TODO: write something here after [#95](https://github.com/serokell/coffer/issues/95) is resolved). At this moment we configure Web API via HTTP header (we are passing `VaultToken`, but it's not used anywhere).
+The Web API is configured via the `Coffer-Backend` HTTP header. It's JSON encoded and should contain:
+- `type` (for now it's only `vault-kv`)
+- fields specific for backend (like `name`, `adress`,`token`, `mount` for `vault-kv`)
+
+Basicly it's JSON version of CLI's config with only one backend
 
 Examples:
 1. Creating new entry
 ```shell
 $ curl -s -D /dev/stderr \
-	-H 'token: root' \
+	-H 'Coffer-Backend : { "type" : "vault-kv", "name" : "vault-local", "address" : "localhost:8209", "mount" : "secret", "token" : "root" }' \
 	'localhost:8081/api/v1/content/create?path=/ex1' \
 	-X POST \
 	-H 'Content-Type: application/json' \
@@ -111,7 +115,7 @@ Content-Type: application/json;charset=utf-8
 2. View all entries
 ```shell
 $ curl -s -D /dev/stderr \
-	-H 'token: root' \
+	-H 'Coffer-Backend : { "type" : "vault-kv", "name" : "vault-local", "address" : "localhost:8209", "mount" : "secret", "token" : "root" }' \
 	'localhost:8081/api/v1/content/view?path=/' \
 	-X GET \
 	-H 'Content-Type: application/json' | jq
