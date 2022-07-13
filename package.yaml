@@ -182,3 +182,4 @@ tests:
       - tasty-hunit
       - text
       - time
+      - bytestring

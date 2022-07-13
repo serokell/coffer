@@ -22,9 +22,11 @@ module Utils
 import Control.Exception (Exception(displayException), try)
 import Control.Lens
 import Control.Monad (void)
-import Data.Aeson (Object, Value(String), eitherDecodeStrict)
+import Data.Aeson (Object, Value(String), eitherDecodeStrict, encode)
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
+import Data.ByteString.Internal qualified as BS
+import Data.ByteString.Lazy qualified as BS (toStrict)
 import Data.Generics
 import Data.Text (Text)
 import Data.Time
@@ -145,6 +147,18 @@ viewRoot = do
 
   pure $ responseBody response
 
+makeCofferHeader :: BS.ByteString
+makeCofferHeader =  BS.toStrict . encode $
+  [aesonQQ|
+      {
+        "type" : "vault-kv",
+        "name" : "vault-local",
+        "address" : "localhost:8209",
+        "mount" : "secret",
+        "token" : "root"
+      }
+  |]
+
 executeCommand
   ::
    ( HttpBodyAllowed (AllowsBody method) (ProvidesBody body)
@@ -164,7 +178,7 @@ executeCommand method urlParts body proxy options =
       body
       proxy
       ( mconcat
-          [ header "token" "root"
+          [ header "Coffer-Backend" makeCofferHeader
           , port 8081
           , options
           ]
