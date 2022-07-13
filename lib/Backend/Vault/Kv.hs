@@ -18,6 +18,8 @@ import Control.Exception (try)
 import Control.Lens hiding ((.=))
 import Control.Monad (foldM, void)
 import Data.Aeson qualified as A
+import Data.Aeson.Casing qualified as A
+import Data.Aeson.TH (deriveFromJSON)
 import Data.Aeson.Text qualified as A
 import Data.Bifunctor (first)
 import Data.Either.Extra (maybeToEither)
@@ -56,6 +58,7 @@ data VaultKvBackend =
   , vbToken :: I.VaultToken
   }
   deriving stock (Show)
+deriveFromJSON (A.aesonPrefix A.camelCase) ''VaultKvBackend
 
 -- | Errors that can be thrown in Vault backend.
 data VaultError

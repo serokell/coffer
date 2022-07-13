@@ -4,7 +4,7 @@
 
 module Web.API where
 
-import Backend.Vault.Kv
+import Backends (SomeBackend)
 import CLI.Types
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path, QualifiedPath)
@@ -15,7 +15,7 @@ import Servant.API
 import Web.Types (NewEntry)
 
 type API
-  = Header' [Required, Strict] "token" VaultToken
+  = Header' [Required, Strict] "Coffer-Backend" SomeBackend
   :> "api" :> "v1" :> "content" :>
     ( "view"
       :> RequiredParam "path"  (QualifiedPath Path)

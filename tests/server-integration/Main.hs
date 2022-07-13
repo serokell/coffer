@@ -24,8 +24,8 @@ main = do
           do
             setEnv "COFFER_CONFIG" "tests/server-integration/config.toml"
             server <- async runServer
-            (_, _, _, vault1) <- runVault 8209 "root"
-            (_, _, _, vault2) <- runVault 8211 "second"
+            (_, _, _, vault1) <- runVault 8213 "root"
+            (_, _, _, vault2) <- runVault 8215 "second"
             sleep 1
             pure (server, vault1, vault2)
           do

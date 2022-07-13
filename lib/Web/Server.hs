@@ -14,8 +14,8 @@ import Data.Text (Text)
 import Polysemy
 import Polysemy.Error hiding (try)
 
-import Backend
-import Backend.Vault.Kv
+import BackendEffect (BackendEffect)
+import Backends (SomeBackend)
 import CLI.Types
 import Entry
 import Error
@@ -126,35 +126,34 @@ reportErrors io = do
       return a
 
 makeServer
-  :: (forall a. VaultToken -> Command a -> Handler a)
+  :: (SomeBackend -> (forall a. Command a -> Handler a))
   -> Server API
-makeServer run token
-  =    view   run token
-  :<|> create run token
+makeServer run backend
+  =    view   (run backend)
+  :<|> create (run backend)
   :<|>
     (\txt fkey ->
-         private run token txt fkey
-    :<|> public  run token txt fkey
-    :<|> set     run token txt fkey
+         private (run backend) txt fkey
+    :<|> public  (run backend) txt fkey
+    :<|> set     (run backend) txt fkey
     )
-  :<|> deleteField run token
-  :<|> find'       run token
-  :<|> rename      run token
-  :<|> copy'       run token
-  :<|> delete'     run token
+  :<|> deleteField (run backend)
+  :<|> find'       (run backend)
+  :<|> rename      (run backend)
+  :<|> copy'       (run backend)
+  :<|> delete'     (run backend)
   :<|>
     (\path tag' ->
-         tag run token path tag' False
-    :<|> tag run token path tag' True
+         tag (run backend) path tag' False
+    :<|> tag (run backend) path tag' True
     )
 
 view
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath Path
   -> Handler Directory
-view run token voQPath = do
-  run token (CmdView ViewOptions {voQPath, voFieldName = Nothing}) >>= \case
+view run voQPath = do
+  run (CmdView ViewOptions {voQPath, voFieldName = Nothing}) >>= \case
     VRDirectory dir -> pure dir
     VREntry entry -> pure $ singleton entry
     VRField{} ->
@@ -169,14 +168,13 @@ view run token voQPath = do
     pretty = resultToText buildViewResult
 
 create
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> Bool
   -> NewEntry
   -> Handler Entry
-create run token coQPath coForce (NewEntry coFields coTags) =
-  run token (CmdCreate CreateOptions
+create run coQPath coForce (NewEntry coFields coTags) =
+  run (CmdCreate CreateOptions
     { coQPath
     , coEdit = False
     , coForce
@@ -202,13 +200,12 @@ create run token coQPath coForce (NewEntry coFields coTags) =
     pretty = resultToText buildCreateError
 
 private
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> FieldName
   -> Handler Entry
-private run token sfoQPath sfoFieldName  = do
-  run token (CmdSetField SetFieldOptions
+private run sfoQPath sfoFieldName  = do
+  run (CmdSetField SetFieldOptions
     { sfoQPath
     , sfoFieldName
     , sfoFieldContents = Nothing
@@ -216,13 +213,12 @@ private run token sfoQPath sfoFieldName  = do
     }) >>= handleSetFieldResult
 
 public
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> FieldName
   -> Handler Entry
-public run token sfoQPath sfoFieldName  =
-  run token (CmdSetField SetFieldOptions
+public run sfoQPath sfoFieldName  =
+  run (CmdSetField SetFieldOptions
     { sfoQPath
     , sfoFieldName
     , sfoFieldContents = Nothing
@@ -230,14 +226,13 @@ public run token sfoQPath sfoFieldName  =
     }) >>= handleSetFieldResult
 
 set
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> FieldName
   -> Maybe FieldContents
   -> Handler Entry
-set run token sfoQPath sfoFieldName sfoFieldContents =
-  run token (CmdSetField SetFieldOptions
+set run sfoQPath sfoFieldName sfoFieldContents =
+  run (CmdSetField SetFieldOptions
     { sfoQPath
     , sfoFieldName
     , sfoFieldContents = sfoFieldContents
@@ -245,13 +240,12 @@ set run token sfoQPath sfoFieldName sfoFieldContents =
     }) >>= handleSetFieldResult
 
 deleteField
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> FieldName
   -> Handler Entry
-deleteField run token dfoQPath dfoFieldName =
-  run token (CmdDeleteField DeleteFieldOptions
+deleteField run dfoQPath dfoFieldName =
+  run (CmdDeleteField DeleteFieldOptions
     { dfoQPath
     , dfoFieldName
     }) >>= \case
@@ -264,15 +258,14 @@ deleteField run token dfoQPath dfoFieldName =
     pretty = resultToText buildDeleteFieldResult
 
 find'
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> Maybe (QualifiedPath Path)
   -> Maybe Text
   -> Maybe (Sort, Direction)
   -> [Filter]
   -> Handler (Maybe Directory)
-find' run token foQPath foText foSort foFilters =
-  run token $ CmdFind FindOptions
+find' run foQPath foText foSort foFilters =
+  run $ CmdFind FindOptions
     { foQPath
     , foText
     , foSort
@@ -280,15 +273,14 @@ find' run token foQPath foText foSort foFilters =
     }
 
 rename
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> Bool
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
   -> Handler [(EntryPath, EntryPath)]
-rename run token roDryRun roQOldPath roQNewPath roForce =
-  run token (CmdRename RenameOptions
+rename run roDryRun roQOldPath roQNewPath roForce =
+  run (CmdRename RenameOptions
     { roDryRun
     , roQOldPath
     , roQNewPath
@@ -296,15 +288,14 @@ rename run token roDryRun roQOldPath roQNewPath roForce =
     }) >>= handleRenameResult
 
 copy'
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> Bool
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
   -> Handler [(EntryPath, EntryPath)]
-copy' run token cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
-  run token (CmdCopy CopyOptions
+copy' run cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
+  run (CmdCopy CopyOptions
     { cpoDryRun
     , cpoQNewPath
     , cpoQOldPath
@@ -312,14 +303,13 @@ copy' run token cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
     }) >>= handleCopyResult
 
 delete'
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> Bool
   -> QualifiedPath Path
   -> Bool
   -> Handler NoContent
-delete' run token doDryRun doQPath doRecursive =
-  run token (CmdDelete DeleteOptions
+delete' run doDryRun doQPath doRecursive =
+  run (CmdDelete DeleteOptions
     { doDryRun
     , doQPath
     , doRecursive
@@ -333,14 +323,13 @@ delete' run token doDryRun doQPath doRecursive =
     pretty = resultToText buildDeleteResult
 
 tag
-  :: (forall a. VaultToken -> Command a -> Handler a)
-  -> VaultToken
+  :: (forall a. Command a -> Handler a)
   -> QualifiedPath EntryPath
   -> EntryTag
   -> Bool
   -> Handler Entry
-tag run token toQPath toTagName toDelete =
-  run token (CmdTag TagOptions
+tag run toQPath toTagName toDelete =
+  run (CmdTag TagOptions
     { toQPath
     , toTagName
     , toDelete

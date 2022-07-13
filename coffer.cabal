@@ -25,6 +25,7 @@ library
       Backend.Interpreter
       Backend.Vault.Kv
       Backend.Vault.Kv.Internal
+      BackendEffect
       BackendName
       Backends
       CLI.Parser
@@ -402,6 +403,7 @@ test-suite server-integration
       aeson
     , async
     , base >=4.14.3.0 && <5
+    , bytestring
     , coffer
     , extra
     , http-client

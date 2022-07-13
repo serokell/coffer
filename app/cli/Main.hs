@@ -4,9 +4,9 @@
 
 module Main where
 
-import Backend
 import Backend.Commands as Commands
 import Backend.Interpreter
+import BackendEffect
 import CLI.Parser
 import CLI.PrettyPrint
 import CLI.Types
