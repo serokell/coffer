@@ -7,7 +7,7 @@ module Web.API where
 import Backends (SomeBackend)
 import CLI.Types
 import Coffer.Directory (Directory)
-import Coffer.Path (EntryPath, Path, QualifiedPath)
+import Coffer.Path (EntryPath, Path)
 import Data.Text (Text)
 import Entry
 import GHC.Generics (Generic)
@@ -18,17 +18,17 @@ type API
   = Header' [Required, Strict] "Coffer-Backend" SomeBackend
   :> "api" :> "v1" :> "content" :>
     ( "view"
-      :> RequiredParam "path"  (QualifiedPath Path)
+      :> RequiredParam "path" Path
       :> Get '[JSON] Directory
 
     :<|> "create"
-      :> RequiredParam "path" (QualifiedPath EntryPath)
+      :> RequiredParam "path" EntryPath
       :> QueryFlag     "force"
       :> ReqBody '[JSON] NewEntry
       :> Post '[JSON] Entry
 
     :<|> "set-field"
-      :> RequiredParam "path" (QualifiedPath EntryPath)
+      :> RequiredParam "path" EntryPath
       :> RequiredParam "field" FieldName
       :>
         (    "private" :> Post '[JSON] Entry
@@ -38,12 +38,12 @@ type API
         )
 
     :<|> "delete-field"
-      :> RequiredParam "path" (QualifiedPath EntryPath)
+      :> RequiredParam "path" EntryPath
       :> RequiredParam "field" FieldName
       :> Delete '[JSON] Entry
 
     :<|> "find"
-      :> OptionalParam  "path" (QualifiedPath Path)
+      :> OptionalParam  "path" Path
       :> OptionalParam  "text" Text
       :> OptionalParam  "sort-field" (Sort, Direction)
       :> OptionalParams "filter" Filter
@@ -51,26 +51,26 @@ type API
 
     :<|> "rename"
       :> QueryFlag     "dry-run"
-      :> RequiredParam "old-path" (QualifiedPath Path)
-      :> RequiredParam "new-path" (QualifiedPath Path)
+      :> RequiredParam "old-path" Path
+      :> RequiredParam "new-path" Path
       :> QueryFlag     "force"
       :> Post '[JSON] [(EntryPath, EntryPath)]
 
     :<|> "copy"
       :> QueryFlag     "dry-run"
-      :> RequiredParam "old-path" (QualifiedPath Path)
-      :> RequiredParam "new-path" (QualifiedPath Path)
+      :> RequiredParam "old-path" Path
+      :> RequiredParam "new-path" Path
       :> QueryFlag     "force"
       :> Post '[JSON] [(EntryPath, EntryPath)]
 
     :<|> "delete"
       :> QueryFlag     "dry-run"
-      :> RequiredParam "path" (QualifiedPath Path)
+      :> RequiredParam "path" Path
       :> QueryFlag     "recursive"
       :> DeleteNoContent
 
     :<|> "tag"
-      :> RequiredParam "path" (QualifiedPath EntryPath)
+      :> RequiredParam "path" EntryPath
       :> RequiredParam "tag" EntryTag
       :>
         (    Post   '[JSON] Entry
