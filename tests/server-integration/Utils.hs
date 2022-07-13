@@ -153,7 +153,7 @@ makeCofferHeader =  BS.toStrict . encode $
       {
         "type" : "vault-kv",
         "name" : "vault-local",
-        "address" : "localhost:8209",
+        "address" : "localhost:8213",
         "mount" : "secret",
         "token" : "root"
       }
