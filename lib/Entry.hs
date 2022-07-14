@@ -91,7 +91,17 @@ getFieldName (UnsafeFieldName t) = t
 
 newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
-  deriving newtype (A.ToJSON, A.FromJSON, Buildable, Hashable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (A.ToJSON, Buildable, Hashable, ToHttpApiData)
+
+instance A.FromJSON EntryTag where
+  parseJSON = withText "FieldName" $
+    (\case
+      Right entryTag -> return entryTag
+      Left err -> fail $ T.unpack . unBadEntryTag $ err
+    ) . newEntryTag
+
+instance FromHttpApiData EntryTag where
+  parseUrlPiece text = first unBadEntryTag $ newEntryTag text
 
 newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
   deriving newtype Buildable
