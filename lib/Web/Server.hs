@@ -23,7 +23,7 @@ import Web.API
 
 import Backend.Interpreter (runBackend)
 import Coffer.Directory (Directory, singleton)
-import Coffer.Path (EntryPath, Path, QualifiedPath(qpPath))
+import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath, qpPath))
 import Coffer.PrettyPrint
   (PrettyPrintMode(WebAPI), buildCopyOrRenameResult, buildCreateError, buildDeleteFieldResult,
   buildDeleteResult, buildSetFieldResult, buildTagResult, buildViewResult)
@@ -150,32 +150,35 @@ makeServer run backend
 
 view
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath Path
+  -> Path
   -> Handler Directory
-view run voQPath = do
-  run (CmdView ViewOptions {voQPath, voFieldName = Nothing}) >>= \case
-    VRDirectory dir -> pure dir
-    VREntry entry -> pure $ singleton entry
-    VRField{} ->
-      throwCofferServerError err500 0 "Unexpected VRField"
-    res@VRPathNotFound{} ->
-      throwCofferServerError err404 100 (pretty res)
-    res@VRDirectoryNoFieldMatch{} ->
-      throwCofferServerError err404 101 (pretty res)
-    res@VREntryNoFieldMatch{} ->
-      throwCofferServerError err404 102 (pretty res)
+view run voPath = do
+  run ( CmdView ViewOptions
+    { voQPath = QualifiedPath Nothing voPath
+    , voFieldName = Nothing
+    }) >>= \case
+      VRDirectory dir -> pure dir
+      VREntry entry -> pure $ singleton entry
+      VRField{} ->
+        throwCofferServerError err500 0 "Unexpected VRField"
+      res@VRPathNotFound{} ->
+        throwCofferServerError err404 100 (pretty res)
+      res@VRDirectoryNoFieldMatch{} ->
+        throwCofferServerError err404 101 (pretty res)
+      res@VREntryNoFieldMatch{} ->
+        throwCofferServerError err404 102 (pretty res)
   where
     pretty = resultToText buildViewResult
 
 create
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> Bool
   -> NewEntry
   -> Handler Entry
-create run coQPath coForce (NewEntry coFields coTags) =
+create run coPath coForce (NewEntry coFields coTags) =
   run (CmdCreate CreateOptions
-    { coQPath
+    { coQPath = QualifiedPath Nothing coPath
     , coEdit = False
     , coForce
     , coTags          = Set.fromList coTags
@@ -201,12 +204,12 @@ create run coQPath coForce (NewEntry coFields coTags) =
 
 private
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> FieldName
   -> Handler Entry
-private run sfoQPath sfoFieldName  = do
+private run sfoPath sfoFieldName  = do
   run (CmdSetField SetFieldOptions
-    { sfoQPath
+    { sfoQPath = QualifiedPath Nothing sfoPath
     , sfoFieldName
     , sfoFieldContents = Nothing
     , sfoVisibility = Just Private
@@ -214,12 +217,12 @@ private run sfoQPath sfoFieldName  = do
 
 public
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> FieldName
   -> Handler Entry
-public run sfoQPath sfoFieldName  =
+public run sfoPath sfoFieldName  =
   run (CmdSetField SetFieldOptions
-    { sfoQPath
+    { sfoQPath = QualifiedPath Nothing sfoPath
     , sfoFieldName
     , sfoFieldContents = Nothing
     , sfoVisibility = Just Public
@@ -227,13 +230,13 @@ public run sfoQPath sfoFieldName  =
 
 set
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> FieldName
   -> Maybe FieldContents
   -> Handler Entry
-set run sfoQPath sfoFieldName sfoFieldContents =
+set run sfoPath sfoFieldName sfoFieldContents =
   run (CmdSetField SetFieldOptions
-    { sfoQPath
+    { sfoQPath = QualifiedPath Nothing sfoPath
     , sfoFieldName
     , sfoFieldContents = sfoFieldContents
     , sfoVisibility = Nothing
@@ -241,12 +244,12 @@ set run sfoQPath sfoFieldName sfoFieldContents =
 
 deleteField
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> FieldName
   -> Handler Entry
-deleteField run dfoQPath dfoFieldName =
+deleteField run dfoPath dfoFieldName =
   run (CmdDeleteField DeleteFieldOptions
-    { dfoQPath
+    { dfoQPath = QualifiedPath Nothing dfoPath
     , dfoFieldName
     }) >>= \case
       DFRSuccess _ qEntry -> pure $ qpPath qEntry
@@ -259,14 +262,14 @@ deleteField run dfoQPath dfoFieldName =
 
 find'
   :: (forall a. Command a -> Handler a)
-  -> Maybe (QualifiedPath Path)
+  -> Maybe Path
   -> Maybe Text
   -> Maybe (Sort, Direction)
   -> [Filter]
   -> Handler (Maybe Directory)
-find' run foQPath foText foSort foFilters =
+find' run foPath foText foSort foFilters =
   run $ CmdFind FindOptions
-    { foQPath
+    { foQPath = (fmap (QualifiedPath Nothing) foPath)
     , foText
     , foSort
     , foFilters
@@ -275,43 +278,43 @@ find' run foQPath foText foSort foFilters =
 rename
   :: (forall a. Command a -> Handler a)
   -> Bool
-  -> QualifiedPath Path
-  -> QualifiedPath Path
+  -> Path
+  -> Path
   -> Bool
   -> Handler [(EntryPath, EntryPath)]
-rename run roDryRun roQOldPath roQNewPath roForce =
+rename run roDryRun roOldPath roNewPath roForce =
   run (CmdRename RenameOptions
     { roDryRun
-    , roQOldPath
-    , roQNewPath
+    , roQOldPath = QualifiedPath Nothing roOldPath
+    , roQNewPath = QualifiedPath Nothing roNewPath
     , roForce
     }) >>= handleRenameResult
 
 copy'
   :: (forall a. Command a -> Handler a)
   -> Bool
-  -> QualifiedPath Path
-  -> QualifiedPath Path
+  -> Path
+  -> Path
   -> Bool
   -> Handler [(EntryPath, EntryPath)]
-copy' run cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
+copy' run cpoDryRun cpoOldPath cpoNewPath cpoForce =
   run (CmdCopy CopyOptions
     { cpoDryRun
-    , cpoQNewPath
-    , cpoQOldPath
+    , cpoQNewPath = QualifiedPath Nothing cpoNewPath
+    , cpoQOldPath = QualifiedPath Nothing cpoOldPath
     , cpoForce
     }) >>= handleCopyResult
 
 delete'
   :: (forall a. Command a -> Handler a)
   -> Bool
-  -> QualifiedPath Path
+  -> Path
   -> Bool
   -> Handler NoContent
-delete' run doDryRun doQPath doRecursive =
+delete' run doDryRun doPath doRecursive =
   run (CmdDelete DeleteOptions
     { doDryRun
-    , doQPath
+    , doQPath = QualifiedPath Nothing doPath
     , doRecursive
     }) >>= \case
       DRSuccess{} -> pure NoContent
@@ -324,13 +327,13 @@ delete' run doDryRun doQPath doRecursive =
 
 tag
   :: (forall a. Command a -> Handler a)
-  -> QualifiedPath EntryPath
+  -> EntryPath
   -> EntryTag
   -> Bool
   -> Handler Entry
-tag run toQPath toTagName toDelete =
+tag run toPath toTagName toDelete =
   run (CmdTag TagOptions
-    { toQPath
+    { toQPath = QualifiedPath Nothing toPath
     , toTagName
     , toDelete
     }) >>= \case
