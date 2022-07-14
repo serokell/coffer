@@ -13,8 +13,10 @@ module Utils
   , findField
   , viewRoot
   , executeCommand
+  , executeCommandWithHeader
   , (@=)
   , processStatusCodeError
+  , unwarpStatusCodeError
   , checkOnlyEntryModifiedDateUpdated
   , executeDeleteCommand
   ) where
@@ -25,15 +27,16 @@ import Control.Monad (void)
 import Data.Aeson (Object, Value(String), eitherDecodeStrict, encode)
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
-import Data.ByteString.Internal qualified as BS
-import Data.ByteString.Lazy qualified as BS (toStrict)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS (toStrict)
+import Data.Char (chr)
 import Data.Generics
 import Data.Text (Text)
 import Data.Time
 import GHC.IO.Handle (Handle)
 import Network.HTTP.Client
   (HttpException(HttpExceptionRequest), HttpExceptionContent(StatusCodeException),
-  Response(responseStatus))
+  Response(responseHeaders, responseStatus))
 import Network.HTTP.Req
 import Network.HTTP.Req qualified as Req (HttpException)
 import Network.HTTP.Types (Status)
@@ -148,7 +151,7 @@ viewRoot = do
   pure $ responseBody response
 
 makeCofferHeader :: BS.ByteString
-makeCofferHeader =  BS.toStrict . encode $
+makeCofferHeader =  LBS.toStrict . encode $
   [aesonQQ|
       {
         "type" : "vault-kv",
@@ -158,6 +161,34 @@ makeCofferHeader =  BS.toStrict . encode $
         "token" : "root"
       }
   |]
+
+executeCommandWithHeader
+  ::
+   ( HttpBodyAllowed (AllowsBody method) (ProvidesBody body)
+   , HttpMethod method, HttpBody body, HttpResponse response
+   )
+   => BS.ByteString
+   -> method
+   -> [Text]
+   -> body
+   -> Proxy response
+   -> Option 'Http
+   -> IO response
+executeCommandWithHeader cofferHeader method urlParts body proxy options =
+  runReq defaultHttpConfig do
+    req
+      method
+      url
+      body
+      proxy
+      ( mconcat
+          [ header "Coffer-Backend" cofferHeader
+          , port 8081
+          , options
+          ]
+      )
+  where
+    url = foldl (/:) baseUrl urlParts
 
 executeCommand
   ::
@@ -170,33 +201,28 @@ executeCommand
    -> Proxy response
    -> Option 'Http
    -> IO response
-executeCommand method urlParts body proxy options =
-  runReq defaultHttpConfig do
-    req
-      method
-      url
-      body
-      proxy
-      ( mconcat
-          [ header "Coffer-Backend" makeCofferHeader
-          , port 8081
-          , options
-          ]
-      )
-  where
-    url = foldl (/:) baseUrl urlParts
+executeCommand = executeCommandWithHeader makeCofferHeader
 
 (@=) :: JsonResponse Value -> Value -> IO ()
 response @= value = scrubDates (responseBody response) @?= value
 
 processStatusCodeError :: (Show res) => Status -> Value -> Either Req.HttpException res -> IO ()
-processStatusCodeError expectedStatus jsonBodyExpected = \case
+processStatusCodeError expectedStatus jsonBodyExpected = unwarpStatusCodeError $ \response bs ->
+  case lookup "Content-Type" $ responseHeaders response of
+    Just "application/json;charset=utf-8" -> do
+      jsonBodyActual <- either assertFailure pure $ eitherDecodeStrict @Value bs
+      jsonBodyActual @?= jsonBodyExpected
+      responseStatus response @?= expectedStatus
+    Just contentType -> assertFailure $ "Not expected content-type heder : " <> (map (chr . fromEnum) $ BS.unpack contentType)
+    Nothing -> do
+      assertFailure "No content-type header were specified"
+
+unwarpStatusCodeError :: (Show res) => (Response () -> BS.ByteString -> IO()) -> Either Req.HttpException res -> IO()
+unwarpStatusCodeError validator = \case
   Right res -> assertFailure $ "Expected http exception, got " <> show res
-  Left (VanillaHttpException (HttpExceptionRequest _ (StatusCodeException response bs))) -> do
-    jsonBodyActual <- either assertFailure pure $ eitherDecodeStrict @Value bs
-    jsonBodyActual @?= jsonBodyExpected
-    responseStatus response @?= expectedStatus
+  Left (VanillaHttpException (HttpExceptionRequest _ (StatusCodeException response bs))) -> validator response bs
   Left httpExc -> assertFailure $ "Expected http exception, got " <> displayException httpExc
+
 
 -- Checks, that after some modifying action only entry's modified date updates.
 checkOnlyEntryModifiedDateUpdated :: Value -> Value -> UTCTime -> UTCTime -> UTCTime -> Text -> IO ()
