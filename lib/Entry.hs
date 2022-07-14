@@ -32,9 +32,11 @@ where
 
 import Coffer.Path (EntryPath)
 import Control.Lens
+import Data.Aeson (FromJSON(parseJSON), withText)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing
 import Data.Aeson.TH
+import Data.Bifunctor (Bifunctor(first))
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
@@ -45,13 +47,30 @@ import Data.Text qualified as T
 import Data.Time (UTCTime)
 import Fmt (Buildable, build)
 import GHC.Generics (Generic)
-import Servant (FromHttpApiData, ToHttpApiData)
+import Servant (FromHttpApiData(parseUrlPiece), ToHttpApiData)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
 newtype FieldName = UnsafeFieldName Text
   deriving stock (Show, Eq)
-  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (A.ToJSON, A.ToJSONKey, Hashable, Buildable, ToHttpApiData)
+
+instance A.FromJSON FieldName where
+  parseJSON = withText "FieldName" $
+    (\case
+      Right fieldName -> return fieldName
+      Left err -> fail $ T.unpack . unBadFieldName $ err
+    ) . newFieldName
+
+instance A.FromJSONKey FieldName where
+  fromJSONKey = A.FromJSONKeyTextParser $
+    (\case
+      Right fieldName -> return fieldName
+      Left err -> fail $ T.unpack . unBadFieldName $ err
+    ) . newFieldName
+
+instance FromHttpApiData FieldName where
+  parseUrlPiece text = first unBadFieldName $ newFieldName text
 
 allowedCharSet :: [Char]
 allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
