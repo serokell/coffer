@@ -54,15 +54,11 @@ import Text.Interpolation.Nyan
 
 newtype PathSegment = UnsafeMkPathSegment { unPathSegment :: Text }
   deriving stock (Show, Eq, Generic)
-  deriving newtype (Buildable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (Buildable, ToHttpApiData)
   deriving newtype (Hashable, A.ToJSON, A.ToJSONKey)
 
-data DirectoryContents = DirectoryContents
-  { dcDirectoryNames :: [PathSegment]
-  , dcEntryNames :: [PathSegment]
-  }
-  deriving stock (Show)
-makeLensesWith abbreviatedFields ''DirectoryContents
+instance FromHttpApiData PathSegment where
+  parseUrlPiece = mkPathSegment
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
@@ -74,6 +70,13 @@ mkPathSegment segment
 
 pathSegmentAllowedCharacters :: [Char]
 pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
+
+data DirectoryContents = DirectoryContents
+  { dcDirectoryNames :: [PathSegment]
+  , dcEntryNames :: [PathSegment]
+  }
+  deriving stock (Show)
+makeLensesWith abbreviatedFields ''DirectoryContents
 
 -- | Path to a directory or an entry.
 newtype Path = Path { unPath :: [PathSegment] }
