@@ -8,6 +8,7 @@ module Common.Common
   , unit_incorrect_field_name_fromHttpApiData
   , unit_incorrect_tag_name_fromJSON
   , unit_incorrect_tag_name_fromHttpApiData
+  , unit_incorrect_path_segment_fromHttpApiData
   ) where
 
 import Control.Exception
@@ -118,4 +119,12 @@ unit_incorrect_tag_name_fromHttpApiData = cofferTest do
   try @HttpException ( addOrRemoveTag POST "tagged" "tag:." )
     >>= unwrapStatusCodeError \response bs -> do
       bs @?= "Error parsing query parameter tag failed: Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'"
+      responseStatus response @?= status400
+
+unit_incorrect_path_segment_fromHttpApiData :: IO ()
+unit_incorrect_path_segment_fromHttpApiData = cofferTest do
+
+  try @HttpException ( createEntry "entry:." )
+    >>= unwrapStatusCodeError \response bs -> do
+      bs @?= "Error parsing query parameter path failed: Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'"
       responseStatus response @?= status400
