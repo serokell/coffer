@@ -6,6 +6,8 @@ module Common.Common
   ( unit_incorrect_backend_name
   , unit_incorrect_field_name_fromJSONKey
   , unit_incorrect_field_name_fromHttpApiData
+  , unit_incorrect_tag_name_fromJSON
+  , unit_incorrect_tag_name_fromHttpApiData
   ) where
 
 import Control.Exception
@@ -18,8 +20,6 @@ import Network.HTTP.Req
 import Network.HTTP.Types (status400)
 import Test.Tasty.HUnit
 import Utils
-  (cofferTest, createEntry, executeCommand, executeCommandWithHeader, setField,
-  unwrapStatusCodeError)
 
 unit_incorrect_backend_name :: IO ()
 unit_incorrect_backend_name = cofferTest do
@@ -88,4 +88,34 @@ unit_incorrect_field_name_fromHttpApiData = cofferTest do
   try @HttpException ( setField "entry" "fieldname:." "contents" )
     >>= unwrapStatusCodeError \response bs -> do
       bs @?= "Error parsing query parameter field failed: Field name can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'"
+      responseStatus response @?= status400
+
+unit_incorrect_tag_name_fromJSON :: IO()
+unit_incorrect_tag_name_fromJSON = cofferTest do
+  try @HttpException
+    (executeCommand
+        POST
+        ["create"]
+        (ReqBodyJson emptyNewEntry)
+        ignoreResponse
+        ("path" =: ("entry" :: Text))
+      ) >>= unwrapStatusCodeError \response bs -> do
+        bs @?= "Error in $.tags[0]: Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'"
+        responseStatus response @?= status400
+    where
+    emptyNewEntry =
+      [aesonQQ|
+        {
+          "fields": {},
+          "tags": [ "tag:." ]
+        }
+      |]
+
+unit_incorrect_tag_name_fromHttpApiData :: IO ()
+unit_incorrect_tag_name_fromHttpApiData = cofferTest do
+  createEntry "tagged"
+
+  try @HttpException ( addOrRemoveTag POST "tagged" "tag:." )
+    >>= unwrapStatusCodeError \response bs -> do
+      bs @?= "Error parsing query parameter tag failed: Tags can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'"
       responseStatus response @?= status400

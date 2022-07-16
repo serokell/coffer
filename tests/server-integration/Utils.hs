@@ -19,7 +19,7 @@ module Utils
   , unwrapStatusCodeError
   , checkOnlyEntryModifiedDateUpdated
   , executeDeleteCommand
-  ) where
+  , addOrRemoveTag) where
 
 import Control.Exception (Exception(displayException), try)
 import Control.Lens
@@ -245,5 +245,23 @@ executeDeleteCommand path recursive =
     ( mconcat
         [ "path" =: path
         , if recursive then queryFlag "recursive" else mempty
+        ]
+    )
+
+addOrRemoveTag
+  ::
+   ( HttpMethod method
+   , HttpBodyAllowed (AllowsBody method) 'NoBody
+   )
+   => method -> Text -> Text -> IO (JsonResponse Value)
+addOrRemoveTag method path tag =
+  executeCommand
+    method
+    ["tag"]
+    NoReqBody
+    (jsonResponse @Value)
+    ( mconcat
+        [ "path" =: path
+        , "tag" =: tag
         ]
     )
