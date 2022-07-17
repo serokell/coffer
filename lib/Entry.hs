@@ -32,9 +32,11 @@ where
 
 import Coffer.Path (EntryPath)
 import Control.Lens
+import Data.Aeson (FromJSON(parseJSON), withText)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing
 import Data.Aeson.TH
+import Data.Bifunctor (Bifunctor(first))
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
@@ -45,13 +47,30 @@ import Data.Text qualified as T
 import Data.Time (UTCTime)
 import Fmt (Buildable, build)
 import GHC.Generics (Generic)
-import Servant (FromHttpApiData, ToHttpApiData)
+import Servant (FromHttpApiData(parseUrlPiece), ToHttpApiData)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
 import System.Console.ANSI.Codes (csi)
 
 newtype FieldName = UnsafeFieldName Text
   deriving stock (Show, Eq)
-  deriving newtype (A.ToJSON, A.ToJSONKey, A.FromJSON, A.FromJSONKey, Hashable, Buildable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (A.ToJSON, A.ToJSONKey, Hashable, Buildable, ToHttpApiData)
+
+instance A.FromJSON FieldName where
+  parseJSON = withText "FieldName" $
+    (\case
+      Right fieldName -> return fieldName
+      Left err -> fail $ T.unpack . unBadFieldName $ err
+    ) . newFieldName
+
+instance A.FromJSONKey FieldName where
+  fromJSONKey = A.FromJSONKeyTextParser $
+    (\case
+      Right fieldName -> return fieldName
+      Left err -> fail $ T.unpack . unBadFieldName $ err
+    ) . newFieldName
+
+instance FromHttpApiData FieldName where
+  parseUrlPiece text = first unBadFieldName $ newFieldName text
 
 allowedCharSet :: [Char]
 allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
@@ -62,9 +81,9 @@ newtype BadFieldName = BadFieldName { unBadFieldName :: Text }
 newFieldName :: Text -> Either BadFieldName FieldName
 newFieldName t
   | T.null t =
-      Left $ BadFieldName "Tags must contain at least 1 character"
+      Left $ BadFieldName "Field name must contain at least 1 character"
   | T.any (`notElem` allowedCharSet) t =
-      Left $ BadFieldName ("Tags can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
+      Left $ BadFieldName ("Field name can only contain the following characters: '" <> T.pack allowedCharSet <> "'")
   | otherwise = Right $ UnsafeFieldName t
 
 getFieldName :: FieldName -> Text
@@ -72,7 +91,17 @@ getFieldName (UnsafeFieldName t) = t
 
 newtype EntryTag = UnsafeEntryTag Text
   deriving stock (Show, Eq, Ord)
-  deriving newtype (A.ToJSON, A.FromJSON, Buildable, Hashable, ToHttpApiData, FromHttpApiData)
+  deriving newtype (A.ToJSON, Buildable, Hashable, ToHttpApiData)
+
+instance A.FromJSON EntryTag where
+  parseJSON = withText "FieldName" $
+    (\case
+      Right entryTag -> return entryTag
+      Left err -> fail $ T.unpack . unBadEntryTag $ err
+    ) . newEntryTag
+
+instance FromHttpApiData EntryTag where
+  parseUrlPiece text = first unBadEntryTag $ newEntryTag text
 
 newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
   deriving newtype Buildable

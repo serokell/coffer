@@ -14,32 +14,12 @@ module Tag.TagTest
 import Control.Exception (try)
 import Control.Lens
 import Control.Monad (void)
-import Data.Aeson
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
-import Data.Text (Text)
 import Data.Time
 import Network.HTTP.Req
 import Network.HTTP.Types (status404, status409)
 import Utils
-
-addOrRemoveTag
-  ::
-   ( HttpMethod method
-   , HttpBodyAllowed (AllowsBody method) 'NoBody
-   )
-   => method -> Text -> Text -> IO (JsonResponse Value)
-addOrRemoveTag method path tag =
-  executeCommand
-    method
-    ["tag"]
-    NoReqBody
-    (jsonResponse @Value)
-    ( mconcat
-        [ "path" =: path
-        , "tag" =: tag
-        ]
-    )
 
 unit_tag_entry :: IO ()
 unit_tag_entry = cofferTest do
