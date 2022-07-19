@@ -22,6 +22,7 @@ import Error
 import Fmt
 import Options.Applicative (execParser)
 import Polysemy
+import Polysemy.Async (Async, asyncToIOFinal)
 import Polysemy.Error (Error, errorToIOFinal)
 import System.Environment (lookupEnv)
 import System.Exit (die, exitFailure)
@@ -29,12 +30,13 @@ import Text.Interpolation.Nyan
 import Toml qualified
 
 runBackendIO
-  :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO ] a
+  :: Sem '[BackendEffect, Error CofferError, Embed IO, Async, Final IO] a
   -> IO a
 runBackendIO action =
   runBackend action
     & errorToIOFinal @CofferError
     & embedToFinal @IO
+    & asyncToIOFinal
     & runFinal
     >>= \case
       Right a -> pure a
