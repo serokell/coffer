@@ -41,11 +41,12 @@ import Entry qualified as E
 import Error (CofferError(..), InternalCommandsError(EntryPathDoesntHavePrefix))
 import GHC.Exts (Down(..), sortWith)
 import Polysemy
+import Polysemy.Async (Async, sequenceConcurrently)
 import Polysemy.Error (Error, throw)
 import Validation (Validation(Failure, Success))
 
 runCommand
-  :: (Members '[BackendEffect, Embed IO, Error CofferError] r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError, Async] r)
   => Config -> Command res -> Sem r res
 runCommand config = \case
   CmdView opts -> catchAndReturn $ viewCmd config opts
@@ -270,7 +271,7 @@ findCmd config (FindOptions qPathMb textMb sortMb filters) = do
 
 renameCmd
   :: forall r
-   . (Members '[BackendEffect, Embed IO, Error CofferError, Error RenameResult] r)
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error RenameResult, Async] r)
   => Config -> RenameOptions -> Sem r RenameResult
 renameCmd
   config
@@ -383,13 +384,14 @@ buildCopyOperations
         oldBackend = qpBackendName old
         newBackend = qpBackendName new
 
-runCopyOperations :: (Member BackendEffect r) => SomeBackend -> [CopyOperation] -> Sem r ()
+runCopyOperations :: (Members '[BackendEffect, Async] r) => SomeBackend -> [CopyOperation] -> Sem r ()
 runCopyOperations backend operations = do
   let newEntries = qpPath . coQNew <$> operations
-  forM_ newEntries (writeEntry backend)
+  void $ sequenceConcurrently $ map (writeEntry backend) newEntries
+  --forM_ newEntries (writeEntry backend)
 
 copyCmd
-  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult, Async] r)
   => Config -> CopyOptions -> Sem r CopyResult
 copyCmd
   config
