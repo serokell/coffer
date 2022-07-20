@@ -4,18 +4,54 @@
 
 module Web.Main
   ( runServer
+  , RunServerException (..)
   ) where
 
 import Backend.Commands (runCommand)
 import Config
+import Control.Exception (Exception, throw)
+import Data.Bifunctor (Bifunctor(first))
+import Data.Either (partitionEithers)
 import Data.Proxy
 import Network.Wai.Handler.Warp (run)
+import Options qualified as O
 import Servant.Server (serve)
+import System.Environment (lookupEnv)
+import Text.Read (readEither)
 import Web.API (API)
 import Web.Server
 
+data ServerOptions = ServerOptions { serverPort :: Maybe Int }
+
+data RunServerException
+  = RunServerIncorrectPort Int
+  | RunServerNoPortSpecified
+  | RunServerEnvVarParseFail String
+  deriving stock (Eq)
+
+instance Show RunServerException where
+  show (RunServerIncorrectPort port) = "Port number should be greater then 0. Your port number is: " ++ show port
+  show RunServerNoPortSpecified = "No port where not specified. Can be set by envirment varieble \"COFFER_SERVER_PORT\" or by \"--port=$port_num\" cmd argument."
+  show (RunServerEnvVarParseFail msg) = "Can't parse port specified by env var \"COFFER_SERVER_PORT\": " ++ msg
+
+instance Exception RunServerException
+
+instance O.Options ServerOptions where
+  defineOptions = pure ServerOptions <*> O.simpleOption "port" Nothing "Port to run a server"
+
 runServer :: IO ()
-runServer = do
-  run 8081 do
-    serve (Proxy :: Proxy API) do
-      makeServer \someBackend -> reportErrors . runBackendIO' . runCommand (makeSingleBackendConfig  someBackend)
+runServer = O.runCommand $ \opts _ -> do
+  envPortStr <- lookupEnv "COFFER_SERVER_PORT"
+  let envPort = maybe (Left RunServerNoPortSpecified) ((first RunServerEnvVarParseFail) . readEither) envPortStr
+  let optPort = maybe (Left RunServerNoPortSpecified) Right $ serverPort opts
+
+  let (errs, ports) = partitionEithers [optPort, envPort]
+
+  case ports of
+    (port : _) -> do
+      if 0 < port
+        then run port $ serve (Proxy :: Proxy API) do
+          makeServer \someBackend ->
+            reportErrors . runBackendIO' . runCommand (makeSingleBackendConfig  someBackend)
+        else throw $ RunServerIncorrectPort port
+    _ -> throw $ last errs

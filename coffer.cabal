@@ -117,6 +117,7 @@ library
     , megaparsec
     , mtl
     , nyan-interpolation
+    , options
     , optparse-applicative
     , polysemy
     , servant
