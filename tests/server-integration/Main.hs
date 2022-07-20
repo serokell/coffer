@@ -6,7 +6,7 @@ module Main where
 
 import Control.Concurrent.Async (async, cancel)
 import Data.Functor ((<&>))
-import System.Environment (setEnv, unsetEnv)
+import System.Environment (withArgs)
 import System.Process (terminateProcess)
 import System.Time.Extra (sleep)
 import Test.Tasty (defaultMain, localOption, withResource)
@@ -22,15 +22,13 @@ main = do
   let testTree =
         withResource
           do
-            setEnv "COFFER_CONFIG" "tests/server-integration/config.toml"
-            server <- async runServer
+            server <- async $ withArgs ["--port=8081"] runServer
             (_, _, _, vault1) <- runVault 8213 "root"
             (_, _, _, vault2) <- runVault 8215 "second"
             sleep 1
             pure (server, vault1, vault2)
           do
             \(server, vault1, vault2) -> do
-              unsetEnv "COFFER_CONFIG"
               cancel server
               terminateProcess vault1
               terminateProcess vault2
