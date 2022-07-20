@@ -8,7 +8,9 @@ module Common.BootServer
   , unit_run_with_no_port_specified
   , unit_run_with_cmd_opt_and_bad_env_var_port
   , unit_run_with_bad_cmd_opt_and_env_var_port
-  , unit_run_with_bad_env_var_port) where
+  , unit_run_with_bad_env_var_port
+  , unit_run_with_bad_cmd_option_port
+  , unit_run_with_bad_str_cmd_option_port) where
 
 import Control.Concurrent.Async (async, cancel, poll)
 import Control.Exception (SomeException(SomeException))
@@ -39,6 +41,23 @@ unit_run_with_cmd_option_port = testServer
   (pure ())
   (assertFailure "Server ended it's work")
   (\err -> assertFailure ("Server raised exception : " ++ show err))
+
+-- can we hide stdout?
+unit_run_with_bad_str_cmd_option_port :: IO()
+unit_run_with_bad_str_cmd_option_port = testServer
+  ""
+  ["--port=abs"]
+  (assertFailure "Server is runnung with bad port env var")
+  (assertFailure "Server successfully ended it's work with bad port env var")
+  (\err -> "ExitFailure 1" @=? err)
+
+unit_run_with_bad_cmd_option_port :: IO()
+unit_run_with_bad_cmd_option_port = testServer
+  ""
+  ["--port=-1"]
+  (assertFailure "Server is runnung with bad port env var")
+  (assertFailure "Server successfully ended it's work with bad port env var")
+  (\err -> show (RunServerIncorrectPort -1) @=? err)
 
 unit_run_with_env_var_port :: IO()
 unit_run_with_env_var_port = testServer
