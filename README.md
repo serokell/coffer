@@ -58,10 +58,9 @@ The coffer CLI will look for its configuration file in the following order:
 
 ### Web API
 
-Coffer also has a Web API. It runs on `localhost:$your_port`.
-Port can be specified via:
+Coffer also has a Web API. The port can be specified via:
 - Cmd line option: `--port`
-- Environment varieble `"COFFER_SERVER_PORT"`
+- Environment variable: `"COFFER_SERVER_PORT"`
 
 Examples:
 1. Stack
