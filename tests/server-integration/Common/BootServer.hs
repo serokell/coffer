@@ -10,7 +10,8 @@ module Common.BootServer
   , unit_run_with_bad_cmd_opt_and_env_var_port
   , unit_run_with_bad_env_var_port
   , unit_run_with_bad_cmd_option_port
-  , unit_run_with_bad_str_cmd_option_port) where
+  , unit_run_with_bad_str_cmd_option_port
+  ) where
 
 import Control.Concurrent.Async (async, cancel, poll)
 import Control.Exception (SomeException(SomeException))
@@ -22,9 +23,15 @@ import Web.Main (RunServerException(..), runServer)
 testPort :: String
 testPort = "8079"
 
-testServer :: String -> [String] -> IO () -> IO () -> (String -> IO ()) -> IO ()
-testServer envPort args serverRunning serverStopped serverCrashed = do
-  setEnv "COFFER_SERVER_PORT" envPort
+maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
+maybeIO action maybe =
+  case maybe of
+    (Just contents) -> action contents
+    Nothing -> pure ()
+
+testServer :: Maybe String -> [String] -> IO () -> IO () -> (String -> IO ()) -> IO ()
+testServer mbEnvPort args serverRunning serverStopped serverCrashed = do
+  maybeIO (setEnv "COFFER_SERVER_PORT") mbEnvPort
   server <- async $ withArgs args runServer
   sleep 1
   serverStatus <- poll server
@@ -32,70 +39,70 @@ testServer envPort args serverRunning serverStopped serverCrashed = do
     Nothing -> cancel server >> serverRunning
     Just (Right _) -> serverStopped
     Just (Left (SomeException err)) -> serverCrashed $ show err
-  unsetEnv "COFFER_SERVER_PORT"
+  maybeIO (\_ -> unsetEnv "COFFER_SERVER_PORT") mbEnvPort
 
 unit_run_with_cmd_option_port :: IO ()
 unit_run_with_cmd_option_port = testServer
-  ""
+  Nothing
   ["--port=" ++ testPort]
   (pure ())
-  (assertFailure "Server ended it's work")
+  (assertFailure "Server ended its work")
   (\err -> assertFailure ("Server raised exception : " ++ show err))
 
 -- can we hide stdout?
 unit_run_with_bad_str_cmd_option_port :: IO()
 unit_run_with_bad_str_cmd_option_port = testServer
-  ""
+  Nothing
   ["--port=abs"]
   (assertFailure "Server is runnung with bad port env var")
-  (assertFailure "Server successfully ended it's work with bad port env var")
+  (assertFailure "Server successfully ended its work with bad port env var")
   (\err -> "ExitFailure 1" @=? err)
 
 unit_run_with_bad_cmd_option_port :: IO()
 unit_run_with_bad_cmd_option_port = testServer
-  ""
+  Nothing
   ["--port=-1"]
-  (assertFailure "Server is runnung with bad port env var")
-  (assertFailure "Server successfully ended it's work with bad port env var")
+  (assertFailure "Server is running with bad port env var")
+  (assertFailure "Server successfully ended its work with bad port env var")
   (\err -> show (RunServerIncorrectPort -1) @=? err)
 
 unit_run_with_env_var_port :: IO()
 unit_run_with_env_var_port = testServer
-  testPort
+  (Just testPort)
   []
   (pure ())
-  (assertFailure "Server ended it's work")
+  (assertFailure "Server ended its work")
   (\err -> assertFailure $ "Server raised exception : " ++ show err)
 
 unit_run_with_bad_env_var_port :: IO()
 unit_run_with_bad_env_var_port = testServer
-  "bad_port"
+  (Just "bad_port")
   []
-  (assertFailure "Server is runnung with bad port env var")
-  (assertFailure "Server successfully ended it's work with bad port env var")
+  (assertFailure "Server is running with bad port env var")
+  (assertFailure "Server successfully ended its work with bad port env var")
   (\err -> show (RunServerEnvVarParseFail "Prelude.read: no parse") @=? err)
 
 unit_run_with_no_port_specified :: IO()
 unit_run_with_no_port_specified =  testServer
-  ""
+  Nothing
   []
-  (assertFailure "Server is runnung without port specified")
-  (assertFailure "Server successfully ended it's work without port specified")
+  (assertFailure "Server is running without port specified")
+  (assertFailure "Server successfully ended its work without port specified")
   (\err -> show RunServerNoPortSpecified @=? err)
 
 unit_run_with_cmd_opt_and_bad_env_var_port :: IO()
 unit_run_with_cmd_opt_and_bad_env_var_port = testServer
-  "-1"
+  (Just "-1")
   ["--port=" ++ testPort]
   (pure ())
-  (assertFailure "Server ended it's work")
+  (assertFailure "Server ended its work")
   (\err -> assertFailure $ "Server raised exception : " ++ show err)
 
 
 unit_run_with_bad_cmd_opt_and_env_var_port :: IO()
 unit_run_with_bad_cmd_opt_and_env_var_port = testServer
-  testPort
+  (Just testPort)
   ["--port=-1"]
   (assertFailure "Server made prefernce to env var instead of cmd option")
-  (assertFailure "Server ended it's work")
+  (assertFailure "Server ended its work")
   (\err -> show (RunServerIncorrectPort -1) @=? err)
