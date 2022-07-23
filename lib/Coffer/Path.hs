@@ -6,7 +6,6 @@ module Coffer.Path
   ( PathSegment
   , unPathSegment
   , mkPathSegment
-  , pathSegmentAllowedCharacters
   , DirectoryContents(..)
   , directoryNames
   , entryNames
@@ -64,12 +63,9 @@ mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
   | T.null segment =
       Left "Path segments must contain at least 1 character"
-  | T.any (`notElem` pathSegmentAllowedCharacters) segment =
-      Left $ "Path segments can only contain the following characters: '" <> T.pack pathSegmentAllowedCharacters <> "'"
+  | '#' `elem` T.unpack segment =
+      Left $ "Path segments can't contain the following characters: '#'"
   | otherwise = Right $ UnsafeMkPathSegment segment
-
-pathSegmentAllowedCharacters :: [Char]
-pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 data DirectoryContents = DirectoryContents
   { dcDirectoryNames :: [PathSegment]
