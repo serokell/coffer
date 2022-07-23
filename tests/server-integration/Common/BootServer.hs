@@ -97,6 +97,6 @@ unit_run_with_bad_cmd_opt_and_env_var_port :: IO()
 unit_run_with_bad_cmd_opt_and_env_var_port = testServer
   (Just testPort)
   ["--port=-1"]
-  (assertFailure "Server made prefernce to env var instead of cmd option")
+  (assertFailure "Expected command-line option to take precedence over the env var, but the env var was used instead.")
   (assertFailure "Server ended its work")
   (\err -> show (RunServerIncorrectPort -1) @=? err)

@@ -58,17 +58,31 @@ The coffer CLI will look for its configuration file in the following order:
 
 ### Web API
 
-Coffer also has a Web API. Currently, it runs on `localhost:8081`. In the future we could configure this but at this moment we can't.
+Coffer also has a Web API. The port can be specified via:
+- Cmd line option: `--port`
+- Environment variable: `"COFFER_SERVER_PORT"`
 
-You can run server in the following ways:
-1. Cabal
+Examples:
+1. Stack
 ```shell
-$ cabal run coffer-server
+$ stack run -- coffer-server --port=8081
 ```
-2. Stack
+
 ```shell
+$ export COFFER_SERVER_PORT=8081
 $ stack run coffer-server
 ```
+
+2. Cabal
+```shell
+$ cabal run -- coffer-server --port=8081
+```
+
+```shell
+$ export COFFER_SERVER_PORT=8081
+$ cabal run coffer-server
+```
+
 
 Documentation for Web API endpoints and their return types could be generated via `servant-openapi3`. (TODO: write something about docs generation after [#114](https://github.com/serokell/coffer/issues/114) is resolved).
 
