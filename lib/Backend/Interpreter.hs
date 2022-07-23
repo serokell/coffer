@@ -15,3 +15,4 @@ runBackend = interpret \case
   ReadEntry (SomeBackend backend) path -> _readEntry backend path
   ListDirectoryContents (SomeBackend backend) path -> _listDirectoryContents backend path
   DeleteEntry (SomeBackend backend) path -> _deleteEntry backend path
+  ValidatePath (SomeBackend backend) path -> _validatePath backend path

@@ -16,13 +16,14 @@ import Coffer.Path
 import Coffer.Util (didimatch)
 import Control.Exception (try)
 import Control.Lens hiding ((.=))
-import Control.Monad (foldM, void)
+import Control.Monad (foldM, void, when)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing qualified as A
 import Data.Aeson.TH (deriveFromJSON)
 import Data.Aeson.Text qualified as A
 import Data.Bifunctor (first)
 import Data.Either.Extra (maybeToEither)
+import Data.Foldable (for_)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Set (Set)
@@ -111,7 +112,9 @@ instance Buildable VaultError where
       [int|s|
         Backend returned a path segment that is not a valid \
         entry or directory name.
-        Got: '#{pathSegment}'.
+        Path segments for Vault KV can only contain the following characters:
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+        Got: #{pathSegment}.
       |]
 
 instance BackendError VaultError
@@ -197,6 +200,15 @@ getPathSegments
   :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
   => s -> [Text]
 getPathSegments path = path ^.. pathSegments . each . to unPathSegment
+
+kvValidatePath :: Effects r => (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+ => VaultKvBackend -> s -> Sem r ()
+kvValidatePath _ path = do
+  for_ (getPathSegments path) \pathSegment ->
+    when (T.any (`notElem` kvPathSegmentAllowedCharacters) pathSegment) $ throw $ BackendError $ InvalidPathSegment $ T.pack . show $ pathSegment
+
+kvPathSegmentAllowedCharacters :: [Char]
+kvPathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 kvWriteEntry :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteEntry backend entry = do
@@ -340,3 +352,4 @@ instance Backend VaultKvBackend where
   _readEntry = kvReadEntry
   _listDirectoryContents = kvListDirectoryContents
   _deleteEntry = kvDeleteEntry
+  _validatePath = kvValidatePath

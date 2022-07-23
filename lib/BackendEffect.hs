@@ -7,10 +7,12 @@ module BackendEffect
   , readEntry
   , writeEntry
   , listDirectoryContents
-  , deleteEntry ) where
+  , deleteEntry
+  , validatePath ) where
 
 import Backends (SomeBackend)
-import Coffer.Path (DirectoryContents, EntryPath, Path)
+import Coffer.Path (DirectoryContents, EntryPath, HasPathSegments, Path, PathSegment)
+import Control.Lens (Each)
 import Entry (Entry)
 import Polysemy
 
@@ -27,4 +29,6 @@ data BackendEffect m a where
   -- | Once all entries are deleted from a directory, then the directory disappears
   --   (i.e. @ListDirectoryContents@ will no longer list that directory)
   DeleteEntry :: SomeBackend -> EntryPath -> BackendEffect m ()
+  ValidatePath :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+    => SomeBackend -> s -> BackendEffect m ()
 makeSem ''BackendEffect
