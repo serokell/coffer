@@ -124,7 +124,7 @@ unit_incorrect_tag_name_fromHttpApiData = cofferTest do
 unit_incorrect_path_segment_fromHttpApiData :: IO ()
 unit_incorrect_path_segment_fromHttpApiData = cofferTest do
 
-  try @HttpException ( createEntry "entry:." )
+  try @HttpException ( createEntry "entry#" )
     >>= unwrapStatusCodeError \response bs -> do
-      bs @?= "Error parsing query parameter path failed: Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'"
+      bs @?= "Error parsing query parameter path failed: Path segments can't contain the following characters: '#'"
       responseStatus response @?= status400

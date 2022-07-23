@@ -9,22 +9,13 @@ load '../helpers/bats-assert/load'
 load '../helpers'
 
 @test "bad path" {
-  run coffer view "$(echo -e "bad\npath")"
+  run coffer view "$(echo -e "bad#path#")"
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid path: "bad\npath".
-Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
-EOF
-}
-
-@test "bad entry path" {
-  run coffer create "$(echo -e "bad/entry\npath")"
-
-  assert_failure
-  assert_output --partial - <<EOF
-Invalid entry path: "bad/entry\npath".
-Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+Parser error:
+Too many # literals.
+Expected format is: [<backend-name>#]<path>.
 EOF
 }
 
