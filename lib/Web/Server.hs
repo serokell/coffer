@@ -129,19 +129,15 @@ makeServer
   :: (SomeBackend -> (forall a. Command a -> Handler a))
   -> Server API
 makeServer run backend
-  =    view   (run backend)
-  :<|> create (run backend)
-  :<|>
-    (\txt fkey ->
-         private (run backend) txt fkey
-    :<|> public  (run backend) txt fkey
-    :<|> set     (run backend) txt fkey
-    )
-  :<|> deleteField (run backend)
-  :<|> find'       (run backend)
-  :<|> rename      (run backend)
-  :<|> copy'       (run backend)
-  :<|> delete'     (run backend)
+  =    view               (run backend)
+  :<|> create             (run backend)
+  :<|> setField           (run backend)
+  :<|> setFieldVisibility (run backend)
+  :<|> deleteField        (run backend)
+  :<|> find'              (run backend)
+  :<|> rename             (run backend)
+  :<|> copy'              (run backend)
+  :<|> delete'            (run backend)
   :<|>
     (\path tag' ->
          tag (run backend) path tag' False
@@ -202,44 +198,33 @@ create run coPath coForce (NewEntry coFields coTags) =
 
     pretty = resultToText buildCreateError
 
-private
+setFieldVisibility
   :: (forall a. Command a -> Handler a)
   -> EntryPath
   -> FieldName
+  -> FieldVisibility
   -> Handler Entry
-private run sfoPath sfoFieldName  = do
+setFieldVisibility run path field visibility =
   run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
+    { sfoQPath = QualifiedPath Nothing path
+    , sfoFieldName = field
     , sfoFieldContents = Nothing
-    , sfoVisibility = Just Private
+    , sfoVisibility = Just visibility
     }) >>= handleSetFieldResult
 
-public
+setField
   :: (forall a. Command a -> Handler a)
   -> EntryPath
   -> FieldName
+  -> Maybe FieldVisibility
+  -> FieldContents
   -> Handler Entry
-public run sfoPath sfoFieldName  =
+setField run path field visibility contents =
   run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
-    , sfoFieldContents = Nothing
-    , sfoVisibility = Just Public
-    }) >>= handleSetFieldResult
-
-set
-  :: (forall a. Command a -> Handler a)
-  -> EntryPath
-  -> FieldName
-  -> Maybe FieldContents
-  -> Handler Entry
-set run sfoPath sfoFieldName sfoFieldContents =
-  run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
-    , sfoFieldContents = sfoFieldContents
-    , sfoVisibility = Nothing
+    { sfoQPath = QualifiedPath Nothing path
+    , sfoFieldName = field
+    , sfoFieldContents = Just contents
+    , sfoVisibility = visibility
     }) >>= handleSetFieldResult
 
 deleteField

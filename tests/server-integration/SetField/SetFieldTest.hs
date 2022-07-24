@@ -6,13 +6,11 @@ module SetField.SetFieldTest where
 
 import Control.Exception (try)
 import Control.Lens
-import Data.Aeson
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
-import Data.Text (Text)
 import Data.Time
 import Network.HTTP.Req
-import Network.HTTP.Types (status400, status404)
+import Network.HTTP.Types (status404)
 import Test.Tasty.HUnit
 import Utils
 
@@ -20,7 +18,7 @@ unit_set_new_field :: IO ()
 unit_set_new_field = cofferTest do
   createEntry "entry"
 
-  response <- setField "entry" "newField" "contents"
+  response <- setField "entry" "newField" Nothing "contents"
   response @=
     [aesonQQ|
       {
@@ -41,26 +39,16 @@ unit_set_new_field = cofferTest do
 unit_set_field_private :: IO ()
 unit_set_field_private = cofferTest do
   createEntry "entry"
-  setField "entry" "public-field" "contents"
-  response <-
-    executeCommand
-      POST
-      ["set-field", "private"]
-      NoReqBody
-      (jsonResponse @Value)
-      ( mconcat
-          [ "path" =: ("entry" :: Text)
-          , "field" =: ("public-field" :: Text)
-          ]
-      )
+
+  response <- setField "entry" "private-field" (Just False) "contents"
 
   let fieldMb =
         responseBody response
           & scrubDates
-          & findField "public-field"
+          & findField "private-field"
 
   case fieldMb of
-    Nothing -> assertFailure $ "Expected field \"public-field\", found nothing"
+    Nothing -> assertFailure $ "Expected field \"private-field\", found nothing"
     Just value ->
       value @?=
         [aesonQQ|
@@ -73,18 +61,9 @@ unit_set_field_private = cofferTest do
 
 unit_set_field_public :: IO ()
 unit_set_field_public = cofferTest do
-  unit_set_field_private
-  response <-
-    executeCommand
-      POST
-      ["set-field", "public"]
-      NoReqBody
-      (jsonResponse @Value)
-      ( mconcat
-          [ "path" =: ("entry" :: Text)
-          , "field" =: ("public-field" :: Text)
-          ]
-      )
+  createEntry "entry"
+
+  response <- setField "entry" "public-field" (Just True) "contents"
 
   let fieldMb =
         responseBody response
@@ -105,7 +84,7 @@ unit_set_field_public = cofferTest do
 
 unit_set_field_entry_not_found :: IO ()
 unit_set_field_entry_not_found = cofferTest do
-  try @HttpException (setField "entry" "field" "contents") >>=
+  try @HttpException (setField "entry" "field" Nothing "contents") >>=
     processStatusCodeError status404
       [aesonQQ|
         [
@@ -116,40 +95,16 @@ unit_set_field_entry_not_found = cofferTest do
         ]
       |]
 
-unit_set_field_missing_field_contents :: IO ()
-unit_set_field_missing_field_contents = cofferTest do
-  createEntry "entry"
-
-  try @HttpException
-    (
-      executeCommand
-        POST
-        ["set-field"]
-        (ReqBodyJson Null)
-        (jsonResponse @Value)
-        ( mconcat
-            [ "path" =: ("entry" :: Text)
-            , "field" =: ("field" :: Text)
-            ]
-        )
-    ) >>=
-    processStatusCodeError status400
-      [aesonQQ|
-        [
-          {
-            "error": "The entry at '/entry' does not yet have a field 'field'.\nIn order to create a new field, please include 'FIELDCONTENTS' in the body.",
-            "code": 301
-          }
-        ]
-      |]
+-- unit_set_field_missing_field_contents :: IO ()
+-- TODO: add test that expects an error in case of missing contents
 
 unit_set_field_updates_modification_date :: IO ()
 unit_set_field_updates_modification_date = cofferTest do
   createEntry "entry"
-  setField "entry" "field" "contents"
+  setField "entry" "field" Nothing "contents"
 
   t1 <- getCurrentTime
-  response <- setField "entry" "field" "contents2"
+  response <- setField "entry" "field" Nothing "contents2"
   t2 <- getCurrentTime
 
   let newModifiedDate = responseBody response ^?! key "dateModified" . _JSON @_ @UTCTime

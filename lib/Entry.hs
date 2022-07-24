@@ -137,6 +137,12 @@ instance A.FromJSON FieldVisibility where
     "private" -> pure Private
     other -> fail $ "expecting either 'public' or 'private', but found: '" <> T.unpack other <> "'"
 
+instance FromHttpApiData FieldVisibility where
+  parseUrlPiece = \case
+    "public"  -> Right Public
+    "private" -> Right Private
+    other     -> Left $ "expecting either 'public' or 'private', but found: '" <> other <> "'"
+
 newtype FieldContents = FieldContents { unFieldContents :: Text }
   deriving stock (Show, Eq, Ord)
   deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)

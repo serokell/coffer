@@ -39,7 +39,7 @@ executeDeleteField path field =
 unit_delete_field :: IO ()
 unit_delete_field = cofferTest do
   createEntry "entry"
-  void $ setField "entry" "field" "contents"
+  void $ setField "entry" "field" Nothing "contents"
 
   response <- executeDeleteField "entry" "field"
 
@@ -79,7 +79,7 @@ unit_delete_field_field_not_found = cofferTest do
 unit_delete_field_updates_entry's_modification_time :: IO ()
 unit_delete_field_updates_entry's_modification_time = cofferTest do
   createEntry "entry"
-  response <- setField "entry" "field" "contents"
+  response <- setField "entry" "field" Nothing "contents"
 
   let oldModificationTime = responseBody response ^?! key "dateModified"
 
