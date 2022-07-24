@@ -6,17 +6,21 @@ module Backends
   ( SomeBackend (..)
   , supportedBackends
   , backendPackedCodec
+  , supportedBackendsMap
+  , SupportedBackend (..)
   ) where
 
 import Backend (Backend(..))
 import Backend.Vault.Kv (VaultKvBackend)
 import Data.Aeson ((.:))
 import Data.Aeson qualified as A
+import Data.Aeson.Types (Parser)
 import Data.Bifunctor (Bifunctor(first))
 import Data.HashMap.Strict qualified as HS
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
+import Options.Applicative.Help.Pretty qualified as Pretty
 import Servant.API (FromHttpApiData(..))
 import Toml (TomlCodec)
 import Toml qualified
@@ -28,13 +32,30 @@ data SomeBackend where
 instance Show SomeBackend where
   show (SomeBackend a) = show a
 
+data SupportedBackend = SupportedBackend
+  { bType :: String
+  , bFromJSON :: A.Value -> Parser SomeBackend
+  , bToml :: Toml.TomlEnv SomeBackend
+  , bPathHelpMsg :: Pretty.Doc
+  }
+
+supportedBackendsMap :: HS.HashMap String SupportedBackend
+supportedBackendsMap = HS.fromList [("vault-kv", vaultKVSup)]
+  where
+    vaultKVSup = SupportedBackend
+      "vault-kv"
+      ((fmap SomeBackend) . (A.parseJSON @VaultKvBackend))
+      (fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend))
+      "Vault Kv paths can contain only the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+
 instance A.FromJSON SomeBackend where
   parseJSON original = A.withObject "SomeBackend" (\obj ->
-    do
-      bType :: String <- obj .: "type"
-      case bType of
-        "vault-kv" -> fmap SomeBackend $ A.parseJSON @VaultKvBackend original
-        _ -> fail "Unknown backend type") original
+      do
+        bType :: String <- obj .: "type"
+        case (HS.lookup bType supportedBackendsMap) of
+           Just supportedBackend -> (bFromJSON supportedBackend) original
+           Nothing -> fail $ "Unknown backend type: " <> bType
+    ) original
 
 instance FromHttpApiData SomeBackend where
   parseHeader = first T.pack . A.eitherDecodeStrict'
@@ -49,7 +70,7 @@ backendPackedCodec = Toml.Codec input output
         Just t -> do
           case Toml.backward Toml._Text t >>= supportedBackends of
             Right c -> c toml
-            Left e -> Failure [ Toml.BiMapError "type" e ]
+            Left _ -> Failure [ Toml.BiMapError "type" (Toml.ArbitraryError "Unknown backend type") ]
         Nothing -> Failure
           [ Toml.BiMapError "type" $ Toml.ArbitraryError
             "Backend doesn't have a `type` key"
@@ -60,5 +81,6 @@ backendPackedCodec = Toml.Codec input output
 
 supportedBackends
   :: Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
-supportedBackends "vault-kv" = Right $ fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend)
-supportedBackends _ = Left (Toml.ArbitraryError "Unknown backend type")
+supportedBackends backend = case HS.lookup (T.unpack backend) supportedBackendsMap of
+  Just x -> Right (bToml x)
+  Nothing ->  Left (Toml.ArbitraryError "Unknown backend type")
