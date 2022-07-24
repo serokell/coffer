@@ -19,19 +19,14 @@ import System.Environment (setEnv, unsetEnv, withArgs)
 import System.Time.Extra (sleep)
 import Test.Tasty.HUnit (assertFailure, (@=?))
 import Web.Main (RunServerException(..), runServer)
+import Control.Monad.Extra (whenJust)
 
 testPort :: String
 testPort = "8079"
 
-maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
-maybeIO action maybe =
-  case maybe of
-    (Just contents) -> action contents
-    Nothing -> pure ()
-
 testServer :: Maybe String -> [String] -> IO () -> IO () -> (String -> IO ()) -> IO ()
 testServer mbEnvPort args serverRunning serverStopped serverCrashed = do
-  maybeIO (setEnv "COFFER_SERVER_PORT") mbEnvPort
+  whenJust mbEnvPort $ setEnv "COFFER_SERVER_PORT"
   server <- async $ withArgs args runServer
   sleep 1
   serverStatus <- poll server
@@ -39,7 +34,7 @@ testServer mbEnvPort args serverRunning serverStopped serverCrashed = do
     Nothing -> cancel server >> serverRunning
     Just (Right _) -> serverStopped
     Just (Left (SomeException err)) -> serverCrashed $ show err
-  maybeIO (\_ -> unsetEnv "COFFER_SERVER_PORT") mbEnvPort
+  whenJust mbEnvPort $ \_ -> unsetEnv "COFFER_SERVER_PORT"
 
 unit_run_with_cmd_option_port :: IO ()
 unit_run_with_cmd_option_port = testServer
@@ -54,7 +49,7 @@ unit_run_with_bad_str_cmd_option_port :: IO()
 unit_run_with_bad_str_cmd_option_port = testServer
   Nothing
   ["--port=abs"]
-  (assertFailure "Server is runnung with bad port env var")
+  (assertFailure "Server is rinnng with bad port env var")
   (assertFailure "Server successfully ended its work with bad port env var")
   (\err -> "ExitFailure 1" @=? err)
 
