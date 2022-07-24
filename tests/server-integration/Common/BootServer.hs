@@ -15,11 +15,11 @@ module Common.BootServer
 
 import Control.Concurrent.Async (async, cancel, poll)
 import Control.Exception (SomeException(SomeException))
+import Control.Monad.Extra (whenJust)
 import System.Environment (setEnv, unsetEnv, withArgs)
 import System.Time.Extra (sleep)
 import Test.Tasty.HUnit (assertFailure, (@=?))
 import Web.Main (RunServerException(..), runServer)
-import Control.Monad.Extra (whenJust)
 
 testPort :: String
 testPort = "8079"
