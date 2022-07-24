@@ -58,7 +58,6 @@ deriving stock instance Show SomeCommand
 -- Command results
 ----------------------------------------------------------------------------
 
--- | All these @ToSchema@ instances for results are redundant due to https://github.com/serokell/coffer/issues/111
 
 data ViewResult
   = VRDirectory Directory

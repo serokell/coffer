@@ -37,6 +37,7 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.OpenApi
+import Data.OpenApi.Lens qualified as Schema
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fmt (Buildable, build, fmt, pretty)
@@ -142,7 +143,7 @@ instance ToSchema EntryPath where
     namedSchema <- genericDeclareNamedSchema defaultSchemaOptions proxy
     pure
       $ namedSchema
-      & schema %~ \s -> s { _schemaPattern = Just "(/${pathSegment})+" }
+      & schema . Schema.pattern ?~ "(/${pathSegment})+"
 
 instance ToHttpApiData EntryPath where
   toUrlPiece = fmt . build
