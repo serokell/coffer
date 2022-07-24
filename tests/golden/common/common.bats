@@ -53,11 +53,6 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid qualified entry path format: "back#/path#\n\nsmth".
-Expected format is: [<backend-name>#]<entry-path>.
-<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
-Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'.
-
 Parser error:
 Too many # literals.
 Expected format is: [<backend-name>#]<path>.
@@ -69,11 +64,6 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid qualified path format: "back#/path#\n\nsmth".
-Expected format is: [<backend-name>#]<path>.
-<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
-Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'.
-
 Parser error:
 Too many # literals.
 Expected format is: [<backend-name>#]<path>.

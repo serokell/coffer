@@ -46,7 +46,7 @@ supportedBackendsMap = HS.fromList [("vault-kv", vaultKVSup)]
       "vault-kv"
       ((fmap SomeBackend) . (A.parseJSON @VaultKvBackend))
       (fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend))
-      "Vault Kv paths can contain only the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+      "Vault Kv paths can contain only the following characters: [a-zA-Z0-9] and symbols '-', '_'."
 
 instance A.FromJSON SomeBackend where
   parseJSON original = A.withObject "SomeBackend" (\obj ->
