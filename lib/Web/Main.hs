@@ -14,13 +14,13 @@ import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 import Data.Proxy
 import Network.Wai.Handler.Warp (run)
+import Options.Applicative
 import Servant.Server (serve)
 import System.Environment (lookupEnv)
+import Text.Interpolation.Nyan
 import Text.Read (readEither)
 import Web.API (API)
 import Web.Server
-import Options.Applicative
-import Text.Interpolation.Nyan
 
 data ServerOptions = ServerOptions { serverPort :: Maybe Int }
 
