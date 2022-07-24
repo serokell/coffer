@@ -17,5 +17,5 @@ main = do
   let openApi = toOpenApi (Proxy :: Proxy API)
         & info . title .~ "Coffer Web API"
         & info . version .~ "1.0"
-        & servers .~ ["localhost:8081"]
-  BL.writeFile "swagger.json" (encodePretty openApi)
+        & servers .~ ["http://localhost:8081"]
+  BL.writeFile "docs/swagger.json" (encodePretty openApi)

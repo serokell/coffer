@@ -1,0 +1,777 @@
+{
+    "servers": [
+        {
+            "url": "http://localhost:8081"
+        }
+    ],
+    "info": {
+        "title": "Coffer Web API",
+        "version": "1.0"
+    },
+    "components": {
+        "schemas": {
+            "EntryPath": {
+                "type": "object",
+                "required": [
+                    "unEntryPath"
+                ],
+                "pattern": "(/${pathSegment})+",
+                "properties": {
+                    "unEntryPath": {
+                        "items": {
+                            "$ref": "#/components/schemas/PathSegment"
+                        },
+                        "type": "array",
+                        "minItems": 1
+                    }
+                }
+            },
+            "Directory": {
+                "type": "object",
+                "required": [
+                    "entries",
+                    "subdirs"
+                ],
+                "properties": {
+                    "subdirs": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Directory"
+                        }
+                    },
+                    "entries": {
+                        "items": {
+                            "$ref": "#/components/schemas/Entry"
+                        },
+                        "type": "array"
+                    }
+                }
+            },
+            "UTCTime": {
+                "type": "string",
+                "format": "yyyy-mm-ddThh:MM:ssZ",
+                "example": "2016-07-22T00:00:00Z"
+            },
+            "FieldName": {
+                "type": "string",
+                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+            },
+            "Field": {
+                "type": "object",
+                "required": [
+                    "dateModified",
+                    "visibility",
+                    "contents"
+                ],
+                "properties": {
+                    "contents": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "$ref": "#/components/schemas/FieldVisibility"
+                    },
+                    "dateModified": {
+                        "$ref": "#/components/schemas/UTCTime"
+                    }
+                }
+            },
+            "PathSegment": {
+                "type": "string",
+                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_]*"
+            },
+            "NewEntry": {
+                "type": "object",
+                "required": [
+                    "fields",
+                    "tags"
+                ],
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/EntryTag"
+                        },
+                        "type": "array"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/NewField"
+                        }
+                    }
+                }
+            },
+            "EntryTag": {
+                "type": "string",
+                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+            },
+            "NewField": {
+                "type": "object",
+                "required": [
+                    "contents",
+                    "visibility"
+                ],
+                "properties": {
+                    "contents": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "$ref": "#/components/schemas/FieldVisibility"
+                    }
+                }
+            },
+            "FieldVisibility": {
+                "type": "string",
+                "enum": [
+                    "public",
+                    "private"
+                ]
+            },
+            "Entry": {
+                "type": "object",
+                "required": [
+                    "path",
+                    "dateModified",
+                    "fields",
+                    "tags"
+                ],
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/EntryTag"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                    },
+                    "masterField": {
+                        "$ref": "#/components/schemas/FieldName"
+                    },
+                    "path": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Field"
+                        }
+                    },
+                    "dateModified": {
+                        "$ref": "#/components/schemas/UTCTime"
+                    }
+                }
+            }
+        }
+    },
+    "paths": {
+        "/api/v1/content/find": {
+            "get": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `filter` or `sort-field` or `text` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Directory"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": false,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "text",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort-field",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "format": "name:<direction>\ndate:<direction>\n<direction>=[asc, desc]\n"
+                        }
+                    },
+                    {
+                        "name": "filter",
+                        "in": "query",
+                        "schema": {
+                            "items": {
+                                "format": "name~<substring>\ndate<op><date>\n<op>=[>=, <=, >, <, =]\n<date>=['YYYY', 'YYYY-MM', 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS']\n"
+                            },
+                            "type": "array"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/view": {
+            "get": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Directory"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `body` or `field` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/content/delete": {
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `recursive` or `path` or `dry-run` or `token`"
+                    },
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "recursive",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/copy": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `force` or `new-path` or `old-path` or `dry-run` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "items": [
+                                            {
+                                                "$ref": "#/components/schemas/EntryPath"
+                                            },
+                                            {
+                                                "$ref": "#/components/schemas/EntryPath"
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "maxItems": 2,
+                                        "minItems": 2
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "old-path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "new-path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/rename": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `force` or `new-path` or `old-path` or `dry-run` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "items": {
+                                        "items": [
+                                            {
+                                                "$ref": "#/components/schemas/EntryPath"
+                                            },
+                                            {
+                                                "$ref": "#/components/schemas/EntryPath"
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "maxItems": 2,
+                                        "minItems": 2
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "dry-run",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "old-path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "new-path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field/public": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/tag": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `tag` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "tag",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ]
+            },
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `tag` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "tag",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/set-field/private": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/delete-field": {
+            "delete": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `field` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "field",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;]*"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/v1/content/create": {
+            "post": {
+                "responses": {
+                    "400": {
+                        "description": "Invalid `body` or `force` or `path` or `token`"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json;charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Entry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "token",
+                        "required": true,
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "path",
+                        "required": true,
+                        "in": "query",
+                        "schema": {}
+                    },
+                    {
+                        "name": "force",
+                        "allowEmptyValue": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json;charset=utf-8": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NewEntry"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "openapi": "3.0.0"
+}

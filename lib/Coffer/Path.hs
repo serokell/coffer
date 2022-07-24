@@ -67,7 +67,8 @@ makeLensesWith abbreviatedFields ''DirectoryContents
 
 instance ToSchema PathSegment where
   declareNamedSchema _ = pure $ NamedSchema (Just "PathSegment")
-    mempty { _schemaPattern = Just pathSegmentPattern }
+    mempty
+      & Schema.pattern ?~ pathSegmentPattern
       & type_ ?~ OpenApiString
     where
       pathSegmentPattern = "[" <> T.pack pathSegmentAllowedCharacters <> "]*"

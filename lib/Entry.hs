@@ -39,6 +39,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
 import Data.OpenApi
+import Data.OpenApi.Lens qualified as Schema
 import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Text (Text)
@@ -59,7 +60,8 @@ instance ToSchema FieldName where
 
 instance ToParamSchema FieldName where
   toParamSchema _ =
-    mempty { _schemaPattern = Just fieldNamePattern }
+    mempty
+      & Schema.pattern ?~ fieldNamePattern
       & type_ ?~ OpenApiString
     where
       fieldNamePattern = "[" <> T.pack allowedCharSet <> "]*"
@@ -90,7 +92,8 @@ instance ToSchema EntryTag where
 
 instance ToParamSchema EntryTag where
   toParamSchema _ =
-    mempty { _schemaPattern = Just entryTagPattern }
+    mempty
+      & Schema.pattern ?~ entryTagPattern
       & type_ ?~ OpenApiString
     where
       entryTagPattern = "[" <> T.pack allowedCharSet <> "]*"
