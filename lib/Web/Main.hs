@@ -14,12 +14,13 @@ import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 import Data.Proxy
 import Network.Wai.Handler.Warp (run)
-import Options qualified as O
 import Servant.Server (serve)
 import System.Environment (lookupEnv)
 import Text.Read (readEither)
 import Web.API (API)
 import Web.Server
+import Options.Applicative
+import Text.Interpolation.Nyan
 
 data ServerOptions = ServerOptions { serverPort :: Maybe Int }
 
@@ -36,12 +37,32 @@ instance Show RunServerException where
 
 instance Exception RunServerException
 
-instance O.Options ServerOptions where
-  defineOptions = pure ServerOptions <*> O.simpleOption "port" Nothing "Port to run a server"
+
+parseServerOptions :: ParserInfo ServerOptions
+parseServerOptions = info (parser <**> helper) mempty
+
+parser ::  Parser ServerOptions
+parser = ServerOptions <$> parseServerOptionPort
+
+parseServerOptionPort :: Parser (Maybe Int)
+parseServerOptionPort = optional $ option auto $ mconcat
+        [ long "port"
+        , short 'p'
+        , metavar "COFFER_SERVER_PORT"
+        , help [int|s|
+            Specify server port to run a server.
+            When this option is not set, the 'COFFER_SERVER_PORT' environment variable will be used.
+            When neither is set, it will crash.
+          |]
+        ]
+
 
 runServer :: IO ()
-runServer = O.runCommand $ \opts _ -> do
+runServer =
+  do
+  opts <- execParser parseServerOptions
   envPortStr <- lookupEnv "COFFER_SERVER_PORT"
+
   let envPort = maybe (Left RunServerNoPortSpecified) ((first RunServerEnvVarParseFail) . readEither) envPortStr
   let optPort = maybe (Left RunServerNoPortSpecified) Right $ serverPort opts
 

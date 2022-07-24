@@ -117,7 +117,7 @@ library:
     - unordered-containers
     - validation-selective
     - warp
-    - options
+    - optparse-applicative
 
 executables:
   coffer:
