@@ -12,7 +12,7 @@ import Data.Text (Text)
 import Entry
 import GHC.Generics (Generic)
 import Servant.API
-import Web.Types (NewEntry)
+import Web.Types (NewEntry, PairObject)
 
 type API
   = Header' [Required, Strict] "token" VaultToken
@@ -54,14 +54,14 @@ type API
       :> RequiredParam "old-path" (QualifiedPath Path)
       :> RequiredParam "new-path" (QualifiedPath Path)
       :> QueryFlag     "force"
-      :> Post '[JSON] [(EntryPath, EntryPath)]
+      :> Post '[JSON] [PairObject EntryPath]
 
     :<|> "copy"
       :> QueryFlag     "dry-run"
       :> RequiredParam "old-path" (QualifiedPath Path)
       :> RequiredParam "new-path" (QualifiedPath Path)
       :> QueryFlag     "force"
-      :> Post '[JSON] [(EntryPath, EntryPath)]
+      :> Post '[JSON] [PairObject EntryPath]
 
     :<|> "delete"
       :> QueryFlag     "dry-run"

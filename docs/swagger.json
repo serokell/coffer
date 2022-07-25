@@ -10,6 +10,21 @@
     },
     "components": {
         "schemas": {
+            "PairObject_EntryPath": {
+                "type": "object",
+                "required": [
+                    "first",
+                    "second"
+                ],
+                "properties": {
+                    "second": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    },
+                    "first": {
+                        "$ref": "#/components/schemas/EntryPath"
+                    }
+                }
+            },
             "EntryPath": {
                 "type": "string",
                 "pattern": "(/[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_]*)+"
@@ -353,17 +368,7 @@
                             "application/json;charset=utf-8": {
                                 "schema": {
                                     "items": {
-                                        "items": [
-                                            {
-                                                "$ref": "#/components/schemas/EntryPath"
-                                            },
-                                            {
-                                                "$ref": "#/components/schemas/EntryPath"
-                                            }
-                                        ],
-                                        "type": "array",
-                                        "maxItems": 2,
-                                        "minItems": 2
+                                        "$ref": "#/components/schemas/PairObject_EntryPath"
                                     },
                                     "type": "array"
                                 }
@@ -425,17 +430,7 @@
                             "application/json;charset=utf-8": {
                                 "schema": {
                                     "items": {
-                                        "items": [
-                                            {
-                                                "$ref": "#/components/schemas/EntryPath"
-                                            },
-                                            {
-                                                "$ref": "#/components/schemas/EntryPath"
-                                            }
-                                        ],
-                                        "type": "array",
-                                        "maxItems": 2,
-                                        "minItems": 2
+                                        "$ref": "#/components/schemas/PairObject_EntryPath"
                                     },
                                     "type": "array"
                                 }

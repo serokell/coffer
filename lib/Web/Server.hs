@@ -38,7 +38,7 @@ import Fmt (Builder, pretty, unlinesF)
 import GHC.Generics (Generic)
 import Servant.API
 import Servant.Server
-import Web.Types (NewEntry(NewEntry), NewField(NewField))
+import Web.Types (NewEntry(NewEntry), NewField(NewField), mkPair, PairObject)
 
 data CofferServerError = CofferServerError
   { cseError :: Text
@@ -71,9 +71,9 @@ handleSetFieldResult = \case
   where
     pretty = resultToText buildSetFieldResult
 
-handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [(EntryPath, EntryPath)]
+handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [PairObject EntryPath]
 handleCopyOrRenameResult rename = \case
-  CPRSuccess _ paths -> pure (paths <&> bimap qpPath qpPath)
+  CPRSuccess _ paths -> pure (paths <&> (mkPair . bimap qpPath qpPath))
   res@CPRPathNotFound{} ->
     throwCofferServerError err404 500 (prettySingleMessage res)
   res@CPRMissingEntryName{} ->
@@ -97,10 +97,10 @@ handleCopyOrRenameResult rename = \case
       CEDestinationIsDirectory{} -> 504
       CEEntryAlreadyExists{} -> 505
 
-handleCopyResult :: CopyResult -> Handler [(EntryPath, EntryPath)]
+handleCopyResult :: CopyResult -> Handler [PairObject EntryPath]
 handleCopyResult = handleCopyOrRenameResult False
 
-handleRenameResult :: RenameResult -> Handler [(EntryPath, EntryPath)]
+handleRenameResult :: RenameResult -> Handler [PairObject EntryPath]
 handleRenameResult = handleCopyOrRenameResult True
 
 runBackendIO' :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO] a -> IO (Either CofferError a)
@@ -286,7 +286,7 @@ rename
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
-  -> Handler [(EntryPath, EntryPath)]
+  -> Handler [PairObject EntryPath]
 rename run token roDryRun roQOldPath roQNewPath roForce =
   run token (CmdRename RenameOptions
     { roDryRun
@@ -302,7 +302,7 @@ copy'
   -> QualifiedPath Path
   -> QualifiedPath Path
   -> Bool
-  -> Handler [(EntryPath, EntryPath)]
+  -> Handler [PairObject EntryPath]
 copy' run token cpoDryRun cpoQOldPath cpoQNewPath cpoForce =
   run token (CmdCopy CopyOptions
     { cpoDryRun

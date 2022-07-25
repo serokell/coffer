@@ -4,6 +4,7 @@
 
 module Web.Types where
 
+import Data.Aeson qualified as A
 import Data.Aeson.Casing (aesonPrefix, camelCase)
 import Data.Aeson.TH (deriveJSON)
 import Data.HashMap.Strict (HashMap)
@@ -29,4 +30,19 @@ data NewEntry = NewEntry
 deriveJSON (aesonPrefix camelCase) ''NewEntry
 
 instance ToSchema NewEntry where
+  declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
+
+-- | Datatype that serves as a workaround for this issue:
+-- https://github.com/biocad/openapi3/issues/31
+data PairObject a = PairObject
+  { poFirst :: a
+  , poSecond :: a
+   }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (A.ToJSON, A.FromJSON)
+
+mkPair :: (a, a) -> PairObject a
+mkPair (a, b) = PairObject a b
+
+instance ToSchema a =>  ToSchema (PairObject a) where
   declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
