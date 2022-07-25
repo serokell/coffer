@@ -43,6 +43,7 @@ import Data.Text qualified as T
 import Fmt (Buildable, build, fmt, pretty)
 import GHC.Generics (Generic)
 import Servant (FromHttpApiData(..), ToHttpApiData(..))
+import Text.Interpolation.Nyan
 
 -- $setup
 -- >>> import Fmt (pretty, build)
@@ -71,14 +72,18 @@ instance ToSchema PathSegment where
       & Schema.pattern ?~ pathSegmentPattern
       & type_ ?~ OpenApiString
     where
-      pathSegmentPattern = "[" <> T.pack pathSegmentAllowedCharacters <> "]*"
+      pathSegmentPattern = [int|s|
+        [#{pathSegmentAllowedCharacters}]
+      |]
 
 mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
   | T.null segment =
       Left "Path segments must contain at least 1 character"
   | T.any (`notElem` pathSegmentAllowedCharacters) segment =
-      Left $ "Path segments can only contain the following characters: '" <> T.pack pathSegmentAllowedCharacters <> "'"
+      Left $ [int|s|
+        Path segments can only contain the following characters: '#{pathSegmentAllowedCharacters}'
+      |]
   | otherwise = Right $ UnsafeMkPathSegment segment
 
 pathSegmentAllowedCharacters :: [Char]
@@ -139,12 +144,24 @@ newtype EntryPath = EntryPath { unEntryPath :: NonEmpty PathSegment }
 instance A.ToJSON EntryPath where
   toJSON = String . pretty
 
+instance ToParamSchema EntryPath where
+  toParamSchema _ =
+    mempty
+      & Schema.pattern ?~ entryPathPattern
+      & type_ ?~ OpenApiString
+    where
+      segmentPattern :: Pattern
+      segmentPattern = [int|s|
+        [#{pathSegmentAllowedCharacters}]*
+      |]
+
+      entryPathPattern :: Pattern
+      entryPathPattern = [int|s|
+        (/#{segmentPattern})+
+      |]
+
 instance ToSchema EntryPath where
-  declareNamedSchema proxy = do
-    namedSchema <- genericDeclareNamedSchema defaultSchemaOptions proxy
-    pure
-      $ namedSchema
-      & schema . Schema.pattern ?~ "(/${pathSegment})+"
+  declareNamedSchema proxy = pure $ NamedSchema (Just "EntryPath") (toParamSchema proxy)
 
 instance ToHttpApiData EntryPath where
   toUrlPiece = fmt . build

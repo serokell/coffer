@@ -11,20 +11,8 @@
     "components": {
         "schemas": {
             "EntryPath": {
-                "type": "object",
-                "required": [
-                    "unEntryPath"
-                ],
-                "pattern": "(/${pathSegment})+",
-                "properties": {
-                    "unEntryPath": {
-                        "items": {
-                            "$ref": "#/components/schemas/PathSegment"
-                        },
-                        "type": "array",
-                        "minItems": 1
-                    }
-                }
+                "type": "string",
+                "pattern": "(/[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_]*)+"
             },
             "Directory": {
                 "type": "object",
@@ -74,10 +62,6 @@
                         "$ref": "#/components/schemas/UTCTime"
                     }
                 }
-            },
-            "PathSegment": {
-                "type": "string",
-                "pattern": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_]*"
             },
             "NewEntry": {
                 "type": "object",
