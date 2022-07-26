@@ -6,8 +6,11 @@ module SetField.SetFieldTest where
 
 import Control.Exception (try)
 import Control.Lens
+import Data.Aeson (Value)
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
+import Data.Functor (void)
+import Data.Text (Text)
 import Data.Time
 import Network.HTTP.Req
 import Network.HTTP.Types (status404)
@@ -113,3 +116,51 @@ unit_set_field_updates_modification_date = cofferTest do
 
   assertBool "Dates are not equal"
     $ responseBody response ^?! key "fields" . key "field" . key "dateModified" . _JSON == newModifiedDate
+
+unit_set_field_visibility :: IO ()
+unit_set_field_visibility = cofferTest do
+  createEntry "dir/entry"
+  void $ setField "dir/entry" "private-field" Nothing "contents"
+  void $ setField "dir/entry" "public-field" Nothing "contents"
+  changeFieldVisibility "dir/entry" "private-field" False
+  changeFieldVisibility "dir/entry" "public-field" True
+
+  response <-
+    executeCommand
+      GET
+      ["view"]
+      NoReqBody
+      (jsonResponse @Value)
+      ("path" =: (("dir/entry") :: Text))
+
+  response @=
+    [aesonQQ|
+      {
+        "entries": [],
+        "subdirs": {
+          "dir": {
+            "entries": [
+              {
+                "path": "/dir/entry",
+                "dateModified": "",
+                "masterField": null,
+                "fields": {
+                  "public-field": {
+                    "dateModified": "",
+                    "visibility": "public",
+                    "contents": "contents"
+                  },
+                  "private-field": {
+                    "dateModified": "",
+                    "visibility": "private",
+                    "contents": "contents"
+                  }
+                },
+                "tags": []
+              }
+            ],
+            "subdirs": {}
+          }
+        }
+      }
+    |]
