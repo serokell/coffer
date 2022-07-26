@@ -51,7 +51,7 @@ unit_run_with_bad_str_cmd_option_port :: IO()
 unit_run_with_bad_str_cmd_option_port = testServer
   Nothing
   ["--port=abs"]
-  (assertFailure "Server is rinnng with bad port env var")
+  (assertFailure "Server is running with bad port env var")
   (assertFailure "Server successfully ended its work with bad port env var")
   (\err -> "ExitFailure 1" @=? err)
 
@@ -94,7 +94,6 @@ unit_run_with_cmd_opt_and_bad_env_var_port = testServer
   (pure ())
   (assertFailure "Server ended its work")
   (\err -> assertFailure $ "Server raised exception : " ++ show err)
-
 
 unit_run_with_bad_cmd_opt_and_env_var_port :: IO()
 unit_run_with_bad_cmd_opt_and_env_var_port = testServer
