@@ -31,12 +31,11 @@ data RunServerException
   deriving stock (Eq)
 
 instance Show RunServerException where
-  show (RunServerIncorrectPort port) = "Port number should be greater then 0. Your port number is: " ++ show port
-  show RunServerNoPortSpecified = "No port where not specified. Can be set by envirment varieble \"COFFER_SERVER_PORT\" or by \"--port=$port_num\" cmd argument."
-  show (RunServerEnvVarParseFail msg) = "Can't parse port specified by env var \"COFFER_SERVER_PORT\": " ++ msg
+  show (RunServerIncorrectPort port) = "Port number should be greater than 0. Your port number is: " ++ show port
+  show RunServerNoPortSpecified = "No port was specified. It can be set using the environment variable \"COFFER_SERVER_PORT\" or the \"--port=$port_num\" command-line option."
+  show (RunServerEnvVarParseFail msg) = "Can't parse port specified by the environment variable \"COFFER_SERVER_PORT\": " ++ msg
 
 instance Exception RunServerException
-
 
 parseServerOptions :: ParserInfo ServerOptions
 parseServerOptions = info (parser <**> helper) mempty
@@ -55,7 +54,6 @@ parseServerOptionPort = optional $ option auto $ mconcat
             When neither is set, it will crash.
           |]
         ]
-
 
 runServer :: IO ()
 runServer =
