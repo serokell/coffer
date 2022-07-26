@@ -17,6 +17,8 @@ import Control.Concurrent.Async (async, cancel, poll)
 import Control.Exception (SomeException(SomeException))
 import Control.Monad.Extra (whenJust)
 import System.Environment (setEnv, unsetEnv, withArgs)
+import System.IO (stderr)
+import System.IO.Silently (hCapture)
 import System.Time.Extra (sleep)
 import Test.Tasty.HUnit (assertFailure, (@=?))
 import Web.Main (RunServerException(..), runServer)
@@ -27,7 +29,7 @@ testPort = "8079"
 testServer :: Maybe String -> [String] -> IO () -> IO () -> (String -> IO ()) -> IO ()
 testServer mbEnvPort args serverRunning serverStopped serverCrashed = do
   whenJust mbEnvPort $ setEnv "COFFER_SERVER_PORT"
-  server <- async $ withArgs args runServer
+  server <- async $ hCapture [stderr] $ withArgs args runServer
   sleep 1
   serverStatus <- poll server
   case serverStatus of

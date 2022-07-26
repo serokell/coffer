@@ -184,3 +184,4 @@ tests:
       - text
       - time
       - bytestring
+      - silently

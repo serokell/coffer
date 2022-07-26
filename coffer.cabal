@@ -414,6 +414,7 @@ test-suite server-integration
     , lens-aeson
     , process
     , req
+    , silently
     , syb
     , tasty
     , tasty-hunit
