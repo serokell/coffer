@@ -5,6 +5,7 @@
 module Backend.Vault.Kv
   ( VaultKvBackend
   , I.VaultToken(..)
+  , kvPathSegmentAllowedCharacters
   ) where
 
 import Backend (Backend(..), Effects)
@@ -113,11 +114,14 @@ instance Buildable VaultError where
         Backend returned a path segment that is not a valid \
         entry or directory name.
         Path segments for Vault KV can only contain the following characters:
-          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+        '#{kvPathSegmentAllowedCharacters}'
         Got: #{pathSegment}.
       |]
 
 instance BackendError VaultError
+
+kvPathSegmentAllowedCharacters :: [Char]
+kvPathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
@@ -206,9 +210,6 @@ kvValidatePath :: Effects r => (HasPathSegments s segments, Each segments segmen
 kvValidatePath _ path = do
   for_ (getPathSegments path) \pathSegment ->
     when (T.any (`notElem` kvPathSegmentAllowedCharacters) pathSegment) $ throw $ BackendError $ InvalidPathSegment $ T.pack . show $ pathSegment
-
-kvPathSegmentAllowedCharacters :: [Char]
-kvPathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 kvWriteEntry :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteEntry backend entry = do
