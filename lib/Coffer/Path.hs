@@ -23,6 +23,7 @@ module Coffer.Path
   , entryPathAsPath
   , replacePathPrefix
   , QualifiedPath (..)
+  , SuperPathSegmented
   ) where
 
 import BackendName (BackendName, newBackendName)
@@ -253,6 +254,12 @@ instance HasPathSegments Path [PathSegment] where
   pathSegments = iso unPath Path
 instance HasPathSegments EntryPath (NonEmpty PathSegment) where
   pathSegments = iso unEntryPath EntryPath
+
+class (HasPathSegments s segments, Each segments segments PathSegment PathSegment) => SuperPathSegmented s segments | s -> segments
+
+instance SuperPathSegmented Path [PathSegment]
+
+instance SuperPathSegmented EntryPath (NonEmpty PathSegment)
 
 ----------------------------------------------------------------------------
 -- Helpers

@@ -12,8 +12,8 @@ import Backend (Backend(..), Effects)
 import Backend.Vault.Kv.Internal qualified as I
 import BackendName (BackendName, backendNameCodec)
 import Coffer.Path
-  (DirectoryContents(DirectoryContents), EntryPath, HasPathSegments, Path, PathSegment,
-  directoryNames, entryNames, mkPath, pathSegments, unPathSegment)
+  (DirectoryContents(DirectoryContents), EntryPath, Path, SuperPathSegmented, directoryNames,
+  entryNames, mkPath, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
 import Control.Exception (try)
 import Control.Lens hiding ((.=))
@@ -201,11 +201,11 @@ orThrowEither
 orThrowEither e mkErr = either (throw . mkErr) pure e
 
 getPathSegments
-  :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+  :: SuperPathSegmented s segments
   => s -> [Text]
 getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
-kvValidatePath :: Effects r => (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
+kvValidatePath :: Effects r => SuperPathSegmented s segments
  => VaultKvBackend -> s -> Sem r ()
 kvValidatePath _ path = do
   for_ (getPathSegments path) \pathSegment ->
