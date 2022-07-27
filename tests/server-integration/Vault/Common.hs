@@ -59,7 +59,7 @@ unit_vault_incorrect_path_segment_fromHttpApiData = cofferTest do
       [aesonQQ|
         [
           {
-            "error" : "Internal backend error:\nBackend returned a path segment that is not a valid entry or directory name.\nPath segments for Vault KV can only contain the following characters:\n  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'\nGot: \"entry:.\".",
+            "error" : "Internal backend error:\nBackend returned a path segment that is not a valid entry or directory name.\nPath segments for Vault KV can only contain the following characters:\n'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'\nGot: \"entry:.\".",
             "code"  : 0
           }
         ]
