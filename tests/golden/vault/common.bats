@@ -16,7 +16,7 @@ load '../helpers'
 Internal backend error:
 Backend returned a path segment that is not a valid entry or directory name.
 Path segments for Vault KV can only contain the following characters:
-  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
 Got: "bad\npath".
 EOF
 }
@@ -29,7 +29,7 @@ EOF
 Internal backend error:
 Backend returned a path segment that is not a valid entry or directory name.
 Path segments for Vault KV can only contain the following characters:
-  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
 Got: "entry\npath".
 EOF
 }
