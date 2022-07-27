@@ -422,8 +422,9 @@ copyCmd
 deleteCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult] r)
   => Config -> DeleteOptions -> Sem r DeleteResult
-deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) recursive) = do
+deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb path) recursive) = do
   backend <- getBackend config backendNameMb
+  validatePath backend path
   getEntryOrDirThrow backend DRPathNotFound qPath >>= \case
     Left entry -> do
       unless dryRun do
