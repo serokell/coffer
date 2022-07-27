@@ -419,19 +419,23 @@ expectedQualifiedEntryPathFormat :: Pretty.Doc
 expectedQualifiedEntryPathFormat = Pretty.vsep
   $ [ "Expected format is: [<backend-name>#]<entry-path>."
     , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
-    , "Backend <entry-path> specifics : "
+    , "Backend <entry-path> specifics :"
     ]
-  <> getBackendsHelpMsg bPathHelpMsg
-  <> [ "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'." ]
+  <> (map bPathHelpMsg $ HS.elems supportedBackendsMap)
+  <> [ Pretty.empty
+     , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'."
+     ]
 
 expectedQualifiedPathFormat :: Pretty.Doc
 expectedQualifiedPathFormat = Pretty.vsep
   $ [ "Expected format is: [<backend-name>#]<path>."
     , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
-    , "Backend <path> specifics : "
+    , "Backend <path> specifics :"
     ]
-   <> getBackendsHelpMsg bPathHelpMsg
-   <> [ "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'." ]
+  <> (map bPathHelpMsg $ HS.elems supportedBackendsMap)
+  <> [ Pretty.empty
+     , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'."
+     ]
 
 expectedFilterFormat :: Pretty.Doc
 expectedFilterFormat = Pretty.vsep
@@ -448,9 +452,6 @@ expectedFilterFormat = Pretty.vsep
 ----------------------------------------------------------------------------
 -- Utils
 ----------------------------------------------------------------------------
-
-getBackendsHelpMsg :: (SupportedBackend -> Pretty.Doc) -> [Pretty.Doc]
-getBackendsHelpMsg getter = (map getter $ HS.elems supportedBackendsMap)
 
 eitherTextReader :: (Text -> Either Text a) -> ReadM a
 eitherTextReader eitherR = eitherReader $ (first T.unpack ) . eitherR . T.pack
