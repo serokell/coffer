@@ -6,7 +6,6 @@ module Coffer.Path
   ( PathSegment
   , unPathSegment
   , mkPathSegment
-  , pathSegmentAllowedCharacters
   , DirectoryContents(..)
   , directoryNames
   , entryNames
@@ -24,6 +23,7 @@ module Coffer.Path
   , entryPathAsPath
   , replacePathPrefix
   , QualifiedPath (..)
+  , SuperPathSegmented
   ) where
 
 import BackendName (BackendName, newBackendName)
@@ -64,12 +64,9 @@ mkPathSegment :: Text -> Either Text PathSegment
 mkPathSegment segment
   | T.null segment =
       Left "Path segments must contain at least 1 character"
-  | T.any (`notElem` pathSegmentAllowedCharacters) segment =
-      Left $ "Path segments can only contain the following characters: '" <> T.pack pathSegmentAllowedCharacters <> "'"
+  | '#' `elem` T.unpack segment =
+      Left $ "Path segments can't contain the following characters: '#'"
   | otherwise = Right $ UnsafeMkPathSegment segment
-
-pathSegmentAllowedCharacters :: [Char]
-pathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 data DirectoryContents = DirectoryContents
   { dcDirectoryNames :: [PathSegment]
@@ -257,6 +254,12 @@ instance HasPathSegments Path [PathSegment] where
   pathSegments = iso unPath Path
 instance HasPathSegments EntryPath (NonEmpty PathSegment) where
   pathSegments = iso unEntryPath EntryPath
+
+class (HasPathSegments s segments, Each segments segments PathSegment PathSegment) => SuperPathSegmented s segments | s -> segments
+
+instance SuperPathSegmented Path [PathSegment]
+
+instance SuperPathSegmented EntryPath (NonEmpty PathSegment)
 
 ----------------------------------------------------------------------------
 -- Helpers

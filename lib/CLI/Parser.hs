@@ -9,11 +9,13 @@ module CLI.Parser
   , parseFilterDate
   ) where
 
+import Backends (SupportedBackend(..), supportedBackendsMap)
 import CLI.Types
 import Coffer.Path (EntryPath, Path, QualifiedPath, mkEntryPath, mkPath, mkQualifiedPath)
 import Data.Bifunctor (first)
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.HashMap.Internal.Strict qualified as HS
 import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as M
@@ -415,17 +417,25 @@ readFilter = do
 
 expectedQualifiedEntryPathFormat :: Pretty.Doc
 expectedQualifiedEntryPathFormat = Pretty.vsep
-  [ "Expected format is: [<backend-name>#]<entry-path>."
-  , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
-  , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'."
-  ]
+  $ [ "Expected format is: [<backend-name>#]<entry-path>."
+    , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+    , "Backend <entry-path> specifics :"
+    ]
+  <> (map bPathHelpMsg $ HS.elems supportedBackendsMap)
+  <> [ Pretty.empty
+     , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'."
+     ]
 
 expectedQualifiedPathFormat :: Pretty.Doc
 expectedQualifiedPathFormat = Pretty.vsep
-  [ "Expected format is: [<backend-name>#]<path>."
-  , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
-  , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'."
-  ]
+  $ [ "Expected format is: [<backend-name>#]<path>."
+    , "<backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'."
+    , "Backend <path> specifics :"
+    ]
+  <> (map bPathHelpMsg $ HS.elems supportedBackendsMap)
+  <> [ Pretty.empty
+     , "Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'."
+     ]
 
 expectedFilterFormat :: Pretty.Doc
 expectedFilterFormat = Pretty.vsep
