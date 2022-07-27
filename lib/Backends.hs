@@ -4,14 +4,13 @@
 
 module Backends
   ( SomeBackend (..)
-  , supportedBackends
-  , backendPackedCodec
+  , someBackendCodec
   , supportedBackendsMap
   , SupportedBackend (..)
   ) where
 
 import Backend (Backend(..))
-import Backend.Vault.Kv (VaultKvBackend)
+import Backend.Vault.Kv (VaultKvBackend, kvPathSegmentAllowedCharacters)
 import Data.Aeson ((.:))
 import Data.Aeson qualified as A
 import Data.Aeson.Types (Parser)
@@ -45,8 +44,11 @@ supportedBackendsMap = HS.fromList [("vault-kv", vaultKVSup)]
     vaultKVSup = SupportedBackend
       "vault-kv"
       ((fmap SomeBackend) . (A.parseJSON @VaultKvBackend))
-      (fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend))
-      "Vault Kv paths can contain only the following characters: [a-zA-Z0-9] and symbols '-', '_'."
+      (fmap SomeBackend . Toml.codecRead (_codec @VaultKvBackend)) $
+      Pretty.vsep
+      [ "Vault Kv paths can contain only the following characters:"
+      , Pretty.squotes $ Pretty.string kvPathSegmentAllowedCharacters
+      ]
 
 instance A.FromJSON SomeBackend where
   parseJSON original = A.withObject "SomeBackend" (\obj ->
@@ -61,16 +63,16 @@ instance FromHttpApiData SomeBackend where
   parseHeader = first T.pack . A.eitherDecodeStrict'
   parseQueryParam t = parseHeader . TE.encodeUtf8 $ t
 
-backendPackedCodec :: TomlCodec SomeBackend
-backendPackedCodec = Toml.Codec input output
+someBackendCodec :: TomlCodec SomeBackend
+someBackendCodec = Toml.Codec input output
   where
     input :: Toml.TomlEnv SomeBackend
     input toml =
       case HS.lookup "type" $ Toml.tomlPairs toml of
         Just t -> do
-          case Toml.backward Toml._Text t >>= supportedBackends of
+          case Toml.backward Toml._Text t >>= lookupSupportedBackend of
             Right c -> c toml
-            Left _ -> Failure [ Toml.BiMapError "type" (Toml.ArbitraryError "Unknown backend type") ]
+            Left e -> Failure [ Toml.BiMapError "type" e ]
         Nothing -> Failure
           [ Toml.BiMapError "type" $ Toml.ArbitraryError
             "Backend doesn't have a `type` key"
@@ -79,8 +81,8 @@ backendPackedCodec = Toml.Codec input output
       SomeBackend <$> Toml.codecWrite _codec a
         <* Toml.codecWrite (Toml.text "type") "vault"
 
-supportedBackends
-  :: Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
-supportedBackends backend = case HS.lookup (T.unpack backend) supportedBackendsMap of
-  Just x -> Right (bToml x)
-  Nothing ->  Left (Toml.ArbitraryError "Unknown backend type")
+    lookupSupportedBackend
+      :: Text -> Either Toml.TomlBiMapError (Toml.TomlEnv SomeBackend)
+    lookupSupportedBackend backend = case HS.lookup (T.unpack backend) supportedBackendsMap of
+      Just x -> Right (bToml x)
+      Nothing ->  Left (Toml.ArbitraryError "Unknown backend type")
