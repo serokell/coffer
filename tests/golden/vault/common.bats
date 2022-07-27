@@ -13,8 +13,9 @@ load '../helpers'
 
   assert_failure
   assert_output --partial - <<EOF
-Internal backend error:
-Backend returned a path segment that is not a valid entry or directory name.
+Invalid path segment for target backend:
+
+Given path segment is not a valid entry or directory name.
 Path segments for Vault KV can only contain the following characters:
 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
 Got: "bad\npath".
@@ -26,10 +27,11 @@ EOF
 
   assert_failure
   assert_output --partial - <<EOF
-Internal backend error:
-Backend returned a path segment that is not a valid entry or directory name.
+Invalid path segment for target backend:
+
+Given path segment is not a valid entry or directory name.
 Path segments for Vault KV can only contain the following characters:
 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
-Got: "entry\npath".
+Got: "entry\npath"
 EOF
 }
