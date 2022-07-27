@@ -24,6 +24,7 @@ data CofferError where
   BadFieldNameError :: BadFieldName -> CofferError
   BadMasterFieldName :: Text -> BadFieldName -> CofferError
   BadEntryTagError :: BadEntryTag -> CofferError
+  InvalidPathSegment :: BackendError err => err -> CofferError
 
 -- | Type class for backend errors.
 class (Buildable err) => BackendError err
@@ -54,6 +55,12 @@ instance Buildable CofferError where
       |]
     BackendNotFound backendName ->
       [int|s|Backend with name '#{backendName}' not found.|]
+    InvalidPathSegment err ->
+      [int|s|
+        Invalid path segment for target backend:
+
+        #{err}
+      |]
     BadFieldNameError err -> build err
     BadMasterFieldName name err ->
       [int|s|

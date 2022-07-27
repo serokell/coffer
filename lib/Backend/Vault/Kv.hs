@@ -68,7 +68,8 @@ data VaultError
   | FieldMetadataNotFound EntryPath FieldName
   | CofferSpecialsNotFound EntryPath
   | BadCofferSpecialsError Text
-  | InvalidPathSegment Text
+  | VaultInvalidPathSegment Text
+  | BackendReturnedInvalidPathSegment Text
 
 instance Buildable VaultError where
   build = \case
@@ -109,12 +110,18 @@ instance Buildable VaultError where
     CofferSpecialsNotFound entryPath ->
       [int|s|Could not find key '#$coffer' in the kv entry at '#{entryPath}'.|]
     BadCofferSpecialsError err -> build err
-    InvalidPathSegment pathSegment ->
+    VaultInvalidPathSegment pathSegment ->
       [int|s|
-        Backend returned a path segment that is not a valid \
+        Given path segment is not a valid \
         entry or directory name.
         Path segments for Vault KV can only contain the following characters:
         '#{kvPathSegmentAllowedCharacters}'
+        Got: #{pathSegment}.
+      |]
+    BackendReturnedInvalidPathSegment pathSegment ->
+      [int|s|
+        Backend returned segment that is not a valid \
+        entry or directory name.
         Got: #{pathSegment}.
       |]
 
@@ -209,7 +216,9 @@ kvValidatePath :: Effects r => SuperPathSegmented s segments
  => VaultKvBackend -> s -> Sem r ()
 kvValidatePath _ path = do
   for_ (getPathSegments path) \pathSegment ->
-    when (T.any (`notElem` kvPathSegmentAllowedCharacters) pathSegment) $ throw $ BackendError $ InvalidPathSegment $ T.pack . show $ pathSegment
+    when (T.any (`notElem` kvPathSegmentAllowedCharacters) pathSegment) $
+      throw $ InvalidPathSegment $ VaultInvalidPathSegment $
+        T.pack . show $ pathSegment
 
 kvWriteEntry :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteEntry backend entry = do
@@ -331,7 +340,7 @@ kvListDirectoryContents backend path = do
     makeDirectoryAndEntryNames :: DirectoryContents -> Text -> Either CofferError DirectoryContents
     makeDirectoryAndEntryNames contents content = do
       case mkPath content of
-        Left _ -> Left $ BackendError (InvalidPathSegment content)
+        Left _ -> Left $ BackendError (BackendReturnedInvalidPathSegment content)
         Right path -> do
           let segments = path ^. pathSegments
           if "/" `T.isSuffixOf` content
