@@ -6,7 +6,7 @@ module Config where
 
 import Backend (Backend(..))
 import BackendName (BackendName, backendNameCodec)
-import Backends (SomeBackend(..), backendPackedCodec)
+import Backends (SomeBackend(..), someBackendCodec)
 import Data.Foldable (toList)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
@@ -26,7 +26,7 @@ makeSingleBackendConfig (SomeBackend backend) = Config (HS.singleton (_name back
 configCodec :: TomlCodec Config
 configCodec = Config
   <$> Toml.dimap toList listToHs
-  (Toml.list backendPackedCodec "backend") .= backends
+  (Toml.list someBackendCodec "backend") .= backends
   <*> backendNameCodec "main_backend" .= mainBackend
   where
     listToHs list = HS.fromList $ fmap (\y@(SomeBackend x) -> (_name x, y)) list
