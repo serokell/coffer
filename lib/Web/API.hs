@@ -37,8 +37,9 @@ type API
     :<|> "set-field-visibility"
       :> RequiredParam "path" EntryPath
       :> RequiredParam "field" FieldName
-      :> ReqBody '[JSON] FieldVisibility
-      :> Post '[JSON] Entry
+      :> (    "public"  :> Post '[JSON] Entry
+         :<|> "private" :> Post '[JSON] Entry
+         )
 
     :<|> "delete-field"
       :> RequiredParam "path" EntryPath

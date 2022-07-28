@@ -18,7 +18,7 @@ unit_view_an_entry = cofferTest do
   createEntry "dir/entry"
   void $ setField "dir/entry" "public-field" Nothing "contents"
   void $ setField "dir/entry" "private-field" Nothing "multiline\ncontents"
-  changeFieldVisibility "dir/entry" "private-field" False
+  changeFieldVisibility "dir/entry" "private-field" "private"
 
   response <-
     executeCommand

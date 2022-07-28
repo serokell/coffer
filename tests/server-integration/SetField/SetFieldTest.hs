@@ -122,8 +122,8 @@ unit_set_field_visibility = cofferTest do
   createEntry "dir/entry"
   void $ setField "dir/entry" "private-field" Nothing "contents"
   void $ setField "dir/entry" "public-field" Nothing "contents"
-  changeFieldVisibility "dir/entry" "private-field" False
-  changeFieldVisibility "dir/entry" "public-field" True
+  changeFieldVisibility "dir/entry" "private-field" "private"
+  changeFieldVisibility "dir/entry" "public-field" "public"
 
   response <-
     executeCommand

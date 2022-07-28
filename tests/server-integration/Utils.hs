@@ -118,12 +118,12 @@ setField path name public contents =
   where
     visibility = boolToVisibility <$> public
 
-changeFieldVisibility :: Text -> Text -> Bool -> IO ()
-changeFieldVisibility path field public = void $
+changeFieldVisibility :: Text -> Text -> Text -> IO ()
+changeFieldVisibility path field visibility = void $
   executeCommand
     POST
-    ["set-field-visibility"]
-    (ReqBodyJson $ String $ boolToVisibility public)
+    ["set-field-visibility", visibility]
+    NoReqBody
     ignoreResponse
     ( mconcat
         [ "path" =: path
