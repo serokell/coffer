@@ -16,9 +16,9 @@ import Utils
 unit_view_an_entry :: IO ()
 unit_view_an_entry = cofferTest do
   createEntry "dir/entry"
-  void $ setField "dir/entry" "public-field" "contents"
-  void $ setField "dir/entry" "private-field" "multiline\ncontents"
-  changeFieldVisibility "dir/entry" "private-field" False
+  void $ setField "dir/entry" "public-field" Nothing "contents"
+  void $ setField "dir/entry" "private-field" Nothing "multiline\ncontents"
+  changeFieldVisibility "dir/entry" "private-field" "private"
 
   response <-
     executeCommand

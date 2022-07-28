@@ -102,8 +102,8 @@ scrubDates =
 cofferTest :: IO () -> IO ()
 cofferTest test = deleteRecords >> test
 
-setField :: Text -> Text -> Text -> IO (JsonResponse Value)
-setField path name contents =
+setField :: Text -> Text -> Maybe Bool -> Text -> IO (JsonResponse Value)
+setField path name public contents =
   executeCommand
     POST
     ["set-field"]
@@ -112,14 +112,17 @@ setField path name contents =
     ( mconcat
         [ "path" =: path
         , "field" =: name
+        , queryParam "visibility" visibility
         ]
     )
+  where
+    visibility = boolToVisibility <$> public
 
-changeFieldVisibility :: Text -> Text -> Bool -> IO ()
-changeFieldVisibility path field public = void $
+changeFieldVisibility :: Text -> Text -> Text -> IO ()
+changeFieldVisibility path field visibility = void $
   executeCommand
     POST
-    ["set-field", visibility]
+    ["set-field-visibility", visibility]
     NoReqBody
     ignoreResponse
     ( mconcat
@@ -127,10 +130,6 @@ changeFieldVisibility path field public = void $
         , "field" =: field
         ]
     )
-  where
-    visibility
-      | public = "public"
-      | otherwise = "private"
 
 -- | Finds field in entry
 findField :: Text -> Value -> Maybe Value
@@ -265,3 +264,11 @@ addOrRemoveTag method path tag =
         , "tag" =: tag
         ]
     )
+
+-- Util functions
+
+-- | Converts Bool to "public" and "private".
+-- true is public
+boolToVisibility :: Bool -> Text
+boolToVisibility True  = "public"
+boolToVisibility False = "private"

@@ -86,7 +86,7 @@ unit_incorrect_field_name_fromHttpApiData :: IO()
 unit_incorrect_field_name_fromHttpApiData = cofferTest do
   createEntry "entry"
 
-  try @HttpException ( setField "entry" "fieldname:." "contents" )
+  try @HttpException ( setField "entry" "fieldname:." Nothing "contents" )
     >>= unwrapStatusCodeError \response bs -> do
       bs @?= "Error parsing query parameter field failed: Field name can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_;'"
       responseStatus response @?= status400

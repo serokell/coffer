@@ -150,7 +150,7 @@ copyOrRenameCreateErrors copy = cofferTest do
 copyOrRenameUpdatesOnlyEntrysModificationTime :: Bool -> IO ()
 copyOrRenameUpdatesOnlyEntrysModificationTime copy = cofferTest do
   createEntry "entry"
-  response <- setField "entry" "field" "contents"
+  response <- setField "entry" "field" Nothing "contents"
   let modifiedDate = responseBody response ^?! key "dateModified"
 
   t1 <- getCurrentTime

@@ -30,12 +30,16 @@ type API
     :<|> "set-field"
       :> RequiredParam "path" EntryPath
       :> RequiredParam "field" FieldName
-      :>
-        (    "private" :> Post '[JSON] Entry
-        :<|> "public"  :> Post '[JSON] Entry
-        :<|> ReqBody '[JSON] (Maybe FieldContents)
-          :> Post '[JSON] Entry
-        )
+      :> OptionalParam "visibility" FieldVisibility
+      :> ReqBody '[JSON] FieldContents
+      :> Post '[JSON] Entry
+
+    :<|> "set-field-visibility"
+      :> RequiredParam "path" EntryPath
+      :> RequiredParam "field" FieldName
+      :> (    "public"  :> Post '[JSON] Entry
+         :<|> "private" :> Post '[JSON] Entry
+         )
 
     :<|> "delete-field"
       :> RequiredParam "path" EntryPath

@@ -102,7 +102,7 @@ unit_tag_duplicate_tag = cofferTest do
 unit_tag_updates_only_entry's_modification_time :: IO ()
 unit_tag_updates_only_entry's_modification_time = cofferTest do
   createEntry "entry"
-  response <- setField "entry" "field" "contents"
+  response <- setField "entry" "field" Nothing  "contents"
   let modificationTime = responseBody response ^?! key "dateModified"
   t1 <- getCurrentTime
   response <- addOrRemoveTag POST "entry" "tag"
