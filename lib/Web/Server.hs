@@ -26,7 +26,8 @@ import Coffer.Directory (Directory, singleton)
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath, qpPath))
 import Coffer.PrettyPrint
   (PrettyPrintMode(WebAPI), buildCopyOrRenameResult, buildCreateError, buildDeleteFieldResult,
-  buildDeleteResult, buildSetFieldResult, buildTagResult, buildViewResult)
+  buildDeleteResult, buildSetFieldResult, buildSetFieldVisibilityResult, buildTagResult,
+  buildViewResult)
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
@@ -66,10 +67,18 @@ handleSetFieldResult = \case
   SFRSuccess _ qEntry -> pure $ qpPath qEntry
   res@SFREntryNotFound{} ->
     throwCofferServerError err404 300 (pretty res)
-  res@SFRMissingFieldContents{} ->
-    throwCofferServerError err400 301 (pretty res)
   where
     pretty = resultToText buildSetFieldResult
+
+handleSetFieldVisibilityResult :: SetFieldVisibilityResult -> Handler Entry
+handleSetFieldVisibilityResult = \case
+  SFVRSuccess _ qEntry -> pure $ qpPath qEntry
+  res@SFVREntryNotFound{} ->
+    throwCofferServerError err404 300 (pretty res)
+  res@SFVRFieldNotFound{} ->
+    throwCofferServerError err404 301 (pretty res)
+  where
+    pretty = resultToText buildSetFieldVisibilityResult
 
 handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [(EntryPath, EntryPath)]
 handleCopyOrRenameResult rename = \case
@@ -208,12 +217,11 @@ setFieldVisibility
   -> FieldVisibility
   -> Handler Entry
 setFieldVisibility run path field visibility =
-  run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing path
-    , sfoFieldName = field
-    , sfoFieldContents = Nothing
-    , sfoVisibility = Just visibility
-    }) >>= handleSetFieldResult
+  run (CmdSetFieldVisibility SetFieldVisibilityOptions
+    { sfvoQPath = QualifiedPath Nothing path
+    , sfvoFieldName = field
+    , sfvoVisibility = visibility
+    }) >>= handleSetFieldVisibilityResult
 
 setField
   :: (forall a. Command a -> Handler a)
@@ -226,7 +234,7 @@ setField run path field visibility contents =
   run (CmdSetField SetFieldOptions
     { sfoQPath = QualifiedPath Nothing path
     , sfoFieldName = field
-    , sfoFieldContents = Just contents
+    , sfoFieldContents = contents
     , sfoVisibility = visibility
     }) >>= handleSetFieldResult
 

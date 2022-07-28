@@ -51,6 +51,7 @@ runCommand config = \case
   CmdView opts -> catchAndReturn $ viewCmd config opts
   CmdCreate opts -> catchAndReturn $ createCmd config opts
   CmdSetField opts -> catchAndReturn $ setFieldCmd config opts
+  CmdSetFieldVisibility opts -> catchAndReturn $ setFieldVisibilityCmd config opts
   CmdDeleteField opts -> deleteFieldCmd config opts
   CmdFind opts -> findCmd config opts
   CmdRename opts -> catchAndReturn $ renameCmd config opts
@@ -120,8 +121,12 @@ setFieldCmd
   => Config -> SetFieldOptions -> Sem r SetFieldResult
 setFieldCmd
   config
-  (SetFieldOptions qEntryPath@(QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb)
-    = do
+  (SetFieldOptions
+    qEntryPath@(QualifiedPath backendNameMb entryPath)
+    fieldName
+    fieldContents
+    visibilityMb
+  ) = do
   backend <- getBackend config backendNameMb
   readEntry backend entryPath >>= \case
     Nothing -> do
@@ -136,26 +141,60 @@ setFieldCmd
     updateOrInsert nowUtc entry =
       entry
         & dateModified .~ nowUtc
-        & fields . at fieldName %%~ updateOrInsertField nowUtc
+        & fields . at fieldName %%~ updateOrInsertFieldFull nowUtc
 
-    updateOrInsertField :: UTCTime -> Maybe Field -> Sem r (Maybe Field)
-    updateOrInsertField nowUtc = \case
-      Just field ->
-        -- The field already exists, update it.
-        pure $ Just $ field
-          & dateModified .~ nowUtc
-          & contents %~ do \currentContents -> fromMaybe currentContents fieldContentsMb
-          & visibility %~ do \currentPrivate -> fromMaybe currentPrivate visibilityMb
+    updateOrInsertFieldFull :: UTCTime -> Maybe Field -> Sem r (Maybe Field)
+    updateOrInsertFieldFull nowUtc =
+      pure . Just .
+      (visibility %~ \current -> fromMaybe current visibilityMb) .
+      updateOrInsertField nowUtc
+
+    updateOrInsertField :: UTCTime -> Maybe Field -> Field
+    updateOrInsertField nowUtc fieldMb = case fieldMb of
       Nothing ->
         -- The field does not yet exist, insert a new one.
-        case fieldContentsMb of
-          Just fieldContents -> pure $ Just $ newField nowUtc fieldContents
-            & visibility %~ do \currentPrivate -> fromMaybe currentPrivate visibilityMb
-          -- If we're trying to insert a new field, but the user has not specified
-          -- what the field contents should be, return an error.
-          Nothing -> do
-            let qEntryPath = QualifiedPath backendNameMb entryPath
-            throw $ SFRMissingFieldContents fieldName qEntryPath
+        newField nowUtc fieldContents
+      Just field ->
+        -- The field already exists, update it.
+        field
+          & dateModified .~ nowUtc
+          & contents .~ fieldContents
+
+setFieldVisibilityCmd
+  :: forall r
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error SetFieldVisibilityResult] r)
+  => Config -> SetFieldVisibilityOptions -> Sem r SetFieldVisibilityResult
+setFieldVisibilityCmd
+  config
+  (SetFieldVisibilityOptions
+    qEntryPath@(QualifiedPath backendNameMb entryPath)
+    fieldName
+    fieldVisibility
+  ) = do
+  backend <- getBackend config backendNameMb
+  readEntry backend entryPath >>= \case
+    Nothing -> do
+      pure $ SFVREntryNotFound qEntryPath
+    Just entry -> do
+      nowUtc <- embed getCurrentTime
+      updatedEntry <- update nowUtc entry
+      void $ writeEntry backend updatedEntry
+      pure $ SFVRSuccess fieldName (QualifiedPath backendNameMb updatedEntry)
+  where
+    update :: UTCTime -> Entry -> Sem r Entry
+    update nowUtc entry =
+      entry
+        & dateModified .~ nowUtc
+        & fields . at fieldName %%~ (fmap Just . updateField nowUtc)
+
+    updateField :: UTCTime -> Maybe Field -> Sem r Field
+    updateField nowUtc fieldMb =
+      updateVisibility fieldMb
+        <&> dateModified .~ nowUtc
+
+    updateVisibility :: Maybe Field -> Sem r Field
+    updateVisibility Nothing = throw $ SFVRFieldNotFound fieldName qEntryPath
+    updateVisibility (Just field) = pure $ field & visibility .~ fieldVisibility
 
 deleteFieldCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError] r)

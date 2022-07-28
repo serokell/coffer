@@ -68,17 +68,8 @@ buildCreateResult mode = \case
     |]
 
 buildSetFieldResult :: PrettyPrintMode -> SetFieldResult -> Builder
-buildSetFieldResult mode = \case
+buildSetFieldResult _ = \case
   SFREntryNotFound path -> buildEntryNotFound path
-  SFRMissingFieldContents fieldName path -> do
-    let fieldContentsMessage :: Builder =
-          case mode of
-            CLI -> "In order to create a new field, please include the 'FIELDCONTENTS' argument."
-            WebAPI -> "In order to create a new field, please include 'FIELDCONTENTS' in the body."
-    [int|s|
-      The entry at '#{path}' does not yet have a field '#{fieldName}'.
-      #{fieldContentsMessage}
-    |]
   SFRSuccess fieldName qEntry -> do
     let entry = qpPath qEntry
     let qPath = view E.path <$> qEntry
@@ -88,6 +79,20 @@ buildSetFieldResult mode = \case
       at '#{qPath}' to:
       #{field ^. E.contents}
     |]
+
+buildSetFieldVisibilityResult :: PrettyPrintMode -> SetFieldVisibilityResult -> Builder
+buildSetFieldVisibilityResult _ = \case
+  SFVRSuccess fieldName qEntry -> do
+    let entry = qpPath qEntry
+    let qPath = view E.path <$> qEntry
+    let field = entry ^?! E.fields . ix fieldName
+    [int|s|
+      Set visibility of field '#{fieldName}' \
+      at '#{qPath}' to #{field ^. E.visibility}
+    |]
+  SFVREntryNotFound path -> buildEntryNotFound path
+  SFVRFieldNotFound field qPath -> [int||The entry at '#{qPath}' does not have a field '#{field}'.|]
+
 
 buildDeleteFieldResult :: PrettyPrintMode -> DeleteFieldResult -> Builder
 buildDeleteFieldResult _ = \case

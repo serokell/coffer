@@ -12,7 +12,8 @@ import CLI.PrettyPrint
 import CLI.Types
 import Coffer.PrettyPrint
   (PrettyPrintMode(CLI), buildCopyResult, buildCreateResult, buildDeleteFieldResult,
-  buildDeleteResult, buildRenameResult, buildSetFieldResult, buildTagResult, buildViewResult)
+  buildDeleteResult, buildRenameResult, buildSetFieldResult, buildSetFieldVisibilityResult,
+  buildTagResult, buildViewResult)
 import Config (Config(..), configCodec)
 import Control.Lens
 import Data.Maybe (fromMaybe)
@@ -85,8 +86,14 @@ main = do
       SomeCommand cmd@CmdSetField{} -> do
         runCommand config cmd >>= \case
           res@SFREntryNotFound{} -> printError $ buildSetFieldResult CLI res
-          res@SFRMissingFieldContents{} -> printError $ buildSetFieldResult CLI res
           res@SFRSuccess{} -> printSuccess $ buildSetFieldResult CLI res
+
+
+      SomeCommand cmd@CmdSetFieldVisibility{} -> do
+        runCommand config cmd >>= \case
+          res@SFVREntryNotFound{} -> printError $ buildSetFieldVisibilityResult CLI res
+          res@SFVRSuccess{} -> printSuccess $ buildSetFieldVisibilityResult CLI res
+          res@SFVRFieldNotFound{} -> printError $ buildSetFieldVisibilityResult CLI res
 
       SomeCommand cmd@CmdDeleteField{} -> do
         runCommand config cmd >>= \case
