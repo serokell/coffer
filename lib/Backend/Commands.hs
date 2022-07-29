@@ -297,10 +297,13 @@ renameCmd
   -- If directory/entry was successfully copied,
   -- then we can delete old directory/entry without delete errors.
   unless dryRun do
-    forM_ pathsToDelete \(CopyOperation old _) -> do
-      deleteEntry oldBackend (qpPath old ^. path)
+    void $ sequenceConcurrently $ map (deleteOldEntry oldBackend) pathsToDelete
 
   pure $ CPRSuccess dryRun $ getOperationPaths <$> operations
+
+  where
+    deleteOldEntry :: SomeBackend -> CopyOperation -> Sem r ()
+    deleteOldEntry oldBackend (CopyOperation old _) = deleteEntry oldBackend (qpPath old ^. path)
 
 data CopyOperation = CopyOperation
   { coQOld :: QualifiedPath Entry
@@ -388,7 +391,6 @@ runCopyOperations :: (Members '[BackendEffect, Async] r) => SomeBackend -> [Copy
 runCopyOperations backend operations = do
   let newEntries = qpPath . coQNew <$> operations
   void $ sequenceConcurrently $ map (writeEntry backend) newEntries
-  --forM_ newEntries (writeEntry backend)
 
 copyCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult, Async] r)
@@ -412,7 +414,7 @@ copyCmd
   pure $ CPRSuccess dryRun $ getOperationPaths <$> operations
 
 deleteCmd
-  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult] r)
+  :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult, Async] r)
   => Config -> DeleteOptions -> Sem r DeleteResult
 deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) recursive) = do
   backend <- getBackend config backendNameMb
@@ -426,9 +428,11 @@ deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) rec
     Right dir
       | recursive -> do
           let entries = Dir.allEntries dir
+          let entryPaths = entries ^.. each . E.path
           unless dryRun do
-            forM_ entries \entry -> deleteEntry backend (entry ^. E.path)
-          let qEntryPaths = entries ^.. each . E.path <&> QualifiedPath backendNameMb
+            void $ sequenceConcurrently $ map (deleteEntry backend) entryPaths
+            --forM_ entries \entry -> deleteEntry backend (entry ^. E.path)
+          let qEntryPaths = map (QualifiedPath backendNameMb) entryPaths
           pure $ DRSuccess dryRun qEntryPaths
       | otherwise -> pure $ DRDirectoryFound qPath
 
