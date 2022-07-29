@@ -17,16 +17,18 @@ import Coffer.Path
 import Coffer.Path qualified as Path
 import Coffer.Util (catchAndReturn)
 import Config (Config(backends, mainBackend))
+import Control.Concurrent
 import Control.Lens (view)
 import Control.Lens hiding (view)
 import Control.Monad.Extra (whenM)
 import Control.Monad.State
 import Data.Bifunctor (Bifunctor(first))
 import Data.Either (rights)
+import Data.Foldable (foldr')
 import Data.HashMap.Strict ((!?))
 import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty qualified as NE
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
@@ -60,7 +62,7 @@ runCommand config = \case
   CmdTag opts -> catchAndReturn $ tagCmd config opts
 
 viewCmd
-  :: (Members '[BackendEffect, Error CofferError, Error ViewResult] r)
+  :: (Members '[BackendEffect, Error CofferError, Error ViewResult, Embed IO, Async] r)
   => Config -> ViewOptions -> Sem r ViewResult
 viewCmd config (ViewOptions qPath@(QualifiedPath backendNameMb _) fieldNameMb) = do
   backend <- getBackend config backendNameMb
@@ -177,7 +179,7 @@ deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb pat
           pure $ DFRSuccess fieldName qPath { qpPath = newEntry }
 
 findCmd
-  :: (Members '[BackendEffect, Error CofferError] r)
+  :: (Members '[BackendEffect, Error CofferError, Embed IO, Async] r)
   => Config -> FindOptions -> Sem r (Maybe Directory)
 findCmd config (FindOptions qPathMb textMb sortMb filters) = do
   let backendNameMb = qPathMb >>= qpBackendName
@@ -318,7 +320,7 @@ getOperationPaths (CopyOperation old new) =
 {-# ANN buildCopyOperations ("HLint: ignore Redundant <$>" :: Text) #-}
 buildCopyOperations
   :: forall r
-   . (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult] r)
+   . (Members '[BackendEffect, Embed IO, Error CofferError, Error CopyResult, Async] r)
   => SomeBackend -> SomeBackend -> QualifiedPath Path -> QualifiedPath Path -> Bool -> Sem r [CopyOperation]
 buildCopyOperations
   oldBackend
@@ -489,7 +491,7 @@ pathIsEntry backend entryPath =
 -- | Returns the entry or directory that the path points to.
 -- If the path doesn't exist at all, throws an error.
 getEntryOrDirThrow
-  :: (Members '[BackendEffect, Error CofferError, Error e] r)
+  :: (Members '[BackendEffect, Error CofferError, Error e, Embed IO, Async] r)
   => SomeBackend -> (QualifiedPath Path -> e) -> QualifiedPath Path -> Sem r (Either Entry Directory)
 getEntryOrDirThrow backend mkError qPath@(QualifiedPath _ path) = do
   getEntryOrDir backend path >>= \case
@@ -500,7 +502,7 @@ getEntryOrDirThrow backend mkError qPath@(QualifiedPath _ path) = do
 -- If the path doesn't exist at all, returns `Nothing`.
 getEntryOrDir
   :: forall r
-   . (Members '[BackendEffect, Error CofferError] r)
+   . (Members '[BackendEffect, Error CofferError, Embed IO, Async] r)
   => SomeBackend -> Path -> Sem r (Maybe (Either Entry Directory))
 getEntryOrDir backend path =
   tryGetEntry path >>= \case
@@ -519,26 +521,30 @@ getEntryOrDir backend path =
     -- If the path doesn't exist OR is an entry, returns `Nothing`.
     tryGetDir :: Path -> Sem r (Maybe Directory)
     tryGetDir rootPath = do
-      dir <- execStateT (go rootPath) Dir.emptyDir
+      mDir <- embed $ newMVar Dir.emptyDir
+      go rootPath mDir
+      dir <- embed $ sortDirectoryAlphabetic <$> takeMVar mDir
       if dir == Dir.emptyDir
         then pure Nothing
         else pure $ Just dir
       where
-        go :: Path -> StateT Directory (Sem r) ()
-        go rootPath = do
-          contents <- lift $ fromMaybe (DirectoryContents [] []) <$> listDirectoryContents backend rootPath
-          -- TODO: run in parallel
-          forM_ (contents ^. entryNames) \entryName -> do
-            entry <- lift $ readEntry backend (Path.appendEntryName rootPath entryName)
-            case entry of
-              Just entry -> modify' (Dir.insertEntry entry)
-              -- This entry has been concurrently deleted (e.g. by some other user) _while_ we're traversing the directory.
-              -- We should just ignore it.
-              Nothing -> pure ()
+        go :: Path -> MVar Directory -> Sem r ()
+        go rootPath mDir = do
+          contents <- fromMaybe (DirectoryContents [] []) <$> listDirectoryContents backend rootPath
+          entries <- fmap (catMaybes . catMaybes) $ sequenceConcurrently $ map
+            (\entryName -> readEntry backend $ Path.appendEntryName rootPath entryName)
+            (contents ^. entryNames)
+          embed $ modifyMVar_ mDir (\dir -> return (foldr' Dir.insertEntry dir entries))
 
-          forM_ (contents ^. directoryNames) \directoryName -> do
-            let subdir = Path [directoryName]
-            go (rootPath <> subdir)
+          void $ sequenceConcurrently $ map
+            (\directoryName -> do
+              let subdir = Path [directoryName]
+              go (rootPath <> subdir) mDir
+            )
+            (contents ^. directoryNames)
+
+        sortDirectoryAlphabetic :: Directory -> Directory
+        sortDirectoryAlphabetic = Dir.mapDir $ sortWith  (view $ E.path . to entryPathName)
 
 -- | This function gets all entries, that are exist in given entry path.
 --
