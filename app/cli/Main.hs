@@ -88,7 +88,6 @@ main = do
           res@SFREntryNotFound{} -> printError $ buildSetFieldResult CLI res
           res@SFRSuccess{} -> printSuccess $ buildSetFieldResult CLI res
 
-
       SomeCommand cmd@CmdSetFieldVisibility{} -> do
         runCommand config cmd >>= \case
           res@SFVREntryNotFound{} -> printError $ buildSetFieldVisibilityResult CLI res

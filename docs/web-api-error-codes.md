@@ -9,7 +9,8 @@
 These codes are grouped in the following way:
 - `view` errors: 100-102
 - `create` errors: 200-202
-- `set-field` errors: 300-301
+- `set-field` errors: 300
+- `set-field-visibility` errors: 350-351
 - `delete-field` errors: 400-401
 - `rename`/`copy` errors: 500-505
 - `delete` errors: 600-601
@@ -37,7 +38,12 @@ See the following tables for detailed explanations of error codes.
 | Error                  | Code |
 |:-----------------------|:----:|
 | Entry not found        | 300  |
-| Missing field contents | 301  |
+
+## Set-field-visibility
+| Error                  | Code |
+|:-----------------------|:----:|
+| Entry not found        | 350  |
+| Field not found        | 351  |
 
 ## Delete-field
 | Error           | Code |

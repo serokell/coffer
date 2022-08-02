@@ -74,9 +74,9 @@ handleSetFieldVisibilityResult :: SetFieldVisibilityResult -> Handler Entry
 handleSetFieldVisibilityResult = \case
   SFVRSuccess _ qEntry -> pure $ qpPath qEntry
   res@SFVREntryNotFound{} ->
-    throwCofferServerError err404 300 (pretty res)
+    throwCofferServerError err404 350 (pretty res)
   res@SFVRFieldNotFound{} ->
-    throwCofferServerError err404 301 (pretty res)
+    throwCofferServerError err404 351 (pretty res)
   where
     pretty = resultToText buildSetFieldVisibilityResult
 

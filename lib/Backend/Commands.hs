@@ -150,7 +150,7 @@ setFieldCmd
       updateOrInsertField nowUtc
 
     updateOrInsertField :: UTCTime -> Maybe Field -> Field
-    updateOrInsertField nowUtc fieldMb = case fieldMb of
+    updateOrInsertField nowUtc = \case
       Nothing ->
         -- The field does not yet exist, insert a new one.
         newField nowUtc fieldContents
