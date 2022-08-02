@@ -125,13 +125,6 @@ reportErrors io = do
     Right (Right a) -> do
       return a
 
--- setFieldVisibility
---   :: (forall a. Command a -> Handler a)
---   -> Bool
---   -> EntryPath
---   -> FieldName
---   -> Handler Entry
-
 makeServer
   :: (SomeBackend -> (forall a. Command a -> Handler a))
   -> Server API

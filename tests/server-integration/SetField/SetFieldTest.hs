@@ -9,11 +9,11 @@ import Control.Lens
 import Data.Aeson (Value)
 import Data.Aeson.Lens
 import Data.Aeson.QQ.Simple (aesonQQ)
-import Data.Functor (void)
 import Data.Text (Text)
 import Data.Time
+import Network.HTTP.Client (responseStatus)
 import Network.HTTP.Req
-import Network.HTTP.Types (status404)
+import Network.HTTP.Types (status404, status415)
 import Test.Tasty.HUnit
 import Utils
 
@@ -43,7 +43,7 @@ unit_set_field_private :: IO ()
 unit_set_field_private = cofferTest do
   createEntry "entry"
 
-  response <- setField "entry" "private-field" (Just False) "contents"
+  response <- setField "entry" "private-field" (Just "private") "contents"
 
   let fieldMb =
         responseBody response
@@ -66,7 +66,7 @@ unit_set_field_public :: IO ()
 unit_set_field_public = cofferTest do
   createEntry "entry"
 
-  response <- setField "entry" "public-field" (Just True) "contents"
+  response <- setField "entry" "public-field" (Just "public") "contents"
 
   let fieldMb =
         responseBody response
@@ -98,8 +98,30 @@ unit_set_field_entry_not_found = cofferTest do
         ]
       |]
 
--- unit_set_field_missing_field_contents :: IO ()
--- TODO: add test that expects an error in case of missing contents
+-- | Request with no body in set-field must be invalid
+-- HTTP Exception with 415 status code (unsupported
+-- media type) is expected
+unit_set_field_missing_field_contents :: IO ()
+unit_set_field_missing_field_contents = cofferTest do
+  createEntry "entry"
+
+  result <- try @HttpException
+    (executeCommand
+      POST
+      ["set-field"]
+      NoReqBody
+      (jsonResponse @Value)
+      (mconcat
+        [ "path" =: ("/entry" :: Text)
+        , "field" =: ("field" :: Text)
+        ]
+      )
+    )
+
+  flip unwrapStatusCodeError result $ \response _ ->
+    if responseStatus response == status415
+    then pure ()
+    else assertFailure $ "Expected Http status 415, got: " <> show response
 
 unit_set_field_updates_modification_date :: IO ()
 unit_set_field_updates_modification_date = cofferTest do
@@ -117,50 +139,44 @@ unit_set_field_updates_modification_date = cofferTest do
   assertBool "Dates are not equal"
     $ responseBody response ^?! key "fields" . key "field" . key "dateModified" . _JSON == newModifiedDate
 
-unit_set_field_visibility :: IO ()
-unit_set_field_visibility = cofferTest do
+unit_set_field_visibility_public :: IO ()
+unit_set_field_visibility_public = cofferTest do
   createEntry "dir/entry"
-  void $ setField "dir/entry" "private-field" Nothing "contents"
-  void $ setField "dir/entry" "public-field" Nothing "contents"
-  changeFieldVisibility "dir/entry" "private-field" "private"
-  changeFieldVisibility "dir/entry" "public-field" "public"
+  setField "dir/entry" "public-field" (Just "private") "contents"
+  fieldMb <-
+    changeFieldVisibility "dir/entry" "public-field" "public"
+      <&> scrubDates
+      <&> findField "public-field"
 
-  response <-
-    executeCommand
-      GET
-      ["view"]
-      NoReqBody
-      (jsonResponse @Value)
-      ("path" =: (("dir/entry") :: Text))
-
-  response @=
-    [aesonQQ|
-      {
-        "entries": [],
-        "subdirs": {
-          "dir": {
-            "entries": [
-              {
-                "path": "/dir/entry",
-                "dateModified": "",
-                "masterField": null,
-                "fields": {
-                  "public-field": {
-                    "dateModified": "",
-                    "visibility": "public",
-                    "contents": "contents"
-                  },
-                  "private-field": {
-                    "dateModified": "",
-                    "visibility": "private",
-                    "contents": "contents"
-                  }
-                },
-                "tags": []
-              }
-            ],
-            "subdirs": {}
+  case fieldMb of
+    Nothing -> assertFailure $ "Expected field \"public-field\", found nothing"
+    Just value ->
+      value @?=
+        [aesonQQ|
+          {
+            "visibility": "public",
+            "dateModified": "",
+            "contents": "contents"
           }
-        }
-      }
-    |]
+        |]
+
+unit_set_field_visibility_private :: IO ()
+unit_set_field_visibility_private = cofferTest do
+  createEntry "dir/entry"
+  setField "dir/entry" "private-field" (Just "public") "contents"
+  fieldMb <-
+    changeFieldVisibility "dir/entry" "private-field" "private"
+      <&> scrubDates
+      <&> findField "private-field"
+
+  case fieldMb of
+    Nothing -> assertFailure $ "Expected field \"private-field\", found nothing"
+    Just value ->
+      value @?=
+        [aesonQQ|
+          {
+            "visibility": "private",
+            "dateModified": "",
+            "contents": "contents"
+          }
+        |]
