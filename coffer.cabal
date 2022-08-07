@@ -331,6 +331,7 @@ test-suite server-integration
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Common.BootServer
       Common.Common
       CopyAndRename.Common
       CopyAndRename.CopyTest
@@ -413,6 +414,7 @@ test-suite server-integration
     , lens-aeson
     , process
     , req
+    , silently
     , syb
     , tasty
     , tasty-hunit

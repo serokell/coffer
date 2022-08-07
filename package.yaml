@@ -117,6 +117,7 @@ library:
     - unordered-containers
     - validation-selective
     - warp
+    - optparse-applicative
 
 executables:
   coffer:
@@ -183,3 +184,4 @@ tests:
       - text
       - time
       - bytestring
+      - silently
