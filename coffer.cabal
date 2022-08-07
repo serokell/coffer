@@ -344,6 +344,7 @@ test-suite server-integration
       Tag.TagTest
       Tree
       Utils
+      Vault.Common
       View.ViewTest
       Paths_coffer
   hs-source-dirs:
