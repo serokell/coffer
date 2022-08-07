@@ -23,6 +23,7 @@ module Coffer.Path
   , entryPathAsPath
   , replacePathPrefix
   , QualifiedPath (..)
+  , getPathSegments
   ) where
 
 import BackendName (BackendName, newBackendName)
@@ -247,8 +248,12 @@ instance (ToHttpApiData path, Buildable path) => ToHttpApiData (QualifiedPath pa
 -- Optics
 ----------------------------------------------------------------------------
 
-class HasPathSegments s pathSegments | s -> pathSegments where
-  pathSegments :: Iso' s pathSegments
+class
+     Each pathSegments pathSegments PathSegment PathSegment
+  => HasPathSegments s pathSegments
+  |  s -> pathSegments
+  where
+    pathSegments :: Iso' s pathSegments
 instance HasPathSegments Path [PathSegment] where
   pathSegments = iso unPath Path
 instance HasPathSegments EntryPath (NonEmpty PathSegment) where
@@ -257,6 +262,11 @@ instance HasPathSegments EntryPath (NonEmpty PathSegment) where
 ----------------------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------------------
+
+getPathSegments
+  :: HasPathSegments s segments
+  => s -> [Text]
+getPathSegments path = path ^.. pathSegments . each . to unPathSegment
 
 -- | Append an item to the end of a list.
 appendNE :: [a] -> a -> NonEmpty a

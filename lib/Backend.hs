@@ -9,7 +9,7 @@ module Backend
 where
 
 import BackendName (BackendName)
-import Coffer.Path (DirectoryContents, EntryPath, Path)
+import Coffer.Path (DirectoryContents, EntryPath, HasPathSegments, Path)
 import Data.Aeson qualified as A
 import Entry (Entry)
 import Error (CofferError)
@@ -26,3 +26,5 @@ class (Show a, A.FromJSON a) => Backend a where
   _readEntry :: Effects r => a -> EntryPath -> Sem r (Maybe Entry)
   _listDirectoryContents :: Effects r => a -> Path -> Sem r (Maybe DirectoryContents)
   _deleteEntry :: Effects r => a -> EntryPath -> Sem r ()
+  _validatePath :: Effects r => HasPathSegments s segments
+    => a -> s -> Sem r ()

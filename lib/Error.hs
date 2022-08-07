@@ -9,7 +9,7 @@ module Error
   ) where
 
 import BackendName (BackendName)
-import Coffer.Path (EntryPath, Path)
+import Coffer.Path (EntryPath, Path, PathSegment, unPathSegment)
 import Data.Text (Text)
 import Entry (BadEntryTag, BadFieldName)
 import Fmt (Buildable(build))
@@ -24,6 +24,10 @@ data CofferError where
   BadFieldNameError :: BadFieldName -> CofferError
   BadMasterFieldName :: Text -> BadFieldName -> CofferError
   BadEntryTagError :: BadEntryTag -> CofferError
+  InvalidPathSegment
+    :: PathSegment
+    -> Text -- ^ Backend-specific error message
+    -> CofferError
 
 -- | Type class for backend errors.
 class (Buildable err) => BackendError err
@@ -54,6 +58,13 @@ instance Buildable CofferError where
       |]
     BackendNotFound backendName ->
       [int|s|Backend with name '#{backendName}' not found.|]
+    InvalidPathSegment segment errMsg ->
+      [int|s|
+        Invalid path segment for target backend:
+        Got: #s{unPathSegment segment}.
+
+        #{errMsg}
+      |]
     BadFieldNameError err -> build err
     BadMasterFieldName name err ->
       [int|s|

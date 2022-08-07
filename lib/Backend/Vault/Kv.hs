@@ -5,24 +5,26 @@
 module Backend.Vault.Kv
   ( VaultKvBackend
   , I.VaultToken(..)
+  , kvPathSegmentAllowedCharacters
   ) where
 
 import Backend (Backend(..), Effects)
 import Backend.Vault.Kv.Internal qualified as I
 import BackendName (BackendName, backendNameCodec)
 import Coffer.Path
-  (DirectoryContents(DirectoryContents), EntryPath, HasPathSegments, Path, PathSegment,
-  directoryNames, entryNames, mkPath, pathSegments, unPathSegment)
+  (DirectoryContents(DirectoryContents), EntryPath, HasPathSegments, Path, directoryNames,
+  entryNames, getPathSegments, mkPath, pathSegments, unPathSegment)
 import Coffer.Util (didimatch)
 import Control.Exception (try)
 import Control.Lens hiding ((.=))
-import Control.Monad (foldM, void)
+import Control.Monad (foldM, void, when)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing qualified as A
 import Data.Aeson.TH (deriveFromJSON)
 import Data.Aeson.Text qualified as A
 import Data.Bifunctor (first)
 import Data.Either.Extra (maybeToEither)
+import Data.Foldable (for_)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Set (Set)
@@ -66,7 +68,7 @@ data VaultError
   | FieldMetadataNotFound EntryPath FieldName
   | CofferSpecialsNotFound EntryPath
   | BadCofferSpecialsError Text
-  | InvalidPathSegment Text
+  | BackendReturnedInvalidPathSegment Text
 
 instance Buildable VaultError where
   build = \case
@@ -107,14 +109,17 @@ instance Buildable VaultError where
     CofferSpecialsNotFound entryPath ->
       [int|s|Could not find key '#$coffer' in the kv entry at '#{entryPath}'.|]
     BadCofferSpecialsError err -> build err
-    InvalidPathSegment pathSegment ->
+    BackendReturnedInvalidPathSegment pathSegment ->
       [int|s|
-        Backend returned a path segment that is not a valid \
+        Backend returned segment that is not a valid \
         entry or directory name.
-        Got: '#{pathSegment}'.
+        Got: #{pathSegment}.
       |]
 
 instance BackendError VaultError
+
+kvPathSegmentAllowedCharacters :: [Char]
+kvPathSegmentAllowedCharacters = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_"
 
 vaultKvCodec :: TomlCodec VaultKvBackend
 vaultKvCodec = VaultKvBackend
@@ -193,10 +198,17 @@ orThrowEither
   -> Sem r a
 orThrowEither e mkErr = either (throw . mkErr) pure e
 
-getPathSegments
-  :: (HasPathSegments s segments, Each segments segments PathSegment PathSegment)
-  => s -> [Text]
-getPathSegments path = path ^.. pathSegments . each . to unPathSegment
+kvValidatePath :: Effects r => HasPathSegments s segments
+ => VaultKvBackend -> s -> Sem r ()
+kvValidatePath _ path = do
+  for_ (path ^.. pathSegments . each) \pathSegment ->
+    when (T.any (`notElem` kvPathSegmentAllowedCharacters) $ unPathSegment pathSegment) $
+      throw $ InvalidPathSegment
+        pathSegment
+        [int|s|
+          Path segments for Vault KV can only contain the following characters:
+          '#{kvPathSegmentAllowedCharacters}'.
+        |]
 
 kvWriteEntry :: Effects r => VaultKvBackend -> Entry -> Sem r ()
 kvWriteEntry backend entry = do
@@ -318,7 +330,7 @@ kvListDirectoryContents backend path = do
     makeDirectoryAndEntryNames :: DirectoryContents -> Text -> Either CofferError DirectoryContents
     makeDirectoryAndEntryNames contents content = do
       case mkPath content of
-        Left _ -> Left $ BackendError (InvalidPathSegment content)
+        Left _ -> Left $ BackendError (BackendReturnedInvalidPathSegment content)
         Right path -> do
           let segments = path ^. pathSegments
           if "/" `T.isSuffixOf` content
@@ -340,3 +352,4 @@ instance Backend VaultKvBackend where
   _readEntry = kvReadEntry
   _listDirectoryContents = kvListDirectoryContents
   _deleteEntry = kvDeleteEntry
+  _validatePath = kvValidatePath
