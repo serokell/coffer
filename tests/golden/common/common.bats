@@ -9,22 +9,13 @@ load '../helpers/bats-assert/load'
 load '../helpers'
 
 @test "bad path" {
-  run coffer view "$(echo -e "bad\npath")"
+  run coffer view "$(echo -e "bad#path#")"
 
   assert_failure
   assert_output --partial - <<EOF
-Invalid path: "bad\npath".
-Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
-EOF
-}
-
-@test "bad entry path" {
-  run coffer create "$(echo -e "bad/entry\npath")"
-
-  assert_failure
-  assert_output --partial - <<EOF
-Invalid entry path: "bad/entry\npath".
-Path segments can only contain the following characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+Parser error:
+Too many # literals.
+Expected format is: [<backend-name>#]<path>.
 EOF
 }
 
@@ -65,6 +56,10 @@ EOF
 Invalid qualified entry path format: "back#/path#\n\nsmth".
 Expected format is: [<backend-name>#]<entry-path>.
 <backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
+Backend <entry-path> specifics :
+Vault Kv paths can contain only the following characters:
+'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+
 Examples: 'vault_kv-backend#secrets/google', 'my/passwords/entry'.
 
 Parser error:
@@ -81,11 +76,16 @@ EOF
 Invalid qualified path format: "back#/path#\n\nsmth".
 Expected format is: [<backend-name>#]<path>.
 <backend-name> can be a string of the following characters: [a-zA-Z0-9] and symbols '-', '_', ';'.
+Backend <path> specifics :
+Vault Kv paths can contain only the following characters:
+'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+
 Examples: 'vault_kv-backend#secrets/google', 'my/passwords/mypage/'.
 
 Parser error:
 Too many # literals.
 Expected format is: [<backend-name>#]<path>.
+
 EOF
 }
 

@@ -4,7 +4,8 @@
 
 module Backend.Commands where
 
-import BackendEffect (BackendEffect, deleteEntry, listDirectoryContents, readEntry, writeEntry)
+import BackendEffect
+  (BackendEffect, deleteEntry, listDirectoryContents, readEntry, validatePath, writeEntry)
 import BackendName (BackendName)
 import Backends (SomeBackend)
 import CLI.Types
@@ -61,8 +62,9 @@ runCommand config = \case
 viewCmd
   :: (Members '[BackendEffect, Error CofferError, Error ViewResult] r)
   => Config -> ViewOptions -> Sem r ViewResult
-viewCmd config (ViewOptions qPath@(QualifiedPath backendNameMb _) fieldNameMb) = do
+viewCmd config (ViewOptions qPath@(QualifiedPath backendNameMb path) fieldNameMb) = do
   backend <- getBackend config backendNameMb
+  validatePath backend path
   getEntryOrDirThrow backend VRPathNotFound qPath >>= \case
     Right dir -> do
       case fieldNameMb of
@@ -97,6 +99,7 @@ createCmd
   (CreateOptions qEntryPath@(QualifiedPath backendNameMb entryPath) _edit force tags fields privateFields)
     = do
   backend <- getBackend config backendNameMb
+  validatePath backend entryPath
   nowUtc <- embed getCurrentTime
   let
     mkField :: FieldVisibility -> FieldInfo -> (FieldName, Field)
@@ -123,6 +126,7 @@ setFieldCmd
   (SetFieldOptions qEntryPath@(QualifiedPath backendNameMb entryPath) fieldName fieldContentsMb visibilityMb)
     = do
   backend <- getBackend config backendNameMb
+  validatePath backend entryPath
   readEntry backend entryPath >>= \case
     Nothing -> do
       pure $ SFREntryNotFound qEntryPath
@@ -162,6 +166,7 @@ deleteFieldCmd
   => Config -> DeleteFieldOptions -> Sem r DeleteFieldResult
 deleteFieldCmd config (DeleteFieldOptions qPath@(QualifiedPath backendNameMb path) fieldName) = do
   backend <- getBackend config backendNameMb
+  validatePath backend path
   readEntry backend path >>= \case
     Nothing -> pure $ DFREntryNotFound qPath
     Just entry -> do
@@ -210,6 +215,7 @@ findCmd config (FindOptions qPathMb textMb sortMb filters) = do
             FilterFieldByDate op date -> matchDate op date (field ^. dateModified)
 
   let path = maybe mempty qpPath qPathMb
+  validatePath backend path
   dir <- getEntryOrDir backend path <&> \case
     Just (Right dir) -> dir
     Just (Left entry) -> Dir.singleton entry
@@ -276,13 +282,15 @@ renameCmd
   config
   (RenameOptions
     dryRun
-    oldQPath@(QualifiedPath oldBackendNameMb _)
-    newQPath@(QualifiedPath newBackendNameMb _)
+    oldQPath@(QualifiedPath oldBackendNameMb oldPath)
+    newQPath@(QualifiedPath newBackendNameMb newPath)
     force
   )
     = do
   oldBackend <- getBackend config oldBackendNameMb
   newBackend <- getBackend config newBackendNameMb
+  validatePath oldBackend oldPath
+  validatePath newBackend newPath
   operations <- buildCopyOperations oldBackend newBackend oldQPath newQPath force
 
   unless dryRun do
@@ -395,13 +403,15 @@ copyCmd
   config
   (CopyOptions
     dryRun
-    oldQPath@(QualifiedPath oldBackendNameMb _)
-    newQPath@(QualifiedPath newBackendNameMb _)
+    oldQPath@(QualifiedPath oldBackendNameMb oldPath)
+    newQPath@(QualifiedPath newBackendNameMb newPath)
     force
   )
     = do
   oldBackend <- getBackend config oldBackendNameMb
   newBackend <- getBackend config newBackendNameMb
+  validatePath oldBackend oldPath
+  validatePath newBackend newPath
   operations <- buildCopyOperations oldBackend newBackend oldQPath newQPath force
 
   unless dryRun do
@@ -412,8 +422,9 @@ copyCmd
 deleteCmd
   :: (Members '[BackendEffect, Embed IO, Error CofferError, Error DeleteResult] r)
   => Config -> DeleteOptions -> Sem r DeleteResult
-deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb _) recursive) = do
+deleteCmd config (DeleteOptions dryRun qPath@(QualifiedPath backendNameMb path) recursive) = do
   backend <- getBackend config backendNameMb
+  validatePath backend path
   getEntryOrDirThrow backend DRPathNotFound qPath >>= \case
     Left entry -> do
       unless dryRun do
@@ -436,6 +447,7 @@ tagCmd
   => Config -> TagOptions -> Sem r TagResult
 tagCmd config (TagOptions qEntryPath@(QualifiedPath backendNameMb entryPath) tag delete) = do
   backend <- getBackend config backendNameMb
+  validatePath backend entryPath
   readEntry backend entryPath >>= \case
     Nothing -> pure $ TREntryNotFound qEntryPath
     Just entry -> do
