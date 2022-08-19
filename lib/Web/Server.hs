@@ -36,6 +36,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import Fmt (Builder, pretty, unlinesF)
 import GHC.Generics (Generic)
+import Polysemy.Async (Async, asyncToIOFinal)
 import Servant.API
 import Servant.Server
 import Web.Types (NewEntry(NewEntry), NewField(NewField))
@@ -103,11 +104,12 @@ handleCopyResult = handleCopyOrRenameResult False
 handleRenameResult :: RenameResult -> Handler [(EntryPath, EntryPath)]
 handleRenameResult = handleCopyOrRenameResult True
 
-runBackendIO' :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO] a -> IO (Either CofferError a)
+runBackendIO' :: Sem '[BackendEffect, Error CofferError, Embed IO, Async, Final IO] a -> IO (Either CofferError a)
 runBackendIO' action =
   runBackend action
     & errorToIOFinal @CofferError
     & embedToFinal @IO
+    & asyncToIOFinal
     & runFinal
 
 reportErrors :: IO (Either CofferError a) -> Handler a
