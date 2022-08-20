@@ -117,6 +117,7 @@ library:
     - tomland
     - unordered-containers
     - validation-selective
+    - wai-cors
     - warp
     - optparse-applicative
 
