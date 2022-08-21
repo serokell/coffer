@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-.PHONY: coffer test haddock haddock-no-deps stylish lint clean bats all
+.PHONY: coffer test haddock haddock-no-deps stylish swagger lint clean bats all
 
 # Build target from the common utility Makefile
 MAKEU = $(MAKE) -C make/
@@ -34,6 +34,9 @@ clean:
 
 stylish:
 	find . -name '.stack-work' -prune -o -name '.dist-newstyle' -prune -o -name '*.hs' -exec stylish-haskell -i '{}' \;
+
+swagger:
+	stack run coffer-swagger-api
 
 lint:
 	hlint .
