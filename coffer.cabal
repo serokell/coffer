@@ -38,7 +38,6 @@ library
       Coffer.Util
       Config
       Entry
-      Entry.Json
       Error
       Web.API
       Web.Main

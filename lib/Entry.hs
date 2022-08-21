@@ -26,7 +26,6 @@ module Entry
   , masterField
   , fields
   , tags
-  , EntryConvertible (..)
 
   -- * Swagger Examples
   , exampleEntryTag
@@ -271,6 +270,3 @@ newEntry path time =
   , eFields = HS.empty
   , eTags = S.empty
   }
-
-class EntryConvertible a where
-  entry :: Prism a a Entry Entry
