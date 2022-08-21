@@ -102,8 +102,8 @@ scrubDates =
 cofferTest :: IO () -> IO ()
 cofferTest test = deleteRecords >> test
 
-setField :: Text -> Text -> Text -> IO (JsonResponse Value)
-setField path name contents =
+setField :: Text -> Text -> Maybe Text -> Text -> IO (JsonResponse Value)
+setField path name visibility contents =
   executeCommand
     POST
     ["set-field"]
@@ -112,25 +112,24 @@ setField path name contents =
     ( mconcat
         [ "path" =: path
         , "field" =: name
+        , queryParam "visibility" visibility
         ]
     )
 
-changeFieldVisibility :: Text -> Text -> Bool -> IO ()
-changeFieldVisibility path field public = void $
-  executeCommand
-    POST
-    ["set-field", visibility]
-    NoReqBody
-    ignoreResponse
-    ( mconcat
-        [ "path" =: path
-        , "field" =: field
-        ]
-    )
-  where
-    visibility
-      | public = "public"
-      | otherwise = "private"
+changeFieldVisibility :: Text -> Text -> Text -> IO Value
+changeFieldVisibility path field visibility = do
+  response <-
+    executeCommand
+      POST
+      ["set-field-visibility", visibility]
+      NoReqBody
+      (jsonResponse @Value)
+      ( mconcat
+          [ "path" =: path
+          , "field" =: field
+          ]
+      )
+  pure $ responseBody response
 
 -- | Finds field in entry
 findField :: Text -> Value -> Maybe Value

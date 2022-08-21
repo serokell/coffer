@@ -26,7 +26,8 @@ import Coffer.Directory (Directory, singleton)
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath, qpPath))
 import Coffer.PrettyPrint
   (PrettyPrintMode(WebAPI), buildCopyOrRenameResult, buildCreateError, buildDeleteFieldResult,
-  buildDeleteResult, buildSetFieldResult, buildTagResult, buildViewResult)
+  buildDeleteResult, buildSetFieldResult, buildSetFieldVisibilityResult, buildTagResult,
+  buildViewResult)
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
@@ -66,10 +67,18 @@ handleSetFieldResult = \case
   SFRSuccess _ qEntry -> pure $ qpPath qEntry
   res@SFREntryNotFound{} ->
     throwCofferServerError err404 300 (pretty res)
-  res@SFRMissingFieldContents{} ->
-    throwCofferServerError err400 301 (pretty res)
   where
     pretty = resultToText buildSetFieldResult
+
+handleSetFieldVisibilityResult :: SetFieldVisibilityResult -> Handler Entry
+handleSetFieldVisibilityResult = \case
+  SFVRSuccess _ qEntry -> pure $ qpPath qEntry
+  res@SFVREntryNotFound{} ->
+    throwCofferServerError err404 350 (pretty res)
+  res@SFVRFieldNotFound{} ->
+    throwCofferServerError err404 351 (pretty res)
+  where
+    pretty = resultToText buildSetFieldVisibilityResult
 
 handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [(EntryPath, EntryPath)]
 handleCopyOrRenameResult rename = \case
@@ -129,19 +138,18 @@ makeServer
   :: (SomeBackend -> (forall a. Command a -> Handler a))
   -> Server API
 makeServer run backend
-  =    view   (run backend)
-  :<|> create (run backend)
-  :<|>
-    (\txt fkey ->
-         private (run backend) txt fkey
-    :<|> public  (run backend) txt fkey
-    :<|> set     (run backend) txt fkey
-    )
-  :<|> deleteField (run backend)
-  :<|> find'       (run backend)
-  :<|> rename      (run backend)
-  :<|> copy'       (run backend)
-  :<|> delete'     (run backend)
+  =    view               (run backend)
+  :<|> create             (run backend)
+  :<|> setField           (run backend)
+  :<|> (\path field->
+            setFieldVisibility (run backend) path field Public
+       :<|> setFieldVisibility (run backend) path field Private
+       )
+  :<|> deleteField        (run backend)
+  :<|> find'              (run backend)
+  :<|> rename             (run backend)
+  :<|> copy'              (run backend)
+  :<|> delete'            (run backend)
   :<|>
     (\path tag' ->
          tag (run backend) path tag' False
@@ -202,44 +210,32 @@ create run coPath coForce (NewEntry coFields coTags) =
 
     pretty = resultToText buildCreateError
 
-private
+setFieldVisibility
   :: (forall a. Command a -> Handler a)
   -> EntryPath
   -> FieldName
+  -> FieldVisibility
   -> Handler Entry
-private run sfoPath sfoFieldName  = do
-  run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
-    , sfoFieldContents = Nothing
-    , sfoVisibility = Just Private
-    }) >>= handleSetFieldResult
+setFieldVisibility run path field visibility =
+  run (CmdSetFieldVisibility SetFieldVisibilityOptions
+    { sfvoQPath = QualifiedPath Nothing path
+    , sfvoFieldName = field
+    , sfvoVisibility = visibility
+    }) >>= handleSetFieldVisibilityResult
 
-public
+setField
   :: (forall a. Command a -> Handler a)
   -> EntryPath
   -> FieldName
+  -> Maybe FieldVisibility
+  -> FieldContents
   -> Handler Entry
-public run sfoPath sfoFieldName  =
+setField run path field visibility contents =
   run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
-    , sfoFieldContents = Nothing
-    , sfoVisibility = Just Public
-    }) >>= handleSetFieldResult
-
-set
-  :: (forall a. Command a -> Handler a)
-  -> EntryPath
-  -> FieldName
-  -> Maybe FieldContents
-  -> Handler Entry
-set run sfoPath sfoFieldName sfoFieldContents =
-  run (CmdSetField SetFieldOptions
-    { sfoQPath = QualifiedPath Nothing sfoPath
-    , sfoFieldName
-    , sfoFieldContents = sfoFieldContents
-    , sfoVisibility = Nothing
+    { sfoQPath = QualifiedPath Nothing path
+    , sfoFieldName = field
+    , sfoFieldContents = contents
+    , sfoVisibility = visibility
     }) >>= handleSetFieldResult
 
 deleteField

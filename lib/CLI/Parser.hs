@@ -68,6 +68,8 @@ commandParser =
         "Create a new entry at the specified path"
     , mkCommand "set-field" CmdSetField setFieldOptions
         "Set a field on the entry at the specified path"
+    , mkCommand "set-field-visibility" CmdSetFieldVisibility setFieldVisibilityOptions
+        "Change a field's visibility on the entry at the specified path"
     , mkCommand "delete-field" CmdDeleteField deleteFieldOptions
         "Delete a field from the entry at the specified path"
     , mkCommand "find" CmdFind findOptions
@@ -168,12 +170,9 @@ setFieldOptions =
           [ metavar "FIELDNAME"
           , help "The name of the field to set"
           ])
-    <*> optional (argument readFieldContents $ mconcat
+    <*> argument readFieldContents ( mconcat
           [ metavar "FIELDCONTENTS"
-          , help $ unlines
-              [ "The contents to insert into the field."
-              , "Required when creating a new field, optional otherwise."
-              ]
+          , help $ "The contents to insert into the field."
           ])
     <*> optional (option readFieldVisibility $ mconcat
           [ long "visibility"
@@ -182,6 +181,26 @@ setFieldOptions =
           , help $ unlines
               [ "Whether to mark this field as 'public' or 'private'"
               , "New fields are public by default when this option is omitted."
+              , "Private fields can only be viewed with 'coffer view',"
+              , "and will be hidden when using other commands."
+              ]
+          ])
+
+setFieldVisibilityOptions :: Parser SetFieldVisibilityOptions
+setFieldVisibilityOptions =
+  SetFieldVisibilityOptions
+    <$> argument readQualifiedEntryPath ( mconcat
+          [ metavar "ENTRYPATH"
+          , help "The path to set the field visibility on, this must already exist as an entry"
+          ])
+    <*> argument readFieldName ( mconcat
+          [ metavar "FIELDNAME"
+          , help "The name of the field to set"
+          ])
+    <*> argument readFieldVisibility ( mconcat
+          [ metavar "VISIBILITY"
+          , help $ unlines
+              [ "Whether to mark this field as 'public' or 'private'"
               , "Private fields can only be viewed with 'coffer view',"
               , "and will be hidden when using other commands."
               ]

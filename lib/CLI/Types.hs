@@ -39,6 +39,7 @@ data Command res where
   CmdView :: ViewOptions -> Command ViewResult
   CmdCreate :: CreateOptions -> Command CreateResult
   CmdSetField :: SetFieldOptions -> Command SetFieldResult
+  CmdSetFieldVisibility :: SetFieldVisibilityOptions -> Command SetFieldVisibilityResult
   CmdDeleteField :: DeleteFieldOptions -> Command DeleteFieldResult
   CmdFind :: FindOptions -> Command (Maybe Directory)
   CmdRename :: RenameOptions -> Command RenameResult
@@ -81,7 +82,12 @@ data CreateResult
 data SetFieldResult
   = SFRSuccess FieldName (QualifiedPath Entry)
   | SFREntryNotFound (QualifiedPath EntryPath)
-  | SFRMissingFieldContents FieldName (QualifiedPath EntryPath)
+  deriving stock (Show)
+
+data SetFieldVisibilityResult
+  = SFVRSuccess FieldName (QualifiedPath Entry)
+  | SFVREntryNotFound (QualifiedPath EntryPath)
+  | SFVRFieldNotFound FieldName (QualifiedPath EntryPath)
   deriving stock (Show)
 
 data DeleteFieldResult
@@ -136,8 +142,15 @@ data CreateOptions = CreateOptions
 data SetFieldOptions = SetFieldOptions
   { sfoQPath :: QualifiedPath EntryPath
   , sfoFieldName :: FieldName
-  , sfoFieldContents :: Maybe FieldContents
+  , sfoFieldContents :: FieldContents
   , sfoVisibility :: Maybe FieldVisibility
+  }
+  deriving stock (Show)
+
+data SetFieldVisibilityOptions = SetFieldVisibilityOptions
+  { sfvoQPath :: QualifiedPath EntryPath
+  , sfvoFieldName :: FieldName
+  , sfvoVisibility :: FieldVisibility
   }
   deriving stock (Show)
 

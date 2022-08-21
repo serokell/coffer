@@ -27,12 +27,11 @@ EOF
       test: aba [2000-01-01 01:01:01]
 EOF
 
-  run coffer set-field /a/b test -V private
+  run coffer set-field-visibility /a/b test private
 
   assert_success
   assert_output - <<EOF
-[SUCCESS] Set field 'test' (private) at '/a/b' to:
-aba
+[SUCCESS] Set visibility of field 'test' at '/a/b' to private
 EOF
 
   run cleanOutput coffer find
@@ -56,12 +55,11 @@ EOF
 @test "change visibility on non existing field" {
   coffer create /a/b
 
-  run coffer set-field /a/b not-exist -V public
+  run coffer set-field-visibility /a/b not-exist public
 
   assert_failure
   assert_output - <<EOF
-[ERROR] The entry at '/a/b' does not yet have a field 'not-exist'.
-In order to create a new field, please include the 'FIELDCONTENTS' argument.
+[ERROR] The entry at '/a/b' does not have a field 'not-exist'.
 EOF
 }
 

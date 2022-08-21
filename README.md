@@ -26,6 +26,7 @@ Available commands:
                            returning only the specified field for each entry
   create                   Create a new entry at the specified path
   set-field                Set a field on the entry at the specified path
+  set-field-visibility     Set a field's visibility on the entry at the specified path
   delete-field             Delete a field from the entry at the specified path
   find                     Find and list entries, optionally filtering
   rename                   Rename an entry or directory
