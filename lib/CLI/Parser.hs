@@ -115,8 +115,8 @@ createOptions =
     <$> argument readQualifiedEntryPath ( mconcat
           [ metavar "ENTRYPATH"
           , help
-              "The path to insert the new entry into, this must not already be \
-              \a directory or an entry unless `-f` is specified"
+              "The path of the new entry. This must not already be a directory or an entry.\
+              \ If it is an entry, `-f` can be used to overwrite it."
           ])
     <*> switch ( mconcat
           [ long "edit"
@@ -237,7 +237,7 @@ renameOptions =
           ])
     <*> argument readQualifiedPath ( mconcat
           [ metavar "OLDPATH"
-          , help "The path to move the old directory or entry from"
+          , help "The path of the directory or entry to be moved"
           ])
     <*> argument readQualifiedPath ( mconcat
           [ metavar "NEWPATH"
@@ -261,7 +261,7 @@ copyOptions =
           ])
     <*> argument readQualifiedPath ( mconcat
           [ metavar "OLDPATH"
-          , help "The path to copy the old directory or entry from"
+          , help "The path of the directory or entry to be copied"
           ])
     <*> argument readQualifiedPath ( mconcat
           [ metavar "NEWPATH"

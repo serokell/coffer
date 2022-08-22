@@ -68,6 +68,13 @@ packages:
   original:
     hackage: tomland-1.3.3.1@sha256:83a8fd26a97164100541f7b26aa40ffdc6f230b21e94cbb3eae1fb7093c4356e,8924
 - completed:
+    hackage: openapi3-3.2.2@sha256:419d0f12ed404581a561095ed78582b86e404f95c2e6b347238d78b2abe49805,4896
+    pantry-tree:
+      size: 2263
+      sha256: 46d01d4cccc37aecddaaca0d08aa516ab762507d78f6d7cc9b720ba223cd8b94
+  original:
+    hackage: openapi3-3.2.2
+- completed:
     hackage: doctest-parallel-0.2.2@sha256:4c5787c681211dc21d3b9cecc009422f724295584700c661b5ac33b29dc031ba,5803
     pantry-tree:
       size: 7976

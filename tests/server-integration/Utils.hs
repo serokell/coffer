@@ -202,7 +202,7 @@ executeCommand
    -> IO response
 executeCommand = executeCommandWithHeader makeCofferHeader
 
-(@=) :: JsonResponse Value -> Value -> IO ()
+(@=) :: HasCallStack => JsonResponse Value -> Value -> IO ()
 response @= value = scrubDates (responseBody response) @?= value
 
 processStatusCodeError :: (Show res) => Status -> Value -> Either Req.HttpException res -> IO ()

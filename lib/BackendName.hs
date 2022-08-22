@@ -13,14 +13,16 @@ module BackendName
 import Coffer.Util (didimatch)
 import Data.Aeson qualified as A
 import Data.Hashable (Hashable)
+import Data.OpenApi
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fmt (Buildable)
+import GHC.Generics (Generic)
 import Toml qualified
 
 newtype BackendName = UnsafeBackendName Text
-  deriving stock (Show, Eq)
-  deriving newtype (Hashable, Buildable)
+  deriving stock (Show, Eq, Generic)
+  deriving newtype (Hashable, Buildable, ToSchema, A.ToJSON)
 
 instance A.FromJSON BackendName where
   parseJSON = A.withText "BackendName" \text ->

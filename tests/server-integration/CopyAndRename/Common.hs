@@ -51,18 +51,18 @@ testCopyOrRename copy = cofferTest do
   response @=
     [aesonQQ|
       [
-        [
-          "/a/b",
-          "/aCopy/b"
-        ],
-        [
-          "/a/c",
-          "/aCopy/c"
-        ],
-        [
-          "/a/d",
-          "/aCopy/d"
-        ]
+        {
+          "from": "/a/b",
+          "to": "/aCopy/b"
+        },
+        {
+          "from": "/a/c",
+          "to": "/aCopy/c"
+        },
+        {
+          "from": "/a/d",
+          "to": "/aCopy/d"
+        }
       ]
     |]
 

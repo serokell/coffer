@@ -4,41 +4,37 @@
 
 module Web.Server where
 
-import Control.Monad.Catch (Exception(displayException), SomeException, try)
-import Control.Monad.Except
-
-import Data.Function ((&))
-import Data.HashMap.Strict qualified as HashMap
-import Data.Text (Text)
-
-import Polysemy
-import Polysemy.Error hiding (try)
-
+import Backend.Interpreter (runBackend)
 import BackendEffect (BackendEffect)
 import Backends (SomeBackend)
 import CLI.Types
-import Entry
-import Error
-import Web.API
-
-import Backend.Interpreter (runBackend)
 import Coffer.Directory (Directory, singleton)
 import Coffer.Path (EntryPath, Path, QualifiedPath(QualifiedPath, qpPath))
 import Coffer.PrettyPrint
   (PrettyPrintMode(WebAPI), buildCopyOrRenameResult, buildCreateError, buildDeleteFieldResult,
   buildDeleteResult, buildSetFieldResult, buildTagResult, buildViewResult)
+import Control.Monad.Catch (Exception(displayException), SomeException, try)
+import Control.Monad.Except
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
 import Data.Bifunctor (bimap)
+import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.HashMap.Strict qualified as HashMap
 import Data.Set qualified as Set
+import Data.Text (Text)
 import Data.Text qualified as T
+import Entry
+import Error
 import Fmt (Builder, pretty, unlinesF)
 import GHC.Generics (Generic)
+import Polysemy
+import Polysemy.Error hiding (try)
 import Servant.API
 import Servant.Server
-import Web.Types (NewEntry(NewEntry), NewField(NewField))
+import Web.API
+import Web.Types (CopiedEntry, NewEntry(NewEntry), NewField(NewField), mkCopiedEntry)
 
 data CofferServerError = CofferServerError
   { cseError :: Text
@@ -71,9 +67,9 @@ handleSetFieldResult = \case
   where
     pretty = resultToText buildSetFieldResult
 
-handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [(EntryPath, EntryPath)]
+handleCopyOrRenameResult :: Bool -> CopyResult -> Handler [CopiedEntry]
 handleCopyOrRenameResult rename = \case
-  CPRSuccess _ paths -> pure (paths <&> bimap qpPath qpPath)
+  CPRSuccess _ paths -> pure (paths <&> (mkCopiedEntry . bimap qpPath qpPath))
   res@CPRPathNotFound{} ->
     throwCofferServerError err404 500 (prettySingleMessage res)
   res@CPRMissingEntryName{} ->
@@ -97,10 +93,10 @@ handleCopyOrRenameResult rename = \case
       CEDestinationIsDirectory{} -> 504
       CEEntryAlreadyExists{} -> 505
 
-handleCopyResult :: CopyResult -> Handler [(EntryPath, EntryPath)]
+handleCopyResult :: CopyResult -> Handler [CopiedEntry]
 handleCopyResult = handleCopyOrRenameResult False
 
-handleRenameResult :: RenameResult -> Handler [(EntryPath, EntryPath)]
+handleRenameResult :: RenameResult -> Handler [CopiedEntry]
 handleRenameResult = handleCopyOrRenameResult True
 
 runBackendIO' :: Sem '[BackendEffect, Error CofferError, Embed IO, Final IO] a -> IO (Either CofferError a)
@@ -143,9 +139,9 @@ makeServer run backend
   :<|> copy'       (run backend)
   :<|> delete'     (run backend)
   :<|>
-    (\path tag' ->
-         tag (run backend) path tag' False
-    :<|> tag (run backend) path tag' True
+    (
+         (\path tag' -> tag (run backend) path tag' False)
+    :<|> (\path tag' -> tag (run backend) path tag' True)
     )
 
 view
@@ -281,7 +277,7 @@ rename
   -> Path
   -> Path
   -> Bool
-  -> Handler [(EntryPath, EntryPath)]
+  -> Handler [CopiedEntry]
 rename run roDryRun roOldPath roNewPath roForce =
   run (CmdRename RenameOptions
     { roDryRun
@@ -296,7 +292,7 @@ copy'
   -> Path
   -> Path
   -> Bool
-  -> Handler [(EntryPath, EntryPath)]
+  -> Handler [CopiedEntry]
 copy' run cpoDryRun cpoOldPath cpoNewPath cpoForce =
   run (CmdCopy CopyOptions
     { cpoDryRun

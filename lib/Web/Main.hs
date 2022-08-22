@@ -13,7 +13,10 @@ import Control.Exception (Exception, throw)
 import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 import Data.Proxy
+import Network.HTTP.Types (hContentType)
 import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Cors
+  (CorsResourcePolicy(..), cors, simpleCorsResourcePolicy, simpleMethods)
 import Options.Applicative
 import Servant.Server (serve)
 import System.Environment (lookupEnv)
@@ -68,8 +71,21 @@ runServer = do
   case ports of
     (port : _) -> do
       if 0 < port
-      then run port $ serve (Proxy :: Proxy API) do
+      then run port $ corsMiddleware $ serve (Proxy :: Proxy API) do
         makeServer \someBackend ->
           reportErrors . runBackendIO' . runCommand (makeSingleBackendConfig  someBackend)
       else throw $ RunServerIncorrectPort port
     _ -> throw $ last errs
+  where
+    -- Allow cross-origin requests from Swagger Editor/UI.
+    corsMiddleware = cors $ const $ Just simpleCorsResourcePolicy
+      { corsRequestHeaders = [hContentType, "Coffer-Backend"]
+      , corsMethods = "DELETE" : "PUT" : simpleMethods
+      , corsOrigins = Just
+        ( [ "https://petstore.swagger.io"
+          , "https://editor.swagger.io"
+          , "https://editor-next.swagger.io"
+          ]
+        , False
+        )
+      }

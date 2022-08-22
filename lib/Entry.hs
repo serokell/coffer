@@ -26,26 +26,32 @@ module Entry
   , masterField
   , fields
   , tags
-  , EntryConvertible (..)
+
+  -- * Swagger Examples
+  , exampleEntryTag
+  , exampleEntry
   )
 where
 
-import Coffer.Path (EntryPath)
+import Coffer.Path (EntryPath, exampleEntryPath)
 import Control.Lens
-import Data.Aeson (FromJSON(parseJSON), withText)
+import Data.Aeson (FromJSON(parseJSON), toJSON, withText)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing
 import Data.Aeson.TH
 import Data.Bifunctor (Bifunctor(first))
+import Data.Data (Proxy(..))
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
 import Data.Hashable (Hashable)
+import Data.OpenApi
+import Data.OpenApi.Lens qualified as Schema
 import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Time (UTCTime)
-import Fmt (Buildable, build)
+import Data.Time (UTCTime(..), fromGregorian)
+import Fmt (Buildable, build, pretty)
 import GHC.Generics (Generic)
 import Servant (FromHttpApiData(parseUrlPiece), ToHttpApiData)
 import System.Console.ANSI (SGR(Reset), setSGRCode)
@@ -71,6 +77,17 @@ instance A.FromJSONKey FieldName where
 
 instance FromHttpApiData FieldName where
   parseUrlPiece text = first unBadFieldName $ newFieldName text
+
+instance ToSchema FieldName where
+  declareNamedSchema proxy = pure $ NamedSchema (Just "FieldName") (toParamSchema proxy)
+
+instance ToParamSchema FieldName where
+  toParamSchema _ =
+    toSchema @Text Proxy
+      & Schema.pattern ?~ fieldNamePattern
+      & example ?~ toJSON (either (error . pretty) id $ newFieldName "password")
+    where
+      fieldNamePattern = "[" <> T.pack allowedCharSet <> "]+"
 
 allowedCharSet :: [Char]
 allowedCharSet = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "-_;"
@@ -103,8 +120,22 @@ instance A.FromJSON EntryTag where
 instance FromHttpApiData EntryTag where
   parseUrlPiece text = first unBadEntryTag $ newEntryTag text
 
+instance ToSchema EntryTag where
+  declareNamedSchema proxy = pure $ NamedSchema (Just "EntryTag") (toParamSchema proxy)
+
+instance ToParamSchema EntryTag where
+  toParamSchema _ =
+    toSchema @Text Proxy
+      & Schema.pattern ?~ entryTagPattern
+      & example ?~ toJSON exampleEntryTag
+    where
+      entryTagPattern = "[" <> T.pack allowedCharSet <> "]+"
+
 newtype BadEntryTag = BadEntryTag { unBadEntryTag :: Text }
   deriving newtype Buildable
+
+exampleEntryTag :: EntryTag
+exampleEntryTag = either (error . pretty) id $ newEntryTag "some-tag"
 
 newEntryTag :: Text -> Either BadEntryTag EntryTag
 newEntryTag tag
@@ -120,6 +151,11 @@ getEntryTag (UnsafeEntryTag t) = t
 data FieldVisibility = Public | Private
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
+
+instance ToSchema FieldVisibility where
+  declareNamedSchema _ = pure $ NamedSchema (Just "FieldVisibility") $
+    toSchema @Text Proxy
+    & enum_ ?~ ["public", "private"]
 
 instance Buildable FieldVisibility where
   build = \case
@@ -141,6 +177,11 @@ newtype FieldContents = FieldContents { unFieldContents :: Text }
   deriving stock (Show, Eq, Ord)
   deriving newtype (Hashable, A.FromJSON, A.ToJSON, A.FromJSONKey, A.ToJSONKey)
 makeLensesFor [("unFieldContents", "fieldContents")] ''FieldContents
+
+instance ToSchema FieldContents where
+  declareNamedSchema _ = pure $ NamedSchema Nothing $
+    toSchema @Text Proxy
+    & example ?~ toJSON (FieldContents "some-password")
 
 -- | User can use ANSI control sequences in field contents.
 -- If some ANSI control sequence contain in field contents then we append @reset@ ANSI control sequence.
@@ -164,6 +205,9 @@ data Field =
 deriveToJSON (aesonPrefix camelCase) ''Field
 makeLensesWith abbreviatedFields ''Field
 
+instance ToSchema Field where
+  declareNamedSchema = genericDeclareNamedSchema $ fromAesonOptions (aesonPrefix camelCase)
+
 newField :: UTCTime -> FieldContents -> Field
 newField time contents =
   Field
@@ -185,6 +229,38 @@ data Entry =
 deriveToJSON (aesonPrefix camelCase) ''Entry
 makeLensesWith abbreviatedFields ''Entry
 
+instance ToSchema Entry where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema (fromAesonOptions (aesonPrefix camelCase)) proxy
+      & mapped . Schema.schema . example ?~ toJSON exampleEntry
+
+exampleEntry :: Entry
+exampleEntry =
+  Entry
+  { ePath = exampleEntryPath
+  , eDateModified = exampleDate
+  , eMasterField = Nothing
+  , eFields = HS.fromList
+      [ ( either (error . pretty) id $ newFieldName "username"
+        , Field
+            { fDateModified = exampleDate
+            , fVisibility = Public
+            , fContents = FieldContents "some-username"
+            }
+        )
+      , ( either (error . pretty) id $ newFieldName "password"
+        , Field
+            { fDateModified = exampleDate
+            , fVisibility = Private
+            , fContents = FieldContents "some-password"
+            }
+        )
+      ]
+  , eTags = S.singleton exampleEntryTag
+  }
+  where
+    exampleDate = UTCTime (fromGregorian 2016 7 22) 0
+
 newEntry :: EntryPath -> UTCTime -> Entry
 newEntry path time =
   Entry
@@ -194,6 +270,3 @@ newEntry path time =
   , eFields = HS.empty
   , eTags = S.empty
   }
-
-class EntryConvertible a where
-  entry :: Prism a a Entry Entry

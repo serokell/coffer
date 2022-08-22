@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "aee511167e363943d6d28e0d45244abca38cbd47",
-        "sha256": "11c4vrxcvxxz82kvjir4253fif4iv17439v3y4ijblnxvwi4znhw",
+        "rev": "5f70e4d7b85eacad77b56356fdb9e072600d4355",
+        "sha256": "0k5sz25g7shmf31ckpdxjfyq28bqwlh7mvn73b2w3b0z966i21y7",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/hackage.nix/archive/aee511167e363943d6d28e0d45244abca38cbd47.tar.gz",
+        "url": "https://github.com/input-output-hk/hackage.nix/archive/5f70e4d7b85eacad77b56356fdb9e072600d4355.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "haskell-nix-weeder": {
@@ -29,10 +29,10 @@
         "homepage": "https://input-output-hk.github.io/haskell.nix",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "29433c04fa097b50be67c5b799eb7a87982cd900",
-        "sha256": "0hrwl6x51gxw80nmqbd8gds289i073zjs6mxzicgsj7lxjn47gmc",
+        "rev": "1b0eac78c61b425ad382427b25a4450c8d6f6771",
+        "sha256": "06m5fa3zndgfngyl2p7v738lv3miljmdwz35c6vqly78agc0xdy9",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/haskell.nix/archive/29433c04fa097b50be67c5b799eb7a87982cd900.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/1b0eac78c61b425ad382427b25a4450c8d6f6771.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
@@ -47,18 +47,6 @@
         "url": "https://github.com/serokell/nixpkgs/archive/1714a2ead1a18678afa3cbf75dff3f024c579061.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "serokell.nix": {
-        "branch": "master",
-        "description": "Serokell Nix infrastructure library",
-        "homepage": null,
-        "owner": "serokell",
-        "repo": "serokell.nix",
-        "rev": "652105c5fc5564f5d8e682d61bdc0d51bbc1f939",
-        "sha256": "19zkjhyjbksf2fw32h7m3x0v8nvgdy2qkjkxg2qzzb25as245vmj",
-        "type": "tarball",
-        "url": "https://github.com/serokell/serokell.nix/archive/652105c5fc5564f5d8e682d61bdc0d51bbc1f939.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "nixpkgs-stylish": {
         "branch": "master",
         "description": "Nix Packages collection",
@@ -71,16 +59,28 @@
         "url": "https://github.com/NixOS/nixpkgs/archive/19574af0af3ffaf7c9e359744ed32556f34536bd.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "serokell.nix": {
+        "branch": "master",
+        "description": "Serokell Nix infrastructure library",
+        "homepage": null,
+        "owner": "serokell",
+        "repo": "serokell.nix",
+        "rev": "652105c5fc5564f5d8e682d61bdc0d51bbc1f939",
+        "sha256": "19zkjhyjbksf2fw32h7m3x0v8nvgdy2qkjkxg2qzzb25as245vmj",
+        "type": "tarball",
+        "url": "https://github.com/serokell/serokell.nix/archive/652105c5fc5564f5d8e682d61bdc0d51bbc1f939.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "stackage.nix": {
         "branch": "master",
         "description": "Automatically generated Nix expressions of Stackage snapshots",
         "homepage": "",
         "owner": "input-output-hk",
         "repo": "stackage.nix",
-        "rev": "04c16cfb469aba767d0669edf5ea409c784c5bb3",
-        "sha256": "1km2a0llii2g9wlqza7w3ra1hwp4p4gs3w3z6wsyxx37cp2l5iyk",
+        "rev": "e26c8280c6adf0e8bc9bb90b81d017cd29c590bd",
+        "sha256": "15pqgzqiny8ljvxhh4331pwd3pd1485z7jc3s3vjpqhvxlvlbx3b",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/stackage.nix/archive/04c16cfb469aba767d0669edf5ea409c784c5bb3.tar.gz",
+        "url": "https://github.com/input-output-hk/stackage.nix/archive/e26c8280c6adf0e8bc9bb90b81d017cd29c590bd.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "xrefcheck": {

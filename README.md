@@ -10,10 +10,6 @@
 
 Coffer is multi-backend password store with multiple frontends. It reaches out to [Vault](https://www.vaultproject.io/), [pass](https://www.passwordstore.org/) and others to store your most precious secrets.
 
-## Installation
-
-??? from releases?
-
 ## Usage
 
 ### CLI
@@ -58,120 +54,13 @@ The coffer CLI will look for its configuration file in the following order:
 
 ### Web API
 
-Coffer also has a Web API. The port can be specified via:
-- Cmd line option: `--port`
-- Environment variable: `"COFFER_SERVER_PORT"`
+Coffer also has a Web API.
+Its documentation can be found [here](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/serokell/coffer/main/docs/swagger.json).
 
-Examples:
-1. Stack
-```shell
-$ stack run -- coffer-server --port=8081
-```
+The port can be specified via the command line option `--port` or the environment variable `COFFER_SERVER_PORT`.
 
 ```shell
-$ export COFFER_SERVER_PORT=8081
-$ stack run coffer-server
-```
-
-2. Cabal
-```shell
-$ cabal run -- coffer-server --port=8081
-```
-
-```shell
-$ export COFFER_SERVER_PORT=8081
-$ cabal run coffer-server
-```
-
-
-Documentation for Web API endpoints and their return types could be generated via `servant-openapi3`. (TODO: write something about docs generation after [#114](https://github.com/serokell/coffer/issues/114) is resolved).
-
-#### Configuration
-The Web API is configured via the `Coffer-Backend` HTTP header. It's JSON encoded and should contain:
-- `type` (for now it's only `vault-kv`)
-- fields specific for backend (like `name`, `adress`,`token`, `mount` for `vault-kv`)
-
-Basicly it's JSON version of CLI's config with only one backend
-
-Examples:
-1. Creating new entry
-```shell
-$ curl -s -D /dev/stderr \
-	-H 'Coffer-Backend : { "type" : "vault-kv", "name" : "vault-local", "address" : "localhost:8209", "mount" : "secret", "token" : "root" }' \
-	'localhost:8081/api/v1/content/create?path=/ex1' \
-	-X POST \
-	-H 'Content-Type: application/json' \
-	-d '{ "fields": { "some-field": { "contents": "hi", "visibility": "public" } }, "tags": ["tag"] }' | jq
-
-HTTP/1.1 200 OK
-Transfer-Encoding: chunked
-Date: Tue, 31 May 2022 13:00:28 GMT
-Server: Warp/3.3.18
-Content-Type: application/json;charset=utf-8
-
-{
-  "path": "/ex1",
-  "dateModified": "2022-05-31T13:00:28.267250327Z",
-  "masterField": null,
-  "fields": {
-    "some-field": {
-      "dateModified": "2022-05-31T13:00:28.267250327Z",
-      "visibility": "public",
-      "contents": "hi"
-    }
-  },
-  "tags": [
-    "tag"
-  ]
-}
-
-```
-2. View all entries
-```shell
-$ curl -s -D /dev/stderr \
-	-H 'Coffer-Backend : { "type" : "vault-kv", "name" : "vault-local", "address" : "localhost:8209", "mount" : "secret", "token" : "root" }' \
-	'localhost:8081/api/v1/content/view?path=/' \
-	-X GET \
-	-H 'Content-Type: application/json' | jq
-
-HTTP/1.1 200 OK
-Transfer-Encoding: chunked
-Date: Tue, 31 May 2022 13:05:31 GMT
-Server: Warp/3.3.18
-Content-Type: application/json;charset=utf-8
-
-{
-  "entries": [
-    {
-      "path": "/ex1",
-      "dateModified": "2022-05-31T13:04:05.827650358Z",
-      "masterField": null,
-      "fields": {},
-      "tags": []
-    },
-    {
-      "path": "/ex2",
-      "dateModified": "2022-05-31T13:04:24.259142027Z",
-      "masterField": null,
-      "fields": {
-        "example": {
-          "dateModified": "2022-05-31T13:04:24.259142027Z",
-          "visibility": "public",
-          "contents": "some contents"
-        }
-      },
-      "tags": []
-    },
-    {
-      "path": "/ex3",
-      "dateModified": "2022-05-31T13:04:08.178256852Z",
-      "masterField": null,
-      "fields": {},
-      "tags": []
-    }
-  ],
-  "subdirs": {}
-}
+$ stack run coffer-server -- --port=8081
 ```
 
 ## Development

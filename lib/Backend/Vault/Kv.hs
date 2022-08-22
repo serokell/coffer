@@ -3,7 +3,7 @@
 -- SPDX-License-Identifier: MPL-2.0
 
 module Backend.Vault.Kv
-  ( VaultKvBackend
+  ( VaultKvBackend(..)
   , I.VaultToken(..)
   , kvPathSegmentAllowedCharacters
   ) where
@@ -11,6 +11,7 @@ module Backend.Vault.Kv
 import Backend (Backend(..), Effects)
 import Backend.Vault.Kv.Internal qualified as I
 import BackendName (BackendName, backendNameCodec)
+import Coffer.Instances ()
 import Coffer.Path
   (DirectoryContents(DirectoryContents), EntryPath, HasPathSegments, Path, directoryNames,
   entryNames, getPathSegments, mkPath, pathSegments, unPathSegment)
@@ -20,13 +21,14 @@ import Control.Lens hiding ((.=))
 import Control.Monad (foldM, void, when)
 import Data.Aeson qualified as A
 import Data.Aeson.Casing qualified as A
-import Data.Aeson.TH (deriveFromJSON)
+import Data.Aeson.TH (deriveJSON)
 import Data.Aeson.Text qualified as A
 import Data.Bifunctor (first)
 import Data.Either.Extra (maybeToEither)
 import Data.Foldable (for_)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HS
+import Data.OpenApi
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
@@ -59,8 +61,12 @@ data VaultKvBackend =
   , vbMount :: Text
   , vbToken :: I.VaultToken
   }
-  deriving stock (Show)
-deriveFromJSON (A.aesonPrefix A.camelCase) ''VaultKvBackend
+  deriving stock (Show, Generic)
+deriveJSON (A.aesonPrefix A.camelCase) ''VaultKvBackend
+
+instance ToSchema VaultKvBackend where
+  declareNamedSchema =
+     genericDeclareNamedSchema (fromAesonOptions (A.aesonPrefix A.camelCase))
 
 -- | Errors that can be thrown in Vault backend.
 data VaultError

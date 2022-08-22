@@ -5,31 +5,35 @@
 module Web.API where
 
 import Backends (SomeBackend)
-import CLI.Types
+import CLI.Types (Direction, Filter, Sort)
 import Coffer.Directory (Directory)
 import Coffer.Path (EntryPath, Path)
 import Data.Text (Text)
 import Entry
-import GHC.Generics (Generic)
 import Servant.API
-import Web.Types (NewEntry)
+import Web.Types (CopiedEntry, NewEntry)
+
+-- Note: We can't yet add swagger docs to `QueryParams` and `QueryFlag`.
+-- See: https://github.com/haskell-servant/servant/issues/1602
 
 type API
-  = Header' [Required, Strict] "Coffer-Backend" SomeBackend
+  = RequiredHeaderDesc "Coffer-Backend" SomeBackend "Details about the backend to connect to."
   :> "api" :> "v1" :> "content" :>
     ( "view"
-      :> RequiredParam "path" Path
+      :> RequiredParamDesc "path" Path "A path to either a directory or an entry."
       :> Get '[JSON] Directory
 
     :<|> "create"
-      :> RequiredParam "path" EntryPath
-      :> QueryFlag     "force"
+      :> RequiredParamDesc "path" EntryPath
+          "The path of the new entry. This must not already be a directory or an entry.\
+          \ If it is an entry, `force` can be used to overwrite it."
+      :> QueryFlag "force"
       :> ReqBody '[JSON] NewEntry
       :> Post '[JSON] Entry
 
     :<|> "set-field"
-      :> RequiredParam "path" EntryPath
-      :> RequiredParam "field" FieldName
+      :> RequiredParamDesc "path" EntryPath "The path of the entry to be modified."
+      :> RequiredParamDesc "field" FieldName "The field to be added/modified."
       :>
         (    "private" :> Post '[JSON] Entry
         :<|> "public"  :> Post '[JSON] Entry
@@ -38,49 +42,51 @@ type API
         )
 
     :<|> "delete-field"
-      :> RequiredParam "path" EntryPath
-      :> RequiredParam "field" FieldName
+      :> RequiredParamDesc "path" EntryPath "The path of the entry to be modified."
+      :> RequiredParamDesc "field" FieldName "The field to be deleted"
       :> Delete '[JSON] Entry
 
     :<|> "find"
-      :> OptionalParam  "path" Path
-      :> OptionalParam  "text" Text
-      :> OptionalParam  "sort-field" (Sort, Direction)
+      :> OptionalParamDesc "path" Path "If specified, only show entries within this path (use `/` to find everything)."
+      :> OptionalParamDesc "text" Text "The text to search for in the paths and tags of entries."
+      :> OptionalParamDesc "sort-field" (Sort, Direction) "Sort the entries inside each directory."
       :> OptionalParams "filter" Filter
       :> Get '[JSON] (Maybe Directory)
 
     :<|> "rename"
-      :> QueryFlag     "dry-run"
-      :> RequiredParam "old-path" Path
-      :> RequiredParam "new-path" Path
+      :> QueryFlag "dry-run"
+      :> RequiredParamDesc "old-path" Path "The path of the directory or entry to be moved."
+      :> RequiredParamDesc "new-path" Path "The path to move the directory or entry to."
       :> QueryFlag     "force"
-      :> Post '[JSON] [(EntryPath, EntryPath)]
+      :> Post '[JSON] [CopiedEntry]
 
     :<|> "copy"
-      :> QueryFlag     "dry-run"
-      :> RequiredParam "old-path" Path
-      :> RequiredParam "new-path" Path
-      :> QueryFlag     "force"
-      :> Post '[JSON] [(EntryPath, EntryPath)]
+      :> QueryFlag "dry-run"
+      :> RequiredParamDesc "old-path" Path "The path of the directory or entry to be copied."
+      :> RequiredParamDesc "new-path" Path "The path to copy the directory or entry to."
+      :> QueryFlag "force"
+      :> Post '[JSON] [CopiedEntry]
 
     :<|> "delete"
-      :> QueryFlag     "dry-run"
-      :> RequiredParam "path" Path
-      :> QueryFlag     "recursive"
+      :> QueryFlag "dry-run"
+      :> RequiredParamDesc "path" Path "The path of the entry or directory to delete."
+      :> QueryFlag "recursive"
       :> DeleteNoContent
 
     :<|> "tag"
-      :> RequiredParam "path" EntryPath
-      :> RequiredParam "tag" EntryTag
       :>
-        (    Post   '[JSON] Entry
-        :<|> Delete '[JSON] Entry
+        (
+          RequiredParamDesc "path" EntryPath "The path of the entry to add a tag to."
+          :> RequiredParamDesc "tag" EntryTag "The name of the tag to add."
+          :> Post '[JSON] Entry
+        :<|>
+          RequiredParamDesc "path" EntryPath "The path of the entry to delete a tag from."
+          :> RequiredParamDesc "tag" EntryTag "The name of the tag to delete."
+          :> Delete '[JSON] Entry
         )
     )
 
-newtype Token = Token { getToken :: Text }
-  deriving stock (Eq, Ord, Show, Generic)
-
-type RequiredParam  = QueryParam' [Required, Strict]
-type OptionalParam  = QueryParam
+type RequiredHeaderDesc name ty desc = Header' [Required, Strict, Description desc] name ty
+type RequiredParamDesc name ty desc = QueryParam' [Required, Strict, Description desc] name ty
+type OptionalParamDesc name ty desc = QueryParam' [Optional, Strict, Description desc] name ty
 type OptionalParams = QueryParams
