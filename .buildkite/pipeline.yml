@@ -58,7 +58,7 @@ steps:
       - "result/bin/coffer"
 
   - label: xrefcheck
-    command: nix run -f ci.nix xrefcheck -c xrefcheck --no-progress -m full --ignored tests/golden/helpers
+    command: nix run -f ci.nix xrefcheck -c xrefcheck
 
   - label: REUSE lint
     command: nix run -f ci.nix pkgs.reuse -c reuse lint
