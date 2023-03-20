@@ -7,16 +7,16 @@ steps:
     command: nix-build ci.nix -A trailing-whitespace-check
 
   - label: shellcheck
-    command: nix run -f ci.nix pkgs.shellcheck -c find . -name '*.sh' -exec shellcheck {} +
+    command: nix shell -f ci.nix pkgs.shellcheck -c find . -name '*.sh' -exec shellcheck {} +
 
   - label: validate cabal files
-    command: nix run -f ci.nix stack2cabal pkgs.diffutils -c ./scripts/validate-cabal-files.sh
+    command: nix shell -f ci.nix stack2cabal pkgs.diffutils -c ./scripts/validate-cabal-files.sh
 
   - label: stylish
-    command: nix run -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
+    command: nix shell -f ci.nix pkgs.gnumake pkgs-stylish.stylish-haskell -c ./scripts/validate-stylish.sh
 
   - label: lint
-    command: nix run -f ci.nix pkgs.haskellPackages.hlint -c hlint .
+    command: nix shell -f ci.nix pkgs.haskellPackages.hlint -c hlint .
 
   - label: build
     key: build
@@ -44,7 +44,7 @@ steps:
     depends_on: build
     commands:
       - export PATH=$(nix-build ci.nix -A project.coffer.components.exes.coffer --no-out-link)/bin:$PATH
-      - nix run
+      - nix shell
           -f ci.nix pkgs.vault pkgs.bats
           -c ./scripts/run-bats-tests.sh
 
@@ -58,10 +58,10 @@ steps:
       - "result/bin/coffer"
 
   - label: xrefcheck
-    command: nix run -f ci.nix xrefcheck -c xrefcheck
+    command: nix shell -f ci.nix xrefcheck -c xrefcheck
 
   - label: REUSE lint
-    command: nix run -f ci.nix pkgs.reuse -c reuse lint
+    command: nix shell -f ci.nix pkgs.reuse -c reuse lint
 
   - label: weeder
     depends_on: build
