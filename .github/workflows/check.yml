@@ -9,7 +9,7 @@ jobs:
   general-checks:
     runs-on: [self-hosted, nix]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: check trailing whitespaces
         run: nix-build ci.nix -A trailing-whitespace-check
@@ -41,7 +41,7 @@ jobs:
   build:
     runs-on: [self-hosted, nix]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: build
         run: nix-build ci.nix -A lib -A cli -A server
@@ -54,7 +54,7 @@ jobs:
     runs-on: [self-hosted, nix]
     needs: build
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'true'
 
