@@ -196,7 +196,7 @@ below for end-of-line comments.
   - You *should* comment every top-level function.
 
 You *must* use [Haddock
-syntax](https://haskell-haddock.readthedocs.io/en/latest/markup.html#markup) in the comments.
+syntax](https://haskell-haddock.readthedocs.io/latest/markup.html#markup) in the comments.
 
 Example:
 
@@ -373,7 +373,7 @@ are partial functions.
 
 As usual, separate type classes with `, ` (comma and a space).
 
-You *should* specify explicit [deriving strategies](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/deriving_strategies.html) in all `deriving` clauses.
+You *should* specify explicit [deriving strategies](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/deriving_strategies.html) in all `deriving` clauses.
 The `-Wmissing-deriving-strategies ` warning (available since GHC-8.8.1) can help you enforce this rule on CI.
 
 ### Function declaration
@@ -392,7 +392,7 @@ You *should* avoid overly general signatures for functions that are actually
 used with only one type for each parameter. If you need the polymorhic version
 (i.e. if you are instantiating it more than once or if you are writing a
 library), you *may* use GHC's [`SPECIALIZE`
-pragma](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/pragmas.html#specialize-pragma).
+pragma](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/pragmas.html#specialize-pragma).
 
 You *should* omit parentheses if you have only one constraint.
 

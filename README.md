@@ -67,7 +67,7 @@ $ stack run coffer-server -- --port=8081
 
 ### Nix
 
-This is the preffered way, install Nix according to the [Nix download page](https://nixos.org/download.html "nix download"). Then execute:
+This is the preffered way, install Nix according to the [Nix download page](https://nixos.org/download/ "nix download"). Then execute:
 
 ```shell
 $ nix develop --extra-experimental-features 'nix-command flakes'
